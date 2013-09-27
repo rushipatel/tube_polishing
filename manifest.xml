@@ -1,0 +1,27 @@
+<package>
+  <description brief="tube_pilishing">
+
+     tube_polishing
+
+  </description>
+  <author>Rushi</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://github.com/rushipatel/tube_polishing</url>
+  <depend package="arm_navigation_msgs"/>
+  <depend package="kinematics_msgs"/>
+  <depend package="actionlib_msgs"/>
+  <depend package="actionlib"/>
+  <depend package="pr2_controllers_msgs"/>
+  <depend package="actionlib"/>
+  <depend package="roscpp"/>
+  <depend package="joint_trajectory_action"/>
+  <depend package="geometry_msgs"/>
+  <depend package="tf"/>
+  <depend package="pr2_arm_navigation_filtering"/>
+  <depend package="tabletop_object_detector"/>
+  <platform os="ubuntu" version="9.04"/>
+  <platform os="ubuntu" version="9.10"/>
+  <platform os="ubuntu" version="10.04"/>
+
+</package>

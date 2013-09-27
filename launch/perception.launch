@@ -1,0 +1,8 @@
+<launch> 
+  
+  <arg name="flatten_table" default="false"/>
+ 
+ <!-- tabletop segmentation and object recognition -->
+  <include file="$(find tabletop_object_detector)/launch/tabletop_segmentation.launch">
+  </include>
+</launch>
