@@ -1,4 +1,0 @@
-<launch>
-  <include file="$(find pr2_machine)/$(env ROBOT).machine" />  
-  <include file="$(find dualArms)/launch/trajectory_filter.launch"/>
-</launch>

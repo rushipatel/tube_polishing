@@ -32,6 +32,8 @@ public:
     dualArms(ros::NodeHandle& rh);
     bool genTrajectory();
     bool executeJointTrajectory();
+    bool moveRightArm(geometry_msgs::Pose pose);
+    bool moveLeftArm(geometry_msgs::Pose pose);
 private:
     TrajClient* traj_client_r_; /*!< Right arm trajectory action client. */
     TrajClient* traj_client_l_; /*!< Left arm trajectory action client. */

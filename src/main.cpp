@@ -9,6 +9,7 @@
 #include <tabletop_object_detector/TabletopSegmentation.h>
 #include <stdio.h>
 #include "dualArms.h"
+#include "robotHead.h"
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
 
@@ -46,7 +47,7 @@ void rotateAroundCenter(ros::NodeHandle rh)
         tfToPose(tfBaseObj, pose);
         dual_arms.objPoseTraj.poses.push_back(pose);
     }
-    for(double i=45; i>=-45; i-=1)
+    /*for(double i=45; i>=-45; i-=1)
     {
         tfBaseObj.setRotation(tf::Quaternion(i*M_PI/180,0,0));
         tfToPose(tfBaseObj, pose);
@@ -75,7 +76,7 @@ void rotateAroundCenter(ros::NodeHandle rh)
         tfBaseObj.setRotation(tf::Quaternion(0,0,i*M_PI/180));
         tfToPose(tfBaseObj, pose);
         dual_arms.objPoseTraj.poses.push_back(pose);
-    }
+    }*/
 
     /*for(int i=0; i<dual_arms.objPoseTraj.poses.size(); i++)
     {
@@ -86,7 +87,6 @@ void rotateAroundCenter(ros::NodeHandle rh)
         ROS_ERROR("IK Failed");
     else
         dual_arms.executeJointTrajectory();
-
 
 }
 
@@ -104,9 +104,31 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    rotateAroundCenter(rh);
+    //rotateAroundCenter(rh);
+    geometry_msgs::Pose pose;
+    pose.position.x = 0.1;
+    pose.position.y = -0.6;
+    pose.position.z = 0.8;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
+    dualArms dual_arms(rh);
+    dual_arms.moveRightArm(pose);
 
-    /*tabletop_object_detector::TabletopSegmentation seg_srv;
+    pose.position.x = 0.1;
+    pose.position.y = 0.6;
+    pose.position.z = 0.8;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
+    dual_arms.moveLeftArm(pose);
+
+    robotHead pr2_head;
+    pr2_head.lookAt(1.0,0.0,0.5);
+
+    tabletop_object_detector::TabletopSegmentation seg_srv;
     if(seg_srv_client.call(seg_srv))
     {
         if(seg_srv.response.result==seg_srv.response.SUCCESS)
@@ -115,10 +137,9 @@ int main(int argc, char **argv)
         }
         else
             ROS_ERROR("Segmentation service returned error %d", seg_srv.response.result);
-
     }
     else
-        ROS_ERROR("Call to segmentation service failed");*/
+        ROS_ERROR("Call to segmentation service failed");
 
   ros::shutdown();
 }
