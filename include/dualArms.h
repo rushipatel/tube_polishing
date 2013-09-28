@@ -19,7 +19,7 @@ typedef actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryActio
 
 /*! \brief Class to move both hands in sync for graspped object by both hands. 
  *
- *  This class takes in offset in transforms for both ahnds and pose array as objPoseTraj.
+ *  This class takes in offset in transforms for both hands and objPoseTraj as pose array.
  *  It generates joint trajectory for both hands using GetconstraintAwarePositionIK service 
  *  and executes both trajectory in synchronized fashion.
  */

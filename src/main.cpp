@@ -1,13 +1,16 @@
 #include <ros/ros.h>
 #include <kinematics_msgs/GetKinematicSolverInfo.h>
 #include <kinematics_msgs/GetConstraintAwarePositionIK.h>
+#include <arm_navigation_msgs/PlanningScene.h>
+#include <arm_navigation_msgs/SetPlanningSceneDiff.h>
 #include <tf/tf.h>
 #include <pr2_controllers_msgs/JointTrajectoryAction.h>
 #include <pr2_controllers_msgs/JointTrajectoryActionGoal.h>
 #include <tabletop_object_detector/TabletopSegmentation.h>
 #include <stdio.h>
 #include "dualArms.h"
-#define NAME_OF_SEGMENTATION_SRV "/tabletop_segmentation"
+#define SEGMENTATION_SRV "/tabletop_segmentation"
+#define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
 
 
 void tfToPose(tf::Transform &tf, geometry_msgs::Pose &pose )
@@ -80,7 +83,7 @@ void rotateAroundCenter(ros::NodeHandle rh)
         ROS_INFO("Pose No. %d Origin = %f %f %f",i,pose.position.x, pose.position.y, pose.position.z);
     }*/
     if(!dual_arms.genTrajectory())
-        ROS_ERROR("get_collosion_free_ik.cpp: IK Failed");
+        ROS_ERROR("IK Failed");
     else
         dual_arms.executeJointTrajectory();
 
@@ -91,10 +94,19 @@ int main(int argc, char **argv)
 {
     ros::init (argc, argv, "get_ik");
     ros::NodeHandle rh;
-    ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(NAME_OF_SEGMENTATION_SRV);
+    ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
+    ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
+    arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
+    arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
+    if(!set_planning_scene_diff_client.call(planning_scene_req, planning_scene_res))
+    {
+        ROS_WARN("Can't get planning scene");
+        return -1;
+    }
+
     rotateAroundCenter(rh);
 
-    tabletop_object_detector::TabletopSegmentation seg_srv;
+    /*tabletop_object_detector::TabletopSegmentation seg_srv;
     if(seg_srv_client.call(seg_srv))
     {
         if(seg_srv.response.result==seg_srv.response.SUCCESS)
@@ -106,7 +118,7 @@ int main(int argc, char **argv)
 
     }
     else
-        ROS_ERROR("Call to segmentation service failed");
+        ROS_ERROR("Call to segmentation service failed");*/
 
   ros::shutdown();
 }
