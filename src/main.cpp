@@ -7,6 +7,8 @@
 #include <pr2_controllers_msgs/JointTrajectoryAction.h>
 #include <pr2_controllers_msgs/JointTrajectoryActionGoal.h>
 #include <tabletop_object_detector/TabletopSegmentation.h>
+#include <tabletop_object_detector/Table.h>
+#include <sensor_msgs/PointCloud.h>
 #include <stdio.h>
 #include "dualArms.h"
 #include "robotHead.h"
@@ -92,7 +94,7 @@ void rotateAroundCenter(ros::NodeHandle rh)
 
 int main(int argc, char **argv)
 {
-    ros::init (argc, argv, "get_ik");
+    ros::init (argc, argv, "tube_polishing");
     ros::NodeHandle rh;
     ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
     ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
@@ -103,7 +105,6 @@ int main(int argc, char **argv)
         ROS_WARN("Can't get planning scene");
         return -1;
     }
-
     //rotateAroundCenter(rh);
     geometry_msgs::Pose pose;
     pose.position.x = 0.1;

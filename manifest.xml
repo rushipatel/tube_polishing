@@ -20,6 +20,7 @@
   <depend package="tf"/>
   <depend package="pr2_arm_navigation_filtering"/>
   <depend package="tabletop_object_detector"/>
+  <depend package="sensor_msgs"/>
   <platform os="ubuntu" version="9.04"/>
   <platform os="ubuntu" version="9.10"/>
   <platform os="ubuntu" version="10.04"/>
