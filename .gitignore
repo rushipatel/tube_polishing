@@ -18,3 +18,12 @@ moc_*.cpp
 qrc_*.cpp
 Makefile
 *-build-*
+*.user
+.cmake
+.cbp
+CMakeCache.txt
+build/*
+build/*/*
+build/*/*/*
+build/*/*/*/*
+*.*~
