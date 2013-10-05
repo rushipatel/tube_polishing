@@ -1,0 +1,19 @@
+<launch>
+  
+  <!-- load pr2_empty_world -->
+  <include file="$(find pr2_gazebo)/launch/pr2_table_object.launch" />
+  
+  <!-- load both_arm_navigation -->
+  <include file="$(find pr2_3dnav)/both_arms_navigation.launch"/>
+
+  <!-- load trajectory_unnormalize -->
+  <include file="$(find trajectory_filter_server)/launch/trajectory_unnormalize.launch"/>
+
+  <!-- load perception for segmentation service -->
+  <include file="$(find tube_polishing)/launch/perception.launch"/>
+  
+  <!-- pr2_interactive_manipulation for rviz -->
+  <include file="$(find pr2_interactive_manipulation)/launch/pr2_interactive_manipulation_desktop.launch"/>
+
+</launch>
+

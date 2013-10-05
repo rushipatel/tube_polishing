@@ -9,6 +9,8 @@
 #include <tabletop_object_detector/TabletopSegmentation.h>
 #include <tabletop_object_detector/Table.h>
 #include <sensor_msgs/PointCloud.h>
+#include <sensor_msgs/point_cloud_conversion.h>
+#include <pcl_ros/transforms.h>
 #include <stdio.h>
 #include "dualArms.h"
 #include "robotHead.h"
@@ -135,6 +137,15 @@ int main(int argc, char **argv)
         if(seg_srv.response.result==seg_srv.response.SUCCESS)
         {
             ROS_INFO("....OK....");
+            for(unsigned int i=0; i<seg_srv.response.clusters.size(); i++)
+            {
+                sensor_msgs::PointCloud pc;
+                pc = seg_srv.response.clusters[i];
+                sensor_msgs::PointCloud2 pc2;
+                sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
+                ROS_INFO("Hight: %f     Width: %f",pc2.height, pc2.width);
+            }
+
         }
         else
             ROS_ERROR("Segmentation service returned error %d", seg_srv.response.result);
