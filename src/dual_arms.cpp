@@ -56,7 +56,7 @@ void dualArms::pose2tf(geometry_msgs::Pose &pose, tf::Transform &tf)
 /*! \brief Gets current joint angle from pr2 controller topics for initial IK seeds.
  *
  */
-void get_current_right_joint_angles_(double current_angles[7])
+void dualArms::get_current_right_joint_angles(double current_angles[7])
 {
     int i;
 
@@ -74,7 +74,7 @@ void get_current_right_joint_angles_(double current_angles[7])
 /*! \brief Gets current joint angle from pr2 controller topics for initial IK seeds.
  *
  */
-void get_current_left_joint_angles_(double current_angles[7])
+void dualArms::get_current_left_joint_angles(double current_angles[7])
 {
   int i;
 
@@ -388,7 +388,7 @@ bool dualArms::moveRightArm(geometry_msgs::Pose pose)
     ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_wrist_flex_joint");
     ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_wrist_roll_joint");
     ik_req.ik_request.ik_seed_state.joint_state.position.resize(7);
-    get_current_right_joint_angles_(crnt_joints);
+    dualArms::get_current_right_joint_angles(crnt_joints);
     for(unsigned int i=0; i<7; i++)
         ik_req.ik_request.ik_seed_state.joint_state.position[i] = crnt_joints[i];
     ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
@@ -455,7 +455,7 @@ bool dualArms::moveLeftArm(geometry_msgs::Pose pose)
     ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_wrist_flex_joint");
     ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_wrist_roll_joint");
     ik_req.ik_request.ik_seed_state.joint_state.position.resize(7);
-    get_current_left_joint_angles_(crnt_joints);
+    get_current_left_joint_angles(crnt_joints);
     for(unsigned int i=0; i<7; i++)
         ik_req.ik_request.ik_seed_state.joint_state.position[i] = crnt_joints[i];
     ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
@@ -533,7 +533,7 @@ bool dualArms::call_right_arm_gpik_(void)
     gpik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
     gpik_req.ik_request.ik_seed_state.joint_state.position.resize(response.kinematic_solver_info.joint_names.size());
     gpik_req.ik_request.ik_seed_state.joint_state.name = response.kinematic_solver_info.joint_names;
-    get_current_right_joint_angles_(last_right_joints);
+    dualArms::get_current_right_joint_angles(last_right_joints);
 
     for(unsigned int i=0; i<objPoseTraj.poses.size(); i++)
     {
@@ -604,7 +604,7 @@ bool dualArms::call_left_arm_gpik_(void)
     gpik_req.ik_request.ik_seed_state.joint_state.position.resize(response.kinematic_solver_info.joint_names.size());
     gpik_req.ik_request.ik_seed_state.joint_state.name = response.kinematic_solver_info.joint_names;
     //double joints[7];
-    get_current_left_joint_angles_(last_left_joints);
+    get_current_left_joint_angles(last_left_joints);
 
     for(unsigned int i=0; i<objPoseTraj.poses.size(); i++)
     {

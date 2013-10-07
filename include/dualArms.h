@@ -34,6 +34,8 @@ public:
     bool executeJointTrajectory();
     bool moveRightArm(geometry_msgs::Pose pose);
     bool moveLeftArm(geometry_msgs::Pose pose);
+    void get_current_right_joint_angles(double current_angles[7]);
+    void get_current_left_joint_angles(double current_angles[7]);
 private:
     TrajClient* traj_client_r_; /*!< Right arm trajectory action client. */
     TrajClient* traj_client_l_; /*!< Left arm trajectory action client. */

@@ -11,7 +11,9 @@
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <pcl_ros/transforms.h>
+#include <pcl_ros/io/pcd_io.h>
 #include <stdio.h>
+#include <Eigen/Eigen>
 #include "dualArms.h"
 #include "robotHead.h"
 #define SEGMENTATION_SRV "/tabletop_segmentation"
@@ -127,7 +129,11 @@ int main(int argc, char **argv)
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
     dual_arms.moveLeftArm(pose);
-
+    double j_val[7];
+    dual_arms.get_current_right_joint_angles(j_val);
+    ROS_INFO("Right: %f %f %f %f %f %f %f",j_val[0],j_val[1],j_val[2],j_val[3],j_val[4],j_val[5],j_val[6]);
+    dual_arms.get_current_left_joint_angles(j_val);
+    ROS_INFO("Left: %f %f %f %f %f %f %f",j_val[0],j_val[1],j_val[2],j_val[3],j_val[4],j_val[5],j_val[6]);
     robotHead pr2_head;
     pr2_head.lookAt(1.0,0.0,0.5);
 
@@ -143,7 +149,10 @@ int main(int argc, char **argv)
                 pc = seg_srv.response.clusters[i];
                 sensor_msgs::PointCloud2 pc2;
                 sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
-                ROS_INFO("Hight: %f     Width: %f",pc2.height, pc2.width);
+                ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
+                pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+                pcl::fromROSMsg(pc2,pcl_cloud);
+                pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/tube_3.pcd",pcl_cloud);
             }
 
         }

@@ -1,7 +1,7 @@
 <launch>
   
   <!-- load pr2_empty_world -->
-  <include file="$(find pr2_gazebo)/launch/pr2_table_object.launch" />
+  <include file="$(find tube_polishing)/launch/pr2_table_object.launch" />
   
   <!-- load both_arm_navigation -->
   <include file="$(find pr2_3dnav)/both_arms_navigation.launch"/>

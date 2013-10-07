@@ -1,0 +1,43 @@
+<robot
+  name="tube_2">
+  <link
+    name="tube_2">
+    <inertial>
+      <origin
+        < xyz="-0.063711 0.034096 -2.08770891199639E-18"
+        rpy="0 0 0" />
+      <mass
+        value="0.1" />
+      <inertia
+        ixx="0.000121083567497293"
+        ixy="8.26890445437284E-36"
+        ixz="0.000162779039309148"
+        iyy="4.54607584012298E-20"
+        iyz="-0.000624543104334262"
+        izz="3.82409726901845E-20" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="1.5707963267949 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_2/meshes/tube_2.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="1.5707963267949 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_2/meshes/tube_2.STL" />
+      </geometry>
+    </collision>
+  </link>
+</robot>
