@@ -12,6 +12,7 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_ros/io/pcd_io.h>
+#include <gazebo_msgs/SpawnModel.h>
 #include <stdio.h>
 #include <Eigen/Eigen>
 #include "dualArms.h"
@@ -102,6 +103,7 @@ int main(int argc, char **argv)
     ros::NodeHandle rh;
     ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
     ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
+    //ros::ServiceClient spawn_model_client = rh.serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_urdf_model");
     arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
     if(!set_planning_scene_diff_client.call(planning_scene_req, planning_scene_res))
@@ -109,7 +111,11 @@ int main(int argc, char **argv)
         ROS_WARN("Can't get planning scene");
         return -1;
     }
+    //ros::service::waitForService("/gazebo/spawn_urdf_model");
+
     //rotateAroundCenter(rh);
+
+    dualArms dual_arms(rh);
     geometry_msgs::Pose pose;
     pose.position.x = 0.1;
     pose.position.y = -0.6;
@@ -118,9 +124,7 @@ int main(int argc, char **argv)
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
-    dualArms dual_arms(rh);
     dual_arms.moveRightArm(pose);
-
     pose.position.x = 0.1;
     pose.position.y = 0.6;
     pose.position.z = 0.8;
@@ -129,13 +133,26 @@ int main(int argc, char **argv)
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
     dual_arms.moveLeftArm(pose);
-    double j_val[7];
-    dual_arms.get_current_right_joint_angles(j_val);
-    ROS_INFO("Right: %f %f %f %f %f %f %f",j_val[0],j_val[1],j_val[2],j_val[3],j_val[4],j_val[5],j_val[6]);
-    dual_arms.get_current_left_joint_angles(j_val);
-    ROS_INFO("Left: %f %f %f %f %f %f %f",j_val[0],j_val[1],j_val[2],j_val[3],j_val[4],j_val[5],j_val[6]);
+
     robotHead pr2_head;
     pr2_head.lookAt(1.0,0.0,0.5);
+
+//    gazebo_msgs::SpawnModelRequest spawn_req;
+//    gazebo_msgs::SpawnModelResponse spawn_res;
+//    spawn_req.model_name = "tube_2";
+//    spawn_req.model_xml = "home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/models/tube_2/robots/tube_2.urdf";
+//    spawn_req.reference_frame = "/base_link";
+//    spawn_req.robot_namespace = "tube_models";
+
+//    if(spawn_model_client.call(spawn_req,spawn_res))
+//    {
+//        if(spawn_res.success)
+//            ROS_INFO("Spawn model successful");
+//        else
+//            ROS_WARN("Couldn't spawn model");
+//    }
+//    else
+//        ROS_WARN("Spawn model service call failed");
 
     tabletop_object_detector::TabletopSegmentation seg_srv;
     if(seg_srv_client.call(seg_srv))
@@ -152,7 +169,7 @@ int main(int argc, char **argv)
                 ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
                 pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
                 pcl::fromROSMsg(pc2,pcl_cloud);
-                pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/tube_3.pcd",pcl_cloud);
+                pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/tube_2.pcd",pcl_cloud);
             }
 
         }

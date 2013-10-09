@@ -4,17 +4,17 @@
     name="tube_2">
     <inertial>
       <origin
-        xyz="-0.063711 0.034096 -2.08770891199639E-18"
+        xyz="-0.063942 0.033865 0.02"
         rpy="0 0 0" />
       <mass
-        value="0.1" />
+        value="0.16822" />
       <inertia
-        ixx="0.000121083567497293"
-        ixy="8.26890445437284E-36"
-        ixz="0.000162779039309148"
-        iyy="4.54607584012298E-20"
-        iyz="-0.000624543104334262"
-        izz="3.82409726901845E-20" />
+        ixx="0.000621486547706431"
+        ixy="-0.000775304821598977"
+        ixz="3.55411547504954E-20"
+        iyy="0.00303826292077285"
+        iyz="5.1090026361141E-20"
+        izz="0.00359885427235475" />
     </inertial>
     <visual>
       <origin
@@ -22,12 +22,12 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://tube_polishing/data/models/tube_2/meshes/tube_2.STL" />
+          filename="package://tube_polishing/data/models/tube_2/meshes/tube_2.stl" />
       </geometry>
       <material
         name="">
         <color
-          rgba="0.79216 0.81961 0.93333 1" />
+          rgba="1 1 1 0.3" />
       </material>
     </visual>
     <collision>
@@ -36,8 +36,13 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://tube_polishing/data/models/tube_2/meshes/tube_2.STL" />
+          filename="package://tube_polishing/data/models/tube_2/meshes/tube_2.stl" />
       </geometry>
     </collision>
   </link>
 </robot>
+<gazebo reference="tube_2">
+  <static>false</static>
+      <gravity>true</gravity>
+    <allow_auto_disable>true</allow_auto_disable>
+</gazebo>

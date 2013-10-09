@@ -12,29 +12,21 @@
     <node name="gazebo_gui" pkg="gazebo" type="gui" respawn="false" output="screen"/>
   </group>
 
-  <include file="$(find pr2_gazebo)/launch/pr2.launch"/>
 
-  <!-- -J r_shoulder_pan_joint -1.75 -J r_shoulder_lift_joint 0.434 -J r_upper_arm_roll_joint -0.94 -J r_elbow_flex_joint -2.12 -J r_forearm_roll_joint -1.95 -J r_wrist_flex_joint -0.76 -J r_wrist_roll_joint -2.94 --> 
-  <!--include file="$(find pr2_controller_configuration_gazebo)/pr2_default_controllers.launch" /-->
-
-  <!-- spawn table and tabletop object-->
+   <!-- spawn table and tabletop object-->
   <param name="table_description" 
    command="$(find xacro)/xacro.py '$(find gazebo_worlds)/objects/table.urdf.xacro'" />
   <node name="spawn_table" pkg="gazebo" type="spawn_model" args="-urdf -param table_description -model table_1" 
    respawn="false" output="screen" />
 
-  <node name="spawn_object" pkg="gazebo" type="spawn_model" 
-   args="-urdf -file $(find tube_polishing)/data/models/tube_2/robots/tube_2.urdf -model object_1 -x 0.75 -z 0.6" 
-   respawn="false" output="screen"/>
+  <!-- node name="spawn_object" pkg="gazebo" type="spawn_model" 
+   args="-urdf -file $(find tube_polishing)/data/models/tube_2/robots/tube_2.urdf -model object_1 -x 0.7 -z 0.8" 
+   respawn="false" output="screen" / -->
 
   <!-- parameters that give you reasonable physics as well as good speed -->
   <!-- needed so that gripper joint stops on objects instead of oscillating forever -->
   <node name="sor_pgs_iters" pkg="dynamic_reconfigure" type="dynparam" args="set gazebo sor_pgs_iters 50"/>
   <node name="sor_pgs_w" pkg="dynamic_reconfigure" type="dynparam" args="set gazebo sor_pgs_w 1.0"/>
   <node name="time_step" pkg="dynamic_reconfigure" type="dynparam" args="set gazebo time_step 0.001"/>
-
-  <!--
-  <node name="move_pr2" pkg="pr2_gazebo" type="move_pr2"/>
-  -->
 
 </launch>

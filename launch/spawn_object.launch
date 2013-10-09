@@ -1,0 +1,7 @@
+ <launch>
+  
+  <node name="spawn_object" pkg="gazebo" type="spawn_model" 
+   args="-urdf -file $(find tube_polishing)/data/models/tube_2/robots/tube_2.urdf -model object_1 -x 0.75 -z 0.56" 
+   respawn="false" output="screen"/>
+   
+ </launch>
