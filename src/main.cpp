@@ -32,6 +32,48 @@ void tfToPose(tf::Transform &tf, geometry_msgs::Pose &pose )
     pose.orientation.w = tf.getRotation().getW();
 }
 
+void write_kinect_output(ros::NodeHandle &nh)
+{
+    sensor_msgs::PointCloud2::ConstPtr recent_cloud = ros::topic::waitForMessage<sensor_msgs::PointCloud2>("head_mount_kinect/depth/points", nh, ros::Duration(3.0));
+    tf::TransformListener listener_;
+    if (!recent_cloud)
+        ROS_ERROR("no point_cloud2 has been received");
+
+    //convert cloud to processing_frame_ (usually base_link)
+    sensor_msgs::PointCloud old_cloud;
+    sensor_msgs::PointCloud2 converted_cloud;
+    sensor_msgs::convertPointCloud2ToPointCloud (*recent_cloud, old_cloud);
+    int current_try=0, max_tries = 3;
+    while (1)
+    {
+        bool transform_success = true;
+        try
+        {
+            listener_.transformPointCloud("base_link", old_cloud, old_cloud);
+        }
+        catch (tf::TransformException ex)
+        {
+            transform_success = false;
+            if (++current_try >= max_tries)
+            {
+                ROS_ERROR("Failed to transform cloud from frame %s into frame %s in %d attempt(s)", old_cloud.header.frame_id.c_str(),"base_link", current_try);
+                break;
+            }
+            ROS_DEBUG("Failed to transform point cloud, attempt %d out of %d, exception: %s", current_try, max_tries, ex.what());
+            //sleep a bit to give the listener a chance to get a new transform
+            ros::Duration(0.1).sleep();
+        }
+        if (transform_success) break;
+        sensor_msgs::convertPointCloudToPointCloud2 (old_cloud, converted_cloud);
+        ROS_INFO_STREAM("Input cloud converted to " << "/base_link" << " frame after " );
+    }
+
+    pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+    pcl::fromROSMsg(converted_cloud,pcl_cloud);
+    pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/kinect_tube_2.pcd",pcl_cloud);
+    ROS_INFO("Kinect output has been written");
+}
+
 void rotateAroundCenter(ros::NodeHandle rh)
 {
     dualArms dual_arms(rh);
@@ -101,6 +143,7 @@ int main(int argc, char **argv)
 {
     ros::init (argc, argv, "tube_polishing");
     ros::NodeHandle rh;
+
     ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
     ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
     //ros::ServiceClient spawn_model_client = rh.serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_urdf_model");
@@ -135,7 +178,7 @@ int main(int argc, char **argv)
     dual_arms.moveLeftArm(pose);
 
     robotHead pr2_head;
-    pr2_head.lookAt(1.0,0.0,0.5);
+    pr2_head.lookAt(0.75,0.0,0.5);
 
 //    gazebo_msgs::SpawnModelRequest spawn_req;
 //    gazebo_msgs::SpawnModelResponse spawn_res;
@@ -153,31 +196,32 @@ int main(int argc, char **argv)
 //    }
 //    else
 //        ROS_WARN("Spawn model service call failed");
+    write_kinect_output(rh);
+//    tabletop_object_detector::TabletopSegmentation seg_srv;
+//    if(seg_srv_client.call(seg_srv))
+//    {
+//        if(seg_srv.response.result==seg_srv.response.SUCCESS)
+//        {
+//            ROS_INFO("....OK....");
+//            for(unsigned int i=0; i<seg_srv.response.clusters.size(); i++)
+//            {
+//                sensor_msgs::PointCloud pc;
+//                pc = seg_srv.response.clusters[i];
+//                sensor_msgs::PointCloud2 pc2;
+//                sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
+//                ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
+//                pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+//                pcl::fromROSMsg(pc2,pcl_cloud);
+//                write_kinect_output(rh);
+//                //pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/tube_2.pcd",pcl_cloud);
+//            }
 
-    tabletop_object_detector::TabletopSegmentation seg_srv;
-    if(seg_srv_client.call(seg_srv))
-    {
-        if(seg_srv.response.result==seg_srv.response.SUCCESS)
-        {
-            ROS_INFO("....OK....");
-            for(unsigned int i=0; i<seg_srv.response.clusters.size(); i++)
-            {
-                sensor_msgs::PointCloud pc;
-                pc = seg_srv.response.clusters[i];
-                sensor_msgs::PointCloud2 pc2;
-                sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
-                ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
-                pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
-                pcl::fromROSMsg(pc2,pcl_cloud);
-                pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/tube_2.pcd",pcl_cloud);
-            }
-
-        }
-        else
-            ROS_ERROR("Segmentation service returned error %d", seg_srv.response.result);
-    }
-    else
-        ROS_ERROR("Call to segmentation service failed");
-
-  ros::shutdown();
+//        }
+//        else
+//            ROS_ERROR("Segmentation service returned error %d", seg_srv.response.result);
+//    }
+//    else
+//        ROS_ERROR("Call to segmentation service failed");
+  ros::spin();
+  //ros::shutdown();
 }
