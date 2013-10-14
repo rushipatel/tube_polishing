@@ -420,7 +420,7 @@ tf::Transform getPlaneTransform (pcl::ModelCoefficients coeffs, double up_direct
     if ( z.dot( tf::Vector3(0, 0, up_direction) ) < 0)
     {
       z = -1.0 * z;
-      ROS_INFO("flipped z");
+      ROS_INFO("flippedPointCloud z");
     }
   }
     
@@ -743,7 +743,7 @@ void TabletopSegmentor::processCloud(const sensor_msgs::PointCloud2 &cloud,
     seg_.setInputCloud (cloud_downsampled_ptr);
     seg_.setInputNormals (cloud_normals_ptr);
     seg_.segment (*table_inliers_ptr, *table_coefficients_ptr);
- 
+
     if (table_coefficients_ptr->values.size () <=3)
     {
       ROS_INFO("Failed to detect table in scan");
@@ -888,8 +888,8 @@ void TabletopSegmentor::processCloud(const sensor_msgs::PointCloud2 &cloud,
 
   // Step 6: Split the objects into Euclidean clusters
   std::vector<pcl::PointIndices> clusters2;
-  //pcl_cluster_.setInputCloud (cloud_objects_ptr);
-  pcl_cluster_.setInputCloud (cloud_objects_downsampled_ptr);
+  pcl_cluster_.setInputCloud (cloud_objects_ptr);
+  //pcl_cluster_.setInputCloud (cloud_objects_downsampled_ptr);
   pcl_cluster_.extract (clusters2);
   ROS_INFO ("Number of clusters found matching the given constraints: %d.", (int)clusters2.size ());
 

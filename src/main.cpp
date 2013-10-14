@@ -10,13 +10,16 @@
 #include <tabletop_object_detector/Table.h>
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/point_cloud_conversion.h>
+#include <pcl/pcl_base.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_ros/io/pcd_io.h>
+#include <pcl/visualization/cloud_viewer.h>
 #include <gazebo_msgs/SpawnModel.h>
 #include <stdio.h>
 #include <Eigen/Eigen>
 #include "dualArms.h"
 #include "robotHead.h"
+
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
 
@@ -180,48 +183,37 @@ int main(int argc, char **argv)
     robotHead pr2_head;
     pr2_head.lookAt(0.75,0.0,0.5);
 
-//    gazebo_msgs::SpawnModelRequest spawn_req;
-//    gazebo_msgs::SpawnModelResponse spawn_res;
-//    spawn_req.model_name = "tube_2";
-//    spawn_req.model_xml = "home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/models/tube_2/robots/tube_2.urdf";
-//    spawn_req.reference_frame = "/base_link";
-//    spawn_req.robot_namespace = "tube_models";
+    //write_kinect_output(rh);
+    tabletop_object_detector::TabletopSegmentation seg_srv;
+    if(seg_srv_client.call(seg_srv))
+    {
+        if(seg_srv.response.result==seg_srv.response.SUCCESS)
+        {
+            ROS_INFO("....OK....");
+            for(unsigned int i=0; i<seg_srv.response.clusters.size(); i++)
+            {
+                sensor_msgs::PointCloud pc;
+                pc = seg_srv.response.clusters[i];
+                sensor_msgs::PointCloud2 pc2;
+                sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
+                ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
+                pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+                pcl::fromROSMsg(pc2,pcl_cloud);
+                //write_kinect_output(rh);
+                pcl::io::savePCDFileASCII("/home/rushi/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/tube_2.pcd",pcl_cloud);
+                pcl::visualization::CloudViewer cloud_viewer("simple_cloud_viewer");
+                pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_ptr;
+                pcl_cloud_ptr = pcl_cloud.makeShared();
+                cloud_viewer.showCloud(pcl_cloud_ptr);
+                while(!cloud_viewer.wasStopped()){}
+            }
 
-//    if(spawn_model_client.call(spawn_req,spawn_res))
-//    {
-//        if(spawn_res.success)
-//            ROS_INFO("Spawn model successful");
-//        else
-//            ROS_WARN("Couldn't spawn model");
-//    }
-//    else
-//        ROS_WARN("Spawn model service call failed");
-    write_kinect_output(rh);
-//    tabletop_object_detector::TabletopSegmentation seg_srv;
-//    if(seg_srv_client.call(seg_srv))
-//    {
-//        if(seg_srv.response.result==seg_srv.response.SUCCESS)
-//        {
-//            ROS_INFO("....OK....");
-//            for(unsigned int i=0; i<seg_srv.response.clusters.size(); i++)
-//            {
-//                sensor_msgs::PointCloud pc;
-//                pc = seg_srv.response.clusters[i];
-//                sensor_msgs::PointCloud2 pc2;
-//                sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
-//                ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
-//                pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
-//                pcl::fromROSMsg(pc2,pcl_cloud);
-//                write_kinect_output(rh);
-//                //pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/tube_2.pcd",pcl_cloud);
-//            }
-
-//        }
-//        else
-//            ROS_ERROR("Segmentation service returned error %d", seg_srv.response.result);
-//    }
-//    else
-//        ROS_ERROR("Call to segmentation service failed");
-  ros::spin();
-  //ros::shutdown();
+        }
+        else
+            ROS_ERROR("Segmentation service returned error %d", seg_srv.response.result);
+    }
+    else
+        ROS_ERROR("Call to segmentation service failed");
+  //ros::spin();
+  ros::shutdown();
 }
