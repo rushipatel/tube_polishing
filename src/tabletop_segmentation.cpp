@@ -256,7 +256,7 @@ bool TabletopSegmentor::serviceCallback(TabletopSegmentation::Request &request,
 
   //add the timestamp from the original cloud
   response.table.pose.header.stamp = recent_cloud->header.stamp;
-  for(size_t i=0; i<response.clusters.size(); i++)
+  for(size_t i; i<response.clusters.size(); i++)
   {
     response.clusters[i].header.stamp = recent_cloud->header.stamp;
   }
@@ -888,8 +888,8 @@ void TabletopSegmentor::processCloud(const sensor_msgs::PointCloud2 &cloud,
 
   // Step 6: Split the objects into Euclidean clusters
   std::vector<pcl::PointIndices> clusters2;
-  pcl_cluster_.setInputCloud (cloud_objects_ptr);
-  //pcl_cluster_.setInputCloud (cloud_objects_downsampled_ptr);
+  //pcl_cluster_.setInputCloud (cloud_objects_ptr);
+  pcl_cluster_.setInputCloud (cloud_objects_downsampled_ptr);
   pcl_cluster_.extract (clusters2);
   ROS_INFO ("Number of clusters found matching the given constraints: %d.", (int)clusters2.size ());
 

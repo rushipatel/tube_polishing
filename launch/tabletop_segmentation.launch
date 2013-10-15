@@ -1,13 +1,17 @@
 <launch>
 
+    <!-- Original -->
+    <!--arg name="tabletop_segmentation_points_in" default="narrow_stereo_textured/points2" /-->
     <arg name="tabletop_segmentation_points_in" default="head_mount_kinect/depth/points" />
     <arg name="tabletop_segmentation_convert_to_base_link" default="true" />
     <arg name="tabletop_segmentation_clustering_voxel_size" default="0.003" />
     <arg name="flatten_table" default="false"/>
     <arg name="table_padding" default="0.02"/>
 
-    <node pkg="tube_polishing" name="tabletop_segmentation" type="tabletop_segmentation" respawn="true" output="screen">
-	<!--topic remapping-->
+    <!--node pkg="tube_polishing" name="tube_tabletop_segmentation" type="tube_tabletop_segmentation" respawn="true" output="screen"-->
+    <!-- Original-->
+    <node pkg="tabletop_object_detector" name="tabletop_segmentation" type="tabletop_segmentation" respawn="true" output="screen">
+	  <!--topic remapping-->
         <remap from="cloud_in" to="$(arg tabletop_segmentation_points_in)" />
         <remap from="segmentation_srv" to="tabletop_segmentation" />
         <remap from="markers_out" to="tabletop_segmentation_markers" />
