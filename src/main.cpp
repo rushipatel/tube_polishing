@@ -22,6 +22,9 @@
 #include <pcl_ros/transforms.h>
 #include <pcl_ros/io/pcd_io.h>
 #include <pcl/visualization/cloud_viewer.h>
+#include <pcl/octree/octree_search.h>
+
+#include <pcl/sample_consensus/sac_model_circle.h>
 
 #include <gazebo_msgs/SpawnModel.h>
 #include <stdio.h>
@@ -43,6 +46,55 @@ void tfToPose(tf::Transform &tf, geometry_msgs::Pose &pose )
     pose.orientation.y = tf.getRotation().getY();
     pose.orientation.z = tf.getRotation().getZ();
     pose.orientation.w = tf.getRotation().getW();
+}
+void generate_normal_marker(pcl::PointCloud<pcl::PointXYZ >::Ptr points, pcl::PointCloud<pcl::Normal>::Ptr normals, visualization_msgs::MarkerArray::Ptr markers)
+{
+    if(points->points.size()!=normals->points.size())
+    {
+        ROS_ERROR("Size of Points and Normals is different. May be both are not from same dataset");
+        return;
+    }
+
+    visualization_msgs::Marker marker;
+    geometry_msgs::Point p;
+
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.lifetime = ros::Duration();
+
+    marker.type = visualization_msgs::Marker::ARROW;
+    marker.scale.x = 0.001;
+    marker.scale.y = 0.0015;
+    marker.scale.z = 0.001;
+
+    marker.color.r = ((double)rand())/RAND_MAX;
+    marker.color.g = ((double)rand())/RAND_MAX;
+    marker.color.b = ((double)rand())/RAND_MAX;
+    marker.color.a = 1.0;
+
+    marker.header = points->header;
+
+    unsigned int marker_id=0;
+
+    for(int i=0; i<points->points.size(); i++)
+    {
+        p.x = points->points[i].x;
+        p.y = points->points[i].y;
+        p.z = points->points[i].z;
+
+        marker.points.push_back(p);
+
+        p.x += normals->points[i].normal_x/100;
+        p.y += normals->points[i].normal_y/100;
+        p.z += normals->points[i].normal_z/100;
+
+        marker.points.push_back(p);
+
+        marker.ns = "tube_polishing_node";
+
+        marker_id++;
+        marker.id = marker_id;
+        markers->markers.push_back(marker);
+    }
 }
 
 void write_kinect_output(ros::NodeHandle &nh)
@@ -83,24 +135,24 @@ void write_kinect_output(ros::NodeHandle &nh)
 
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     pcl::fromROSMsg(converted_cloud,pcl_cloud);
-    pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/kinect_tube_2.pcd",pcl_cloud);
+    pcl::io::savePCDFileASCII("~/home/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/kinect_tube_2.pcd",pcl_cloud);
     ROS_INFO("Kinect output has been written");
 }
 
-void runRANSAC(pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr, visualization_msgs::Marker& cloud_marker)
+void ransac_cylinder(pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud, visualization_msgs::MarkerArray::Ptr markers)
 {
     pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
     pcl::SACSegmentationFromNormals<pcl::PointXYZ, pcl::Normal> seg;
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ> ());
-    pcl::PointCloud<pcl::Normal>::Ptr tube_normals_ptr (new pcl::PointCloud<pcl::Normal>);
-    pcl::ModelCoefficients::Ptr coefficients_cylinder_ptr (new pcl::ModelCoefficients);
-    pcl::PointIndices::Ptr inliers_cylinder_ptr (new pcl::PointIndices);
+    pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
+    pcl::ModelCoefficients::Ptr coeff (new pcl::ModelCoefficients);
+    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
 
     // Estimate point normals
     ne.setSearchMethod (tree);
-    ne.setInputCloud (tube_cloud_ptr);
+    ne.setInputCloud (tube_cloud);
     ne.setKSearch (50);
-    ne.compute (*tube_normals_ptr);
+    ne.compute (*normals);
 
     // Create the segmentation object for cylinder segmentation and set all the parameters
     seg.setOptimizeCoefficients (true);
@@ -110,48 +162,77 @@ void runRANSAC(pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr, visualization
     seg.setMaxIterations (10000);
     seg.setDistanceThreshold (0.01);
     seg.setRadiusLimits (0.018, 0.022);
-    seg.setInputCloud (tube_cloud_ptr);
-    seg.setInputNormals (tube_normals_ptr);
+    seg.setInputCloud (tube_cloud);
+    seg.setInputNormals (normals);
+    seg.setDistanceFromOrigin(0.01);
 
     // Obtain the cylinder inliers and coefficients
-    seg.segment (*inliers_cylinder_ptr, *coefficients_cylinder_ptr);
-    std::cerr << "Cylinder coefficients: " << *coefficients_cylinder_ptr << std::endl;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cyl_out_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+    seg.segment (*inliers, *coeff);
+    std::cerr << "Cylinder coefficients: " << *coeff << std::endl;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::ExtractIndices<pcl::PointXYZ> extract;
 
-    extract.setInputCloud(tube_cloud_ptr);
-    extract.setIndices(inliers_cylinder_ptr);
+    extract.setInputCloud(tube_cloud);
+    extract.setIndices(inliers);
     extract.setNegative(false);
-    extract.filter(*cyl_out_cloud_ptr);
+    extract.filter(*cloud_out);
+
 
     //visualization_msgs::Marker cloud_marker;
-    cloud_marker.action = visualization_msgs::Marker::ADD;
-    cloud_marker.lifetime = ros::Duration();
+//    cloud_marker.action = visualization_msgs::Marker::ADD;
+//    cloud_marker.lifetime = ros::Duration();
 
-    cloud_marker.type = visualization_msgs::Marker::ARROW;
-    cloud_marker.scale.x = coefficients_cylinder_ptr->values[6]*2;
-    cloud_marker.scale.y = coefficients_cylinder_ptr->values[6]*2;
-    cloud_marker.scale.z = 0;
+//    cloud_marker.type = visualization_msgs::Marker::ARROW;
+//    cloud_marker.scale.x = coeff->values[6]*2;
+//    cloud_marker.scale.y = coeff->values[6]*2;
+//    cloud_marker.scale.z = 0;
 
-    cloud_marker.color.r = ((double)rand())/RAND_MAX;
-    cloud_marker.color.g = ((double)rand())/RAND_MAX;
-    cloud_marker.color.b = ((double)rand())/RAND_MAX;
-    cloud_marker.color.a = 1.0;
+//    cloud_marker.color.r = ((double)rand())/RAND_MAX;
+//    cloud_marker.color.g = ((double)rand())/RAND_MAX;
+//    cloud_marker.color.b = ((double)rand())/RAND_MAX;
+//    cloud_marker.color.a = 1.0;
 
-    cloud_marker.header = cyl_out_cloud_ptr->header;
-    geometry_msgs::Point p;
-    p.x = coefficients_cylinder_ptr->values[0];
-    p.y = coefficients_cylinder_ptr->values[1];
-    p.z = coefficients_cylinder_ptr->values[2];
-    cloud_marker.points.push_back(p);
-    p.x = coefficients_cylinder_ptr->values[0]+coefficients_cylinder_ptr->values[3];
-    p.y = coefficients_cylinder_ptr->values[1]+coefficients_cylinder_ptr->values[4];
-    p.z = coefficients_cylinder_ptr->values[2]+coefficients_cylinder_ptr->values[5];
-    cloud_marker.points.push_back(p);
-    cloud_marker.ns = "tube_polishing_node";
-    cloud_marker.id = 1;
+//    cloud_marker.header = cloud_out->header;
+//    geometry_msgs::Point p;
+//    p.x = coeff->values[0];
+//    p.y = coeff->values[1];
+//    p.z = coeff->values[2];
+//    cloud_marker.points.push_back(p);
+//    p.x = coeff->values[0]+coeff->values[3];
+//    p.y = coeff->values[1]+coeff->values[4];
+//    p.z = coeff->values[2]+coeff->values[5];
+//    cloud_marker.points.push_back(p);
+//    cloud_marker.ns = "tube_polishing_node";
+//    cloud_marker.id = 1;
 
-    ROS_INFO("Number of Inliers %d: ",cyl_out_cloud_ptr->points.size());
+    ROS_INFO("Number of Inliers %d: ",cloud_out->points.size());
+
+//    pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree(0.01);
+//    pcl::PointXYZ search_point;
+//    search_point.x = coeff->values[0];
+//    search_point.y = coeff->values[1];
+//    search_point.z = coeff->values[2];
+//    octree.setInputCloud(tube_cloud);
+//    octree.addPointsFromInputCloud();
+
+//    std::vector<int> neighbor_idx;
+//    std::vector<float> sqrt_dist;
+//    octree.nearestKSearch(search_point,50,neighbor_idx,sqrt_dist);
+
+//    ROS_INFO("Size of neighbour is: %d",neighbor_idx.size());
+
+//    pcl::PointCloud<pcl::PointXYZ>::Ptr neighbor_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+//    pcl::PointXYZ point;
+
+//    for(int i=0; i<neighbor_idx.size(); i++)
+//    {
+//        point.x = tube_cloud->points[neighbor_idx[i]].x;
+//        point.y = tube_cloud->points[neighbor_idx[i]].y;
+//        point.z = tube_cloud->points[neighbor_idx[i]].z;
+//        neighbor_cloud->points.push_back(point);
+//    }
+
+    generate_normal_marker(tube_cloud, normals, markers);
 
 }
 
@@ -227,7 +308,7 @@ int main(int argc, char **argv)
 
     ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
     ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
-    ros::Publisher marker_pub = rh.advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
+    ros::Publisher marker_pub = rh.advertise<visualization_msgs::MarkerArray>("tube_cylinder_markers", 10);
     //ros::ServiceClient spawn_model_client = rh.serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_urdf_model");
     arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
@@ -282,17 +363,17 @@ int main(int argc, char **argv)
                     ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
                     pcl::fromROSMsg(pc2,pcl_cloud);
                     //write_kinect_output(rh);
-                    pcl::io::savePCDFileASCII("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/tube_2.pcd",pcl_cloud);
+                    //pcl::io::savePCDFileASCII("../data/pcd_files/tube_2.pcd",pcl_cloud);
                     pcl::visualization::CloudViewer cloud_viewer("simple_cloud_viewer");
                     pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_ptr;
                     pcl_cloud_ptr = pcl_cloud.makeShared();
                     tube_cloud_ptr = pcl_cloud.makeShared();
                     cloud_viewer.showCloud(pcl_cloud_ptr);
-                    //while(!cloud_viewer.wasStopped()){}
+                    while(!cloud_viewer.wasStopped()){}
                 }
-                visualization_msgs::Marker m;
-                runRANSAC(pcl_cloud.makeShared(),m);
-                marker_pub.publish(m);
+                visualization_msgs::MarkerArray::Ptr ma (new visualization_msgs::MarkerArray);
+                ransac_cylinder(pcl_cloud.makeShared(),ma);
+                marker_pub.publish(ma);
             }
             else
                 ROS_ERROR("Segmentation service returned error %d", seg_srv.response.result);
