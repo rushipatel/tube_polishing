@@ -32,6 +32,7 @@
 
 #include "dualArms.h"
 #include "robotHead.h"
+#include "perception.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
@@ -102,48 +103,6 @@ void generate_normal_marker(pcl::PointCloud<pcl::PointXYZ >::Ptr points, pcl::Po
     markers = marker;
 }
 
-void experinmental_marker_pub(visualization_msgs::MarkerArray &marker_out)
-{
-    static unsigned int marker_id=0;
-    visualization_msgs::Marker marker;
-    geometry_msgs::Point p;
-
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.lifetime = ros::Duration();
-
-    marker.type = visualization_msgs::Marker::ARROW;
-    marker.scale.x = 0.001;
-    marker.scale.y = 0.0015;
-    marker.scale.z = 0.001;
-
-    marker.color.r = ((double)rand())/RAND_MAX;
-    marker.color.g = ((double)rand())/RAND_MAX;
-    marker.color.b = ((double)rand())/RAND_MAX;
-    marker.color.a = 1.0;
-
-    marker.header.frame_id = "/base_link";
-    marker.header.stamp = ros::Time::now();
-
-    p.x = 0.75;
-    p.y = 0.00;
-    p.z = 0.6;
-
-    marker.points.push_back(p);
-
-    p.x += 0.333/100;
-    p.y += 0.333/100;
-    p.z += 0.333/100;
-
-    marker.points.push_back(p);
-
-    marker.ns = "tube_polishing_node";
-
-    marker_id++;
-    marker.id = marker_id;
-    marker_out.markers.push_back(marker);
-
-}
-
 void write_kinect_output(ros::NodeHandle &nh)
 {
     sensor_msgs::PointCloud2::ConstPtr recent_cloud = ros::topic::waitForMessage<sensor_msgs::PointCloud2>("head_mount_kinect/depth/points", nh, ros::Duration(3.0));
@@ -186,6 +145,8 @@ void write_kinect_output(ros::NodeHandle &nh)
     ROS_INFO("Kinect output has been written");
 }
 
+
+
 void ransac_cylinder(pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud, visualization_msgs::Marker &markers)
 {
     pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
@@ -200,6 +161,9 @@ void ransac_cylinder(pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud, visualizati
     ne.setInputCloud (tube_cloud);
     ne.setKSearch (50);
     ne.compute (*normals);
+
+    pcl::PointCloud<pcl::PointXYZINormal> pn;
+
 
     // Create the segmentation object for cylinder segmentation and set all the parameters
     seg.setOptimizeCoefficients (true);
@@ -278,6 +242,8 @@ void ransac_cylinder(pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud, visualizati
 //        point.z = tube_cloud->points[neighbor_idx[i]].z;
 //        neighbor_cloud->points.push_back(point);
 //    }
+
+
 
     generate_normal_marker(tube_cloud, normals, markers);
 
@@ -409,20 +375,10 @@ int main(int argc, char **argv)
                     sensor_msgs::PointCloud2 pc2;
                     sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
                     ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
-                    pcl::fromROSMsg(pc2,pcl_cloud);
+                    process_tube_cloud(pc2);
                     //write_kinect_output(rh);
                     //pcl::io::savePCDFileASCII("../data/pcd_files/tube_2.pcd",pcl_cloud);
-                    pcl::visualization::CloudViewer cloud_viewer("simple_cloud_viewer");
-                    pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud_ptr;
-                    pcl_cloud_ptr = pcl_cloud.makeShared();
-                    tube_cloud_ptr = pcl_cloud.makeShared();
-                    cloud_viewer.showCloud(pcl_cloud_ptr);
-                    while(!cloud_viewer.wasStopped()){}
                 }
-                visualization_msgs::Marker ma;// (new visualization_msgs::Marker);
-                ransac_cylinder(pcl_cloud.makeShared(),ma);
-                marker_pub.publish(ma);
-                cloud_pub.publish();
             }
             else
                 ROS_ERROR("Segmentation service returned error %d", seg_srv.response.result);
