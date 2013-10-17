@@ -24,6 +24,7 @@
 #include <pcl/surface/mls.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/pcl_base.h>
+#include <pcl/filters/radius_outlier_removal.h>
 
 #include <boost/thread/thread.hpp>
 
@@ -38,6 +39,7 @@ void get_axis_points(pcl::PointCloud<PointT>::Ptr cloud_in, double r, pcl::Point
 void process_tube_cloud(sensor_msgs::PointCloud2 &object_cloud);
 void display_cloud(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer);
 void display_normals(pcl::PointCloud<PointT>::Ptr cloud_with_normals);
+int segmentize_axis(pcl::PointCloud<PointT>::Ptr axis_points, pcl::PointCloud<PointT>::Ptr axis_line_points);
 
 
 #endif // PERCEPTION_H

@@ -178,28 +178,84 @@ void get_axis_points(pcl::PointCloud<PointT>::Ptr cloud_in, double r, pcl::Point
 
 }
 
-void ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficients::Ptr coefficient)
+bool ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficients::Ptr coefficient, pcl::PointIndices::Ptr inliers)
 {
     pcl::SACSegmentation<PointT> seg;
     pcl::ModelCoefficients coeff;
-    pcl::PointIndices inliers;
+    //pcl::PointIndices inliers;
 
     // Create the segmentation object for cylinder segmentation and set all the parameters
     seg.setOptimizeCoefficients (true);
     seg.setModelType (pcl::SACMODEL_LINE);
     seg.setMethodType (pcl::SAC_RANSAC);
+    seg.setOptimizeCoefficients(true);
+    seg.setProbability(0.995);
     seg.setMaxIterations (10000);
-    seg.setDistanceThreshold (0.003);
+    seg.setDistanceThreshold (0.001);
     seg.setInputCloud (axis_points);
 
     // Obtain the cylinder inliers and coefficients
-    seg.segment (inliers, coeff);
+    seg.segment (*inliers, coeff);
 
     coefficient->header = coeff.header;
     coefficient->values = coeff.values;
 
-    ROS_INFO("Number of Line inliers : %d",inliers.indices.size());
+    ROS_INFO("Number of Line inliers : %d",inliers->indices.size());
     ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
+
+    if(inliers->indices.size()>20)
+        return true;
+    else
+        return false;
+}
+
+void remove_inliers(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices)
+{
+    pcl::ExtractIndices<PointT> extract;
+    extract.setInputCloud(points);
+    extract.setIndices(indices);
+    extract.setNegative(true);
+    extract.filter(*points);
+}
+
+void remove_neighbors(pcl::PointCloud<PointT>::Ptr points, pcl::ModelCoefficients::Ptr coeff)
+{
+    const double step_size = 0.005;
+
+}
+
+int segmentize_axis(pcl::PointCloud<PointT>::Ptr axis_points, pcl::PointCloud<PointT>::Ptr axis_line_points)
+{
+    pcl::ModelCoefficients::Ptr line_coeff(new pcl::ModelCoefficients);
+    pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+    //pcl::PointCloud<PointT>::Ptr axis_line_points (new pcl::PointCloud<PointT>);
+
+    /*pcl::PointCloud<PointT>::Ptr filtered_axis_points(new pcl::PointCloud<PointT>);
+    pcl::RadiusOutlierRemoval<PointT> outrem;
+    outrem.setRadiusSearch(0.003);
+    outrem.setMinNeighborsInRadius(2);
+    outrem.filter(*filtered_axis_points);
+    ROS_INFO("%d Outliers removed",axis_points->points.size()-filtered_axis_points->points.size());*/
+
+    PointT p;
+    bool flag = true;
+    do
+    {
+        inliers->indices.clear();
+        flag = false;
+        if(ransac_line(axis_points, line_coeff, inliers))
+            flag = true;
+        p.x = line_coeff->values[0];
+        p.y = line_coeff->values[1];
+        p.z = line_coeff->values[2];
+        axis_line_points->points.push_back(p);
+        //remove_inliers(axis_points,inliers);
+        remove_neighbors(axis_points, line_coeff);
+    }while(flag);
+    axis_line_points->header = axis_points->header;
+    axis_line_points->width = axis_line_points->points.size();
+    axis_line_points->height = 1;
+    ROS_INFO("%d lines found",axis_line_points->points.size());
 }
 
 void process_tube_cloud(sensor_msgs::PointCloud2 &object_cloud)
@@ -237,15 +293,18 @@ void process_tube_cloud(sensor_msgs::PointCloud2 &object_cloud)
     ROS_INFO("Width: %d   Height: %d   Size: %d",axis_points->width, axis_points->height, axis_points->points.size());
 
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
-    viewer = pointsVis(axis_points);
-    display_cloud(viewer);
-    viewer->addPointCloud<PointT>(cloud,"tube_axis");
+    //viewer = pointsVis(axis_points);
     //display_cloud(viewer);
-
-    //do further analysis
-    pcl::ModelCoefficients::Ptr line_coeff(new pcl::ModelCoefficients);
-    ransac_line(axis_points, line_coeff);
+    //viewer->addPointCloud<PointT>(cloud,"tube_axis");
+    //display_cloud(viewer);
+    pcl::PointCloud<PointT>::Ptr axis_line_points(new pcl::PointCloud<PointT>);
+    segmentize_axis(axis_points,axis_line_points);
+    viewer = pointsVis(axis_line_points);
+    display_cloud(viewer);
+    ROS_INFO("Number of axis_line_points is: %d", axis_line_points->points.size());
 }
+
+
 
 void display_cloud(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer)
 {
