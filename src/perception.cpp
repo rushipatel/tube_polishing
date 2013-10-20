@@ -178,6 +178,30 @@ void get_axis_points(pcl::PointCloud<PointT>::Ptr cloud_in, double r, pcl::Point
 
 }
 
+void remove_inliers(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices)
+{
+    pcl::ExtractIndices<PointT> extract;
+    extract.setInputCloud(points);
+    extract.setIndices(indices);
+    extract.setNegative(true);
+    extract.filter(*points);
+}
+
+void remove_inliers(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices)
+{
+    pcl::ExtractIndices<PointT> extract;
+    pcl::PointIndices::Ptr pcl_indices(new pcl::PointIndices);
+
+    pcl_indices->indices.resize(indices.size());
+    for(size_t i=0; i<indices.size(); i++)
+        pcl_indices->indices[i] = indices[i];
+
+    extract.setInputCloud(points);
+    extract.setIndices(pcl_indices);
+    extract.setNegative(true);
+    extract.filter(*points);
+}
+
 bool ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficients::Ptr coefficient, pcl::PointIndices::Ptr inliers)
 {
     pcl::SACSegmentation<PointT> seg;
@@ -189,9 +213,9 @@ bool ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficient
     seg.setModelType (pcl::SACMODEL_LINE);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setOptimizeCoefficients(true);
-    seg.setProbability(0.995);
+    seg.setProbability(0.99);
     seg.setMaxIterations (10000);
-    seg.setDistanceThreshold (0.001);
+    seg.setDistanceThreshold (0.005);
     seg.setInputCloud (axis_points);
 
     // Obtain the cylinder inliers and coefficients
@@ -203,26 +227,34 @@ bool ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficient
     ROS_INFO("Number of Line inliers : %d",inliers->indices.size());
     ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
 
-    if(inliers->indices.size()>20)
+    if(inliers->indices.size()>100)
         return true;
     else
         return false;
 }
 
-void remove_inliers(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices)
+void get_line_points(pcl::PointCloud<PointT>::Ptr axis_points, pcl::PointIndices::Ptr inliers, pcl::PointCloud<PointT>::Ptr axis_line_points, pcl::ModelCoefficients::Ptr line_coeff)
 {
+    pcl::PointCloud<PointT>::Ptr line_points(new pcl::PointCloud<PointT>);
+    pcl::PointCloud<PointT>::Ptr line_inliers(new pcl::PointCloud<PointT>);
     pcl::ExtractIndices<PointT> extract;
-    extract.setInputCloud(points);
-    extract.setIndices(indices);
-    extract.setNegative(true);
-    extract.filter(*points);
+    extract.setInputCloud(axis_points);
+    extract.setIndices(inliers);
+    extract.setNegative(false);
+    extract.filter(*line_inliers);
+
+    pcl::ProjectInliers<PointT> proj;
+    proj.setModelType (pcl::SACMODEL_LINE);
+    proj.setInputCloud (line_inliers);
+    proj.setModelCoefficients (line_coeff);
+    proj.filter(*line_points);
+    PointT p1, p2;
+    pcl::getMaxSegment(*line_points,p1,p2);
+    axis_line_points->points.push_back(p1);
+    axis_line_points->points.push_back(p2);
+    //pcl::concatenateFields();
 }
 
-void remove_neighbors(pcl::PointCloud<PointT>::Ptr points, pcl::ModelCoefficients::Ptr coeff)
-{
-    const double step_size = 0.005;
-
-}
 
 int segmentize_axis(pcl::PointCloud<PointT>::Ptr axis_points, pcl::PointCloud<PointT>::Ptr axis_line_points)
 {
@@ -237,20 +269,19 @@ int segmentize_axis(pcl::PointCloud<PointT>::Ptr axis_points, pcl::PointCloud<Po
     outrem.filter(*filtered_axis_points);
     ROS_INFO("%d Outliers removed",axis_points->points.size()-filtered_axis_points->points.size());*/
 
-    PointT p;
+    PointT p1, p2;
     bool flag = true;
     do
     {
         inliers->indices.clear();
         flag = false;
-        if(ransac_line(axis_points, line_coeff, inliers))
+        if(ransac_line(axis_points,line_coeff,inliers))
             flag = true;
-        p.x = line_coeff->values[0];
-        p.y = line_coeff->values[1];
-        p.z = line_coeff->values[2];
-        axis_line_points->points.push_back(p);
-        //remove_inliers(axis_points,inliers);
-        remove_neighbors(axis_points, line_coeff);
+//        p.x = line_coeff->values[0];
+//        p.y = line_coeff->values[1];
+//        p.z = line_coeff->values[2];
+        get_line_points(axis_points,inliers,axis_line_points,line_coeff);
+        remove_inliers(axis_points,inliers);
     }while(flag);
     axis_line_points->header = axis_points->header;
     axis_line_points->width = axis_line_points->points.size();
