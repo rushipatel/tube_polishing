@@ -285,7 +285,7 @@ void points_in_cylinder(line l, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::Poin
     float dy = p1.y - p2.y;
     float dz = p1.z - p2.z;
 
-    float r = 0.01;
+    float r = 0.005;
 
     float l_sq = (dx*dx) + (dy*dy) + (dz*dz);
     float r_sq = r*r;
@@ -327,7 +327,7 @@ void remove_inliers(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indi
 
 bool ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficients::Ptr coefficient, pcl::PointIndices::Ptr inliers)
 {
-    if(axis_points->points.size()<20) //check if there are enough points to generate model
+    if(axis_points->points.size()<10) //check if there are enough points to generate model
     {
         ROS_INFO("No more points to fit line model");
         return false;
@@ -341,9 +341,9 @@ bool ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficient
     seg.setModelType (pcl::SACMODEL_LINE);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setOptimizeCoefficients(true);
-    seg.setProbability(0.99);
+    seg.setProbability(0.985);
     seg.setMaxIterations (10000);
-    seg.setDistanceThreshold (0.0005);  //This will determine smallest cylinder
+    seg.setDistanceThreshold (0.001);  //This will determine smallest cylinder
     seg.setInputCloud (axis_points);
     // Obtain the cylinder inliers and coefficients
     seg.segment (*inliers, coeff);
@@ -353,7 +353,7 @@ bool ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficient
     ROS_INFO("Number of Line inliers : %d",inliers->indices.size());
     ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
 
-    if(inliers->indices.size()>20) // if confidence in line
+    if(inliers->indices.size()>10) // if confidence in line
         return true;
     else
         return false;
