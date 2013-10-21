@@ -24,7 +24,7 @@
    respawn="false" output="screen" />
 
   <node name="spawn_object" pkg="gazebo" type="spawn_model" 
-   args="-urdf -file $(find tube_polishing)/data/models/tube_2/robots/tube_2.urdf -model object_1 -x 0.75 -z 0.6" 
+   args="-urdf -file $(find tube_polishing)/data/models/tube_4/robots/tube_4.urdf -model object_1 -x 0.75 -z 0.6" 
    respawn="false" output="screen"/>
 
   <!-- parameters that give you reasonable physics as well as good speed -->

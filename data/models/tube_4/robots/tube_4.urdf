@@ -1,0 +1,48 @@
+<robot
+  name="tube_4">
+  <link
+    name="tube_4">
+    <inertial>
+      <origin
+        xyz="0.035841 -0.0024373 0.039995"
+        rpy="0 0 0" />
+      <mass
+        value="0.022445" />
+      <inertia
+        ixx="5.83958758583548E-05"
+        ixy="-3.85557725115844E-06"
+        ixz="2.84589612454531E-06"
+        iyy="2.61587143460715E-05"
+        iyz="-1.84694971251165E-05"
+        izz="6.32825444810275E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_4/meshes/tube_4.stl" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_4/meshes/tube_4.stl" />
+      </geometry>
+    </collision>
+  </link>
+</robot>
+<gazebo reference="tube_4">
+  <static>true</static>
+      <gravity>false</gravity>
+    <allow_auto_disable>true</allow_auto_disable>
+</gazebo>
