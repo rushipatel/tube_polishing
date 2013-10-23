@@ -1,0 +1,48 @@
+<robot
+  name="tube_6">
+  <link
+    name="tube_6">
+    <inertial>
+      <origin
+        xyz="0.085487 0.031645 0.0080006"
+        rpy="0 0 0" />
+      <mass
+        value="0.16005" />
+      <inertia
+        ixx="0.000440396618092397"
+        ixy="-3.33055863966711E-05"
+        ixz="1.58404123789234E-09"
+        iyy="0.000309369503692614"
+        iyz="-2.76123885335644E-09"
+        izz="0.000740744552326746" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_6/meshes/tube_6.stl" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.64706 0.61961 0.58824 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_6/meshes/tube_6.stl" />
+      </geometry>
+    </collision>
+  </link>
+</robot>
+<gazebo reference="tube_6">
+  <static>false</static>
+      <gravity>true</gravity>
+    <allow_auto_disable>true</allow_auto_disable>
+</gazebo>

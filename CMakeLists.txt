@@ -21,7 +21,7 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #uncomment if you have defined services
 #rosbuild_gensrv()
 #common commands for building c++ executables and libraries
-rosbuild_add_library(dual_arms_lib src/dual_arms.cpp src/robot_head.cpp src/perception.cpp)
+rosbuild_add_library(dual_arms_lib src/dual_arms.cpp src/robot_head.cpp src/perception.cpp src/tube_perception.cpp)
 rosbuild_add_executable(${PROJECT_NAME} src/main.cpp)
 #rosbuild_add_executable(tube_tabletop_segmentation src/tabletop_segmentation.cpp)
 target_link_libraries(${PROJECT_NAME} dual_arms_lib)

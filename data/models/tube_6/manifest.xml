@@ -1,0 +1,6 @@
+<package>
+  <description brief="tube_6">tube_6</description>
+  <depend package="gazebo" />
+  <author>me</author>
+  <license>BSD</license>
+</package>

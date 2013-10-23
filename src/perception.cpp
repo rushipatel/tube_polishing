@@ -139,7 +139,7 @@ void get_largest_cluster(pcl::PointCloud<PointT>::Ptr points_in, pcl::PointCloud
     {
         if(clusters.size()==1)
         {
-            ROS_INFO("One cluster found from raw_axis_points");
+            ROS_INFO("One cluster found from raw axis points");
             copy_point_cloud(points_in, clusters[0], points_out);
         }
         else
@@ -154,7 +154,7 @@ void get_largest_cluster(pcl::PointCloud<PointT>::Ptr points_in, pcl::PointCloud
                     max = clusters[i].indices.size();
                 }
             }
-            ROS_WARN("Number(%d) of clusters is greater than one. Consider optimizing clustering parameters",clusters.size());
+            ROS_WARN("More than one cluster(%d) in collapsing normals. Consider optimizing clustering parameters",clusters.size());
             ROS_INFO("Using cluster %d with highest number of points %d",cluster_no+1,max);
             copy_point_cloud(points_in, clusters[cluster_no], points_out);
         }
@@ -275,7 +275,7 @@ float is_in_cylinder( const PointT & pt1, const PointT & pt2, float length_sq, f
     }
 }
 
-void points_in_cylinder(line l, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers)
+void cylinder_filter(line l, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers)
 {
     PointT p1, p2;
     p1 = l.p1;
@@ -327,7 +327,10 @@ void remove_inliers(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indi
 
 bool ransac_line(pcl::PointCloud<PointT>::Ptr axis_points, pcl::ModelCoefficients::Ptr coefficient, pcl::PointIndices::Ptr inliers)
 {
-    if(axis_points->points.size()<10) //check if there are enough points to generate model
+    const int strong_cnfd_points = 100;
+    const int weak_cnfd_points = 10;
+
+    if(axis_points->points.size()<weak_cnfd_points) //check if there are enough points to generate model
     {
         ROS_INFO("No more points to fit line model");
         return false;
@@ -399,7 +402,7 @@ int segmentize_axis(pcl::PointCloud<PointT>::Ptr axis_points, pcl::PointCloud<Po
         remove_inliers(axis_points,inliers);
         ln_vec.push_back(ln);
         inliers->indices.clear();
-        points_in_cylinder(ln, axis_points, inliers);
+        cylinder_filter(ln, axis_points, inliers);
         remove_inliers(axis_points,inliers);
 
         inliers->indices.clear();
@@ -444,7 +447,7 @@ void process_tube_cloud(sensor_msgs::PointCloud2 &object_cloud)
     pcl::PointCloud<PointT>::Ptr axis_points(new pcl::PointCloud<PointT>);
     get_axis_points(cloud, r, axis_points);
 
-    ROS_INFO("Width: %d   Height: %d   Size: %d",axis_points->width, axis_points->height, axis_points->points.size());
+    //ROS_INFO("Width: %d   Height: %d   Size: %d",axis_points->width, axis_points->height, axis_points->points.size());
 
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
     //viewer = pointsVis(axis_points);
