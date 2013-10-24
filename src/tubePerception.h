@@ -32,36 +32,74 @@
 #include <pcl/filters/radius_outlier_removal.h>
 
 #include <boost/thread/thread.hpp>
+#include <sstream>
 
 typedef pcl::PointXYZRGBNormal PointT;
 
-class tubePerception
-{   
-public:
-    struct line
+namespace TubePerception
+{
+    class Cylinder// : public Line
     {
+    public:
         PointT p1;
         PointT p2;
-        //float l;
-        //float m;
+        float radius;
+        bool isStrong;
+        pcl::ModelCoefficients coefficients;
     };
-    tubePerception(sensor_msgs::PointCloud2 &tubeCloud);
-    tubePerception(sensor_msgs::PointCloud2 &tubeCloud, geometry_msgs::Pose sensorPose);
-    ~tubePerception();
-    void processCloud(void);
-    std::vector<line> lines;
 
-private:
-    //sensor_msgs::PointCloud2  ros_tube_cloud;
-    pcl::PointCloud<PointT>::Ptr tube_cloud_;
-    pcl::PointCloud<PointT>::Ptr axis_points_;
-    pcl::PointCloud<PointT>::Ptr raw_axis_points_;
-    void estimate_normals_(void);
-    void get_radius_(void);
-    void collaps_normals_(void);
-    float r_; //std::vector<float> r_
-    const int strong_line_points_ = 100;
-    const int weak_line_points_ = 10;
-};
+    class Tube
+    {
+    public:
+        Tube(sensor_msgs::PointCloud2 &tubeCloud);
+        //~Tube();
+       std::vector<TubePerception::Cylinder> cylinders;
+       typedef boost::shared_ptr<Tube> Ptr;
 
+    protected:
+        pcl::PointCloud<PointT>::Ptr tube_cloud_;
+        pcl::PointCloud<PointT>::Ptr axis_points_;
+        int num_of_points_;
+    };
+
+    class CloudProcessing : public Tube
+    {
+    public:
+        CloudProcessing(sensor_msgs::PointCloud2 &tubeCloud) : Tube(tubeCloud)
+        {
+            num_of_points_ = tube_cloud_->points.size();
+            r_ = 0;
+            strong_line_thr_ = 0.1;
+            weak_line_thr_ = 0.02;
+            z_error_ = 0;
+        }
+        //CloudProcessing(sensor_msgs::PointCloud2 &tubeCloud, geometry_msgs::Pose sensorPose);
+        //~CloudProcessing();
+        void processCloud(void);
+        void displayCloud(int sec);
+        void displayAxisPoints(int sec);
+        void displayCylinders(int sec);
+        void displayLines(int sec);
+        void setZerror(float error);
+
+    private:
+        void estimate_normals_(void);
+        void get_radius_(void);
+        void collaps_normals_(void);
+        bool find_line_(pcl::PointIndices::Ptr inliers, Cylinder *cyl);
+        void remove_inliers_(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices);
+        void remove_inliers_(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices);
+        void get_line_points_(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, Cylinder* cylinder);
+        void segmentize_axis_(void);
+        void compensateError(void);
+        void cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers);
+        float is_in_cylinder_( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt );
+        float r_;
+        float strong_line_thr_;
+        float weak_line_thr_;
+        pcl::PointCloud<PointT>::Ptr raw_axis_points_;
+        float z_error_;
+    };
+
+}
 #endif // TUBEPERCEPTION_H

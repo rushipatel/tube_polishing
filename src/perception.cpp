@@ -462,7 +462,6 @@ void process_tube_cloud(sensor_msgs::PointCloud2 &object_cloud)
 }
 
 
-
 void display_cloud(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer)
 {
     while (!viewer->wasStopped ())

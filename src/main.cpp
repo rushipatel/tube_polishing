@@ -32,7 +32,7 @@
 
 #include "dualArms.h"
 #include "robotHead.h"
-#include "perception.h"
+#include "tubePerception.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
@@ -374,8 +374,14 @@ int main(int argc, char **argv)
                     pc = seg_srv.response.clusters[i];
                     sensor_msgs::PointCloud2 pc2;
                     sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
-                    ROS_INFO("Hight: %d     Width: %d",pc2.height, pc2.width);
-                    process_tube_cloud(pc2);
+                    ROS_INFO("Original cloud size: %d",pc2.height*pc2.width);
+                    TubePerception::CloudProcessing cp(pc2);
+                    cp.processCloud();
+                    //cp.displayCloud(5);
+                    //cp.displayAxisPoints(5);
+                    cp.displayLines(60);
+                    cp.displayCylinders(0);
+
                     //write_kinect_output(rh);
                     //pcl::io::savePCDFileASCII("../data/pcd_files/tube_2.pcd",pcl_cloud);
                 }
