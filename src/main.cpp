@@ -377,9 +377,9 @@ int main(int argc, char **argv)
                     ROS_INFO("Original cloud size: %d",pc2.height*pc2.width);
                     TubePerception::CloudProcessing cp(pc2);
                     cp.processCloud();
-                    //cp.displayCloud(5);
+                    cp.displayCloud(5);
                     //cp.displayAxisPoints(5);
-                    cp.displayLines(60);
+                    //cp.displayLines(60);
                     cp.displayCylinders(0);
 
                     //write_kinect_output(rh);

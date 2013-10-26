@@ -45,7 +45,15 @@ namespace TubePerception
         PointT p2;
         float radius;
         bool isStrong;
+        std::vector<int> neighbourCylinders;
+
         pcl::ModelCoefficients coefficients;
+    };
+
+    class Curve
+    {
+    public:
+        std::vector<PointT> curve_points;
     };
 
     class Tube
@@ -54,7 +62,7 @@ namespace TubePerception
         Tube(sensor_msgs::PointCloud2 &tubeCloud);
         //~Tube();
        std::vector<TubePerception::Cylinder> cylinders;
-       typedef boost::shared_ptr<Tube> Ptr;
+       std::vector<Curve> curves;
 
     protected:
         pcl::PointCloud<PointT>::Ptr tube_cloud_;
@@ -94,6 +102,9 @@ namespace TubePerception
         void compensateError(void);
         void cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers);
         float is_in_cylinder_( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt );
+        void get_line_graph_(void);
+        void print_line_graph_(void);
+        void add_neighbour_(int cyl_ind, int neighbour_ind);
         float r_;
         float strong_line_thr_;
         float weak_line_thr_;

@@ -36,6 +36,86 @@ void CloudProcessing::processCloud(void)
     get_radius_();
     collaps_normals_();
     segmentize_axis_();
+    get_line_graph_();
+    //get_curves_();
+    print_line_graph_();
+}
+
+void CloudProcessing::get_line_graph_(void)
+{
+    float dist;
+    for(size_t i=0; i<cylinders.size(); i++)
+    {
+        for(size_t j=0; j<cylinders.size(); j++)
+        {
+            if(i!=j)
+            {
+                dist = pcl::euclideanDistance(cylinders[i].p1, cylinders[j].p1);
+                if( dist < (r_) )
+                {
+                    std::cout<<"adding "<<j<<" in "<<i<<std::endl;
+                    add_neighbour_(i, j);
+                }
+
+                dist = pcl::euclideanDistance(cylinders[i].p2, cylinders[j].p1);
+                if( dist < (r_) )
+                {
+                    std::cout<<"adding "<<j<<" in "<<i<<std::endl;
+                    add_neighbour_(i, j);
+                }
+
+                dist = pcl::euclideanDistance(cylinders[i].p1, cylinders[j].p2);
+                if( dist < (r_) )
+                {
+                    std::cout<<"adding "<<j<<" in "<<i<<std::endl;
+                    add_neighbour_(i, j);
+                }
+
+                dist = pcl::euclideanDistance(cylinders[i].p2, cylinders[j].p2);
+                if( dist < (r_) )
+                {
+                    std::cout<<"adding "<<j<<" in "<<i<<std::endl;
+                    add_neighbour_(i, j);
+                }
+            }
+        }
+    }
+}
+
+void CloudProcessing::add_neighbour_(int cyl_ind, int neighbour_ind)
+{
+    for(size_t i=0; i<cylinders[cyl_ind].neighbourCylinders.size(); i++)
+    {
+        if(cylinders[cyl_ind].neighbourCylinders[i]==neighbour_ind)
+            return;
+    }
+        cylinders[cyl_ind].neighbourCylinders.push_back(neighbour_ind);
+}
+
+void CloudProcessing::print_line_graph_(void)
+{
+    for(int i=0; i<cylinders.size(); i++)
+    {
+        std::cout<<std::endl<<"Cylinder "<<i<<" :";
+        for(size_t j=0; j<cylinders[i].neighbourCylinders.size(); j++)
+            std::cout<<std::endl<<"\t\t"<<cylinders[i].neighbourCylinders[j];
+    }
+}
+
+void CloudProcessing::group_cylinders_(void)
+{
+    std::vector<int> cyl_ind_stack;
+
+    int curve_ind = 0;
+    int cyl_ind;
+    for(size_t i=0; i<cylinders.size(); i++)
+    {
+        cyl_ind_stack.push_back(i);
+        while(!cyl_ind_stack.empty())
+        {
+            cyl_ind = cyl_ind_stack.pop_back();
+        }
+    }
 }
 
 void CloudProcessing::compensateError(void)
@@ -182,46 +262,6 @@ bool CloudProcessing::find_line_(pcl::PointIndices::Ptr inliers, Cylinder *cyl)
 
     return false;
 }
-
-/*bool CloudProcessing::find_weak_line_(pcl::PointIndices::Ptr inliers, Cylinder *cyl)
-{
-    if(raw_axis_points_->points.size()<(weak_line_thr_*num_of_points_) )  //check if there are enough points to generate model
-        return false;
-    pcl::SACSegmentation<PointT> seg;
-    pcl::ModelCoefficients coeff;
-    //pcl::PointIndices inliers;
-
-    // Create the segmentation object for cylinder segmentation and set all the parameters
-    seg.setOptimizeCoefficients (true);
-    seg.setModelType (pcl::SACMODEL_LINE);
-    seg.setMethodType (pcl::SAC_RANSAC);
-    seg.setOptimizeCoefficients(true);
-    seg.setProbability(0.98);
-    seg.setMaxIterations (10000);
-    seg.setDistanceThreshold (0.002);
-    seg.setInputCloud (raw_axis_points_);
-    // Obtain the cylinder inliers and coefficients
-    seg.segment (*inliers, coeff);
-
-    ROS_INFO("Number of Weak Line inliers : %d",inliers->indices.size());
-    ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
-
-    if( strong_line_thr_ > (inliers->indices.size()/num_of_points_) >= weak_line_thr_ ) // if confidence in line
-    {
-        get_line_points_(inliers,coeff,cyl);
-        cyl->isStrong = false;
-        cyl->radius = r_;
-        return true;
-    }
-    else if( inliers->indices.size()>(strong_line_thr_*num_of_points_) )
-    {
-        get_line_points_(inliers,coeff,cyl);
-        cyl->isStrong = true;
-        cyl->radius = r_;
-        return true;
-    }
-    return false;
-}*/
 
 void CloudProcessing::get_line_points_(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, Cylinder* cylinder)
 {
