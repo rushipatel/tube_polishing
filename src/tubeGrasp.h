@@ -10,8 +10,6 @@ namespace TubeGrasp
     {
     public:
         Grasp();
-        int id;
-        int idOfPair;
         geometry_msgs::Pose pose;
         float quality;
         //TubePerception::Cylinder ofCylinder;

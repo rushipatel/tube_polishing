@@ -10,6 +10,7 @@
 
 #include <pcl/point_types.h>
 #include <pcl/common/io.h>
+#include <pcl/io/pcd_io.h>
 #include <pcl/pcl_base.h>
 #include <pcl/common/common.h>
 #include <pcl/features/normal_3d.h>
@@ -45,6 +46,7 @@ namespace TubePerception
         PointT p2;
         float radius;
         bool isStrong;
+        std::vector<PointT> pointsOfInterest;
         std::vector<int> neighbourCylinders;
 
         pcl::ModelCoefficients coefficients;
@@ -77,8 +79,9 @@ namespace TubePerception
         {
             num_of_points_ = tube_cloud_->points.size();
             r_ = 0;
-            strong_line_thr_ = 0.1;
-            weak_line_thr_ = 0.02;
+            strong_line_thr_ = 0.2;
+            weak_line_thr_ = 0.1;
+            min_points_ = 0.05;
             z_error_ = 0;
         }
         //CloudProcessing(sensor_msgs::PointCloud2 &tubeCloud, geometry_msgs::Pose sensorPose);
@@ -89,6 +92,7 @@ namespace TubePerception
         void displayCylinders(int sec);
         void displayLines(int sec);
         void setZerror(float error);
+        bool writeAxisPointsOnFile(std::string fileName);
 
     private:
         void estimate_normals_(void);
@@ -97,7 +101,7 @@ namespace TubePerception
         bool find_line_(pcl::PointIndices::Ptr inliers, Cylinder *cyl);
         void remove_inliers_(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices);
         void remove_inliers_(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices);
-        void get_line_points_(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, Cylinder* cylinder);
+        void get_line_points_(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2);
         void segmentize_axis_(void);
         void compensateError(void);
         void cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers);
@@ -105,8 +109,10 @@ namespace TubePerception
         void get_line_graph_(void);
         void print_line_graph_(void);
         void add_neighbour_(int cyl_ind, int neighbour_ind);
+        void get_point_of_interest();
         float r_;
         float strong_line_thr_;
+        float min_points_;
         float weak_line_thr_;
         pcl::PointCloud<PointT>::Ptr raw_axis_points_;
         float z_error_;

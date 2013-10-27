@@ -381,9 +381,7 @@ int main(int argc, char **argv)
                     //cp.displayAxisPoints(5);
                     //cp.displayLines(60);
                     cp.displayCylinders(0);
-
-                    //write_kinect_output(rh);
-                    //pcl::io::savePCDFileASCII("../data/pcd_files/tube_2.pcd",pcl_cloud);
+                    cp.writeAxisPointsOnFile("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/axis_points.pcd");
                 }
             }
             else

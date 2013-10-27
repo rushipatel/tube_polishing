@@ -36,9 +36,34 @@ void CloudProcessing::processCloud(void)
     get_radius_();
     collaps_normals_();
     segmentize_axis_();
-    get_line_graph_();
+    get_point_of_interest();
+    //get_line_graph_();
     //get_curves_();
-    print_line_graph_();
+    //print_line_graph_();
+}
+
+bool CloudProcessing::writeAxisPointsOnFile(std::string fileName)
+{
+    if(pcl::io::savePCDFileASCII(fileName,*axis_points_))
+        return true;
+    return false;
+}
+
+void CloudProcessing::get_point_of_interest()
+{
+    PointT p;
+    for(size_t i=0; i<cylinders.size(); i++)
+    {
+        if(cylinders[i].isStrong)
+        {
+            p.x = (cylinders[i].p1.x + cylinders[i].p2.x) / 2;
+            p.y = (cylinders[i].p1.y + cylinders[i].p2.y) / 2;
+            p.z = (cylinders[i].p1.z + cylinders[i].p2.z) / 2;
+            p.rgb = cylinders[i].p1.rgb; //in case
+
+            cylinders[i].pointsOfInterest.push_back(p);
+        }
+    }
 }
 
 void CloudProcessing::get_line_graph_(void)
@@ -102,7 +127,7 @@ void CloudProcessing::print_line_graph_(void)
     }
 }
 
-void CloudProcessing::group_cylinders_(void)
+/*void CloudProcessing::group_cylinders_(void)
 {
     std::vector<int> cyl_ind_stack;
 
@@ -116,7 +141,7 @@ void CloudProcessing::group_cylinders_(void)
             cyl_ind = cyl_ind_stack.pop_back();
         }
     }
-}
+}*/
 
 void CloudProcessing::compensateError(void)
 {
@@ -150,12 +175,13 @@ void CloudProcessing::get_radius_(void)
     seg.setModelType (pcl::SACMODEL_CYLINDER);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setNormalDistanceWeight (0.1);
-    seg.setMaxIterations (10000);
+    seg.setMaxIterations (20000);
     seg.setDistanceThreshold (0.01);
     seg.setRadiusLimits (0.001, 0.2);
+    seg.setProbability(0.99);
     seg.setInputCloud (tube_cloud_);
     seg.setInputNormals (tube_cloud_);
-    seg.setDistanceFromOrigin(0.01);
+    seg.setDistanceFromOrigin(0.05);
     // Obtain the cylinder inliers and coefficients
     seg.segment (inliers, coeff);
     ROS_INFO("Foud cylinder radius using cylinder RANSAC: %f", coeff.values[6]);
@@ -185,13 +211,17 @@ void CloudProcessing::segmentize_axis_(void)
 {
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
     Cylinder cyl;
+    PointT p1, p2;
 
     while(find_line_(inliers,&cyl))
     {
         cylinders.push_back(cyl);
         remove_inliers_(raw_axis_points_,inliers);
+
         inliers->indices.clear();
+
         cylinder_filter_(cyl, raw_axis_points_, inliers);
+        get_line_points_(inliers,cyl.coefficients, p1, p2); // no use for p1 & p2
         remove_inliers_(raw_axis_points_,inliers);
 
         inliers->indices.clear();
@@ -206,7 +236,7 @@ void CloudProcessing::segmentize_axis_(void)
 
 bool CloudProcessing::find_line_(pcl::PointIndices::Ptr inliers, Cylinder *cyl)
 {
-    if(raw_axis_points_->points.size()< (weak_line_thr_*num_of_points_) ) //check if there are enough points to generate model
+    if(raw_axis_points_->points.size()< (min_points_*num_of_points_) ) //check if there are enough points to generate model
         return false;
     pcl::SACSegmentation<PointT> seg;
     pcl::ModelCoefficients coeff;
@@ -218,52 +248,70 @@ bool CloudProcessing::find_line_(pcl::PointIndices::Ptr inliers, Cylinder *cyl)
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setOptimizeCoefficients(true);
     seg.setProbability(0.99);
-    seg.setMaxIterations (10000);
+    seg.setMaxIterations (20000);
     seg.setDistanceThreshold (0.001);
     seg.setInputCloud (raw_axis_points_);
     // Obtain the cylinder inliers and coefficients
     seg.segment (*inliers, coeff);
 
+    PointT p1,p2;
 
-    if( inliers->indices.size()>(strong_line_thr_*num_of_points_) )
+    if( inliers->indices.size()>(min_points_*num_of_points_) )
     {
         ROS_INFO("Number of Strong Line inliers : %d",inliers->indices.size());
         ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
 
-        get_line_points_(inliers,coeff,cyl);
+        get_line_points_(inliers,coeff, p1, p2);
+        cyl->p1 = p1;
+        cyl->p2 = p2;
         cyl->isStrong = true;
         cyl->radius = r_;
-        cyl->coefficients = coeff;
-        cyl->coefficients.values.push_back(r_);
+        cyl->coefficients.header = coeff.header;
+        cyl->coefficients.values.resize(7);
+        cyl->coefficients.values[0] = p1.x;
+        cyl->coefficients.values[1] = p1.y;
+        cyl->coefficients.values[2] = p1.z;
+        cyl->coefficients.values[3] = p2.x - p1.x;
+        cyl->coefficients.values[4] = p2.y - p1.y;
+        cyl->coefficients.values[5] = p2.z - p1.z;
+        cyl->coefficients.values[6] = r_;
         return true;
     }
     else
     {
-        ROS_INFO("Trying to find weak line");
-        seg.setProbability(0.98);
+        ROS_INFO("Trying to find weak line...");
+        seg.setProbability(0.97);
         seg.setMaxIterations (10000);
         seg.setDistanceThreshold (0.002);
         inliers->indices.clear();
         seg.segment (*inliers, coeff);
     }
 
-    if( inliers->indices.size() > (weak_line_thr_*num_of_points_) ) // if confidence in line
+    if( inliers->indices.size() > (min_points_*num_of_points_) ) // if confidence in line
     {
         ROS_INFO("Number of Weak Line inliers : %d",inliers->indices.size());
         ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
 
-        get_line_points_(inliers,coeff,cyl);
+        get_line_points_(inliers,coeff, p1, p2);
+        cyl->p1 = p1;
+        cyl->p2 = p2;
         cyl->isStrong = false;
         cyl->radius = r_;
-        cyl->coefficients = coeff;
-        cyl->coefficients.values.push_back(r_);
+        cyl->coefficients.values.resize(7);
+        cyl->coefficients.values[0] = p1.x;
+        cyl->coefficients.values[1] = p1.y;
+        cyl->coefficients.values[2] = p1.z;
+        cyl->coefficients.values[3] = p2.x - p1.x;
+        cyl->coefficients.values[4] = p2.y - p1.y;
+        cyl->coefficients.values[5] = p2.z - p1.z;
+        cyl->coefficients.values[6] = r_;
         return true;
     }
 
     return false;
 }
 
-void CloudProcessing::get_line_points_(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, Cylinder* cylinder)
+void CloudProcessing::get_line_points_(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2)
 {
     pcl::PointCloud<PointT>::Ptr line_points(new pcl::PointCloud<PointT>);
     pcl::PointCloud<PointT>::Ptr line_inliers(new pcl::PointCloud<PointT>);
@@ -274,18 +322,17 @@ void CloudProcessing::get_line_points_(pcl::PointIndices::Ptr inliers, pcl::Mode
     extract.filter(*line_inliers);
     pcl::ModelCoefficients::Ptr coeff(new pcl::ModelCoefficients);
     coeff->header = line_coeff.header;
-    coeff->values = line_coeff.values;
+    coeff->values.resize(6);
+    for(int i=0; i<6; i++)
+        coeff->values[i] = line_coeff.values[i];
 
     pcl::ProjectInliers<PointT> proj;
     proj.setModelType (pcl::SACMODEL_LINE);
     proj.setInputCloud (line_inliers);
     proj.setModelCoefficients (coeff);
     proj.filter(*line_points);
-    PointT p1, p2;
+    //PointT p1, p2;
     pcl::getMaxSegment(*line_points,p1,p2);
-
-    cylinder->p1 = p1;
-    cylinder->p2 = p2;
 
     for(size_t i=0; i<line_points->points.size(); i++)
         axis_points_->points.push_back(line_points->points[i]);
@@ -426,6 +473,7 @@ void CloudProcessing::displayCylinders(int sec)
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
     pcl::ModelCoefficients coeffs;
+    float sum;
     coeffs.values.resize(7);
     for (size_t i=0; i<cylinders.size(); i++)
     {
@@ -440,6 +488,20 @@ void CloudProcessing::displayCylinders(int sec)
         std::strstream ss;
         ss<<"Cylinder_"<<i;
         viewer->addCylinder(coeffs,ss.str());
+        ss<<"_weld";
+        sum = coeffs.values[3]+coeffs.values[4]+coeffs.values[5];
+        sum = 0.005/sum;
+        if(!cylinders[i].pointsOfInterest.empty())
+        {
+            coeffs.values[0] = cylinders[i].pointsOfInterest[0].x;
+            coeffs.values[1] = cylinders[i].pointsOfInterest[0].y;
+            coeffs.values[2] = cylinders[i].pointsOfInterest[0].z;
+            coeffs.values[3] *= sum;
+            coeffs.values[4] *= sum;
+            coeffs.values[5] *= sum;
+            coeffs.values[6] = cylinders[i].radius + 0.0015;
+            viewer->addCylinder(coeffs,ss.str());
+        }
     }
     viewer->addPointCloud<PointT> (axis_points_,"LinePoints");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "LinePoints");
