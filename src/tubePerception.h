@@ -22,6 +22,9 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/octree/octree_search.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <LinearMath/btVector3.h>
+#include <LinearMath/btQuaternion.h>
+#include <tf/tf.h>
 
 #include <pcl/sample_consensus/sac_model_circle.h>
 
@@ -109,7 +112,8 @@ namespace TubePerception
         void get_line_graph_(void);
         void print_line_graph_(void);
         void add_neighbour_(int cyl_ind, int neighbour_ind);
-        void get_point_of_interest();
+        void get_point_of_interest_();
+        btVector3 CloudProcessing::get_perp_vec3_(btVector3 v3);
         float r_;
         float strong_line_thr_;
         float min_points_;

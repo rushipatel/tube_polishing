@@ -36,7 +36,7 @@ void CloudProcessing::processCloud(void)
     get_radius_();
     collaps_normals_();
     segmentize_axis_();
-    get_point_of_interest();
+    get_point_of_interest_();
     //get_line_graph_();
     //get_curves_();
     //print_line_graph_();
@@ -49,7 +49,23 @@ bool CloudProcessing::writeAxisPointsOnFile(std::string fileName)
     return false;
 }
 
-void CloudProcessing::get_point_of_interest()
+btVector3 CloudProcessing::get_perp_vec3_(btVector3 v3)
+{
+    btVector3 perp_vec, unit_vec;
+    unit_vec.setZero();
+    int a = v3.furthestAxis(); //0,1,2=x,y,z
+    if(a==1)
+        unit_vec.setY(1);
+    else if(a==2)
+        unit_vec.setZ(1);
+    else
+        unit_vec.setX(1);
+    perp_vec = v3.cross(unit_vec);
+    perp_vec.normalize();
+    return perp_vec;
+}
+
+void CloudProcessing::get_point_of_interest_()
 {
     PointT p;
     for(size_t i=0; i<cylinders.size(); i++)

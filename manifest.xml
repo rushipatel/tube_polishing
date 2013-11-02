@@ -25,6 +25,7 @@
   <depend package="pcl"/>
   <depend package="gazebo_msgs"/>
   <depend package="visualization_msgs"/>
+  <depend package="bullet"/>
   <platform os="ubuntu" version="9.04"/>
   <platform os="ubuntu" version="9.10"/>
   <platform os="ubuntu" version="10.04"/>
