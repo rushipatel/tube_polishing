@@ -112,7 +112,9 @@ namespace TubePerception
         void get_line_graph_(void);
         void print_line_graph_(void);
         void add_neighbour_(int cyl_ind, int neighbour_ind);
-        void get_point_of_interest_();
+        void get_point_of_interest_(void);
+        btVector3 get_perp_vec3_(btVector3 v3);
+        void get_trajectories_of_interest_(void);
         btVector3 CloudProcessing::get_perp_vec3_(btVector3 v3);
         float r_;
         float strong_line_thr_;

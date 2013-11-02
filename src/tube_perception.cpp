@@ -82,6 +82,22 @@ void CloudProcessing::get_point_of_interest_()
     }
 }
 
+void CloudProcessing::get_trajectories_of_interest_()
+{
+    btVector3 vec3, perp_vec3;
+    for(int i=0; i<cylinders.size(); i++)
+    {
+        for(int j=0; j<cylinders[i].pointsOfInterest.size(); j++)
+        {
+            vec3.setX(cylinders[i].p2.x - cylinders[i].p1.x);
+            vec3.setY(cylinders[i].p2.y - cylinders[i].p1.y);
+            vec3.setZ(cylinders[i].p2.z - cylinders[i].p1.z);
+            perp_vec3 = get_perp_vec3_(vec3);
+            for(int k=0; )
+        }
+    }
+}
+
 void CloudProcessing::get_line_graph_(void)
 {
     float dist;
