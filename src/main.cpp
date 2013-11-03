@@ -376,7 +376,6 @@ int main(int argc, char **argv)
                     sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
                     ROS_INFO("Original cloud size: %d",pc2.height*pc2.width);
                     TubePerception::CloudProcessing cp(pc2);
-                    cp.processCloud();
                     cp.displayCloud(5);
                     //cp.displayAxisPoints(5);
                     //cp.displayLines(60);

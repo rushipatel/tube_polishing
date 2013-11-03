@@ -29,14 +29,32 @@ Tube::Tube(sensor_msgs::PointCloud2 &tubeCloud)
     num_of_points_ = tube_cloud_->points.size();
 }
 
-void CloudProcessing::processCloud(void)
+geometry_msgs::Pose Cylinder::getPose(void)
+{
+    return pose_;
+}
+
+tf::Transform Cylinder::getTransform(void)
+{
+    tf::Transform tf;
+    tf.setOrigin(tf::Vector3(pose_.position.x, pose_.position.y, pose_.position.z));
+    tf::Quaternion q;
+    q.setX(pose_.orientation.x);
+    q.setY(pose_.orientation.y);
+    q.setZ(pose_.orientation.z);
+    q.setW(pose_.orientation.w);
+    tf.setRotation(q);
+    return tf;
+}
+
+void CloudProcessing::processCloud_(void)
 {
     compensateError();
     estimate_normals_();
     get_radius_();
     collaps_normals_();
     segmentize_axis_();
-    get_point_of_interest_();
+    define_pose_();
     //get_line_graph_();
     //get_curves_();
     //print_line_graph_();
@@ -49,9 +67,9 @@ bool CloudProcessing::writeAxisPointsOnFile(std::string fileName)
     return false;
 }
 
-btVector3 CloudProcessing::get_perp_vec3_(btVector3 v3)
+tf::Vector3 CloudProcessing::get_perp_vec3_(tf::Vector3 v3)
 {
-    btVector3 perp_vec, unit_vec;
+    tf::Vector3 perp_vec, unit_vec;
     unit_vec.setZero();
     int a = v3.furthestAxis(); //0,1,2=x,y,z
     if(a==1)
@@ -65,36 +83,32 @@ btVector3 CloudProcessing::get_perp_vec3_(btVector3 v3)
     return perp_vec;
 }
 
-void CloudProcessing::get_point_of_interest_()
+//cylindrical axis is X
+void CloudProcessing::define_pose_(void)
 {
-    PointT p;
+    tf::Vector3 v1, v2, v3;
+    tf::Matrix3x3 mat;
+    tf::Quaternion q;
     for(size_t i=0; i<cylinders.size(); i++)
     {
-        if(cylinders[i].isStrong)
-        {
-            p.x = (cylinders[i].p1.x + cylinders[i].p2.x) / 2;
-            p.y = (cylinders[i].p1.y + cylinders[i].p2.y) / 2;
-            p.z = (cylinders[i].p1.z + cylinders[i].p2.z) / 2;
-            p.rgb = cylinders[i].p1.rgb; //in case
+        cylinders[i].pose_.position.x = (cylinders[i].p1.x + cylinders[i].p2.x) / 2;
+        cylinders[i].pose_.position.y = (cylinders[i].p1.y + cylinders[i].p2.y) / 2;
+        cylinders[i].pose_.position.z = (cylinders[i].p1.z + cylinders[i].p2.z) / 2;
 
-            cylinders[i].pointsOfInterest.push_back(p);
-        }
-    }
-}
+        v1.setX(cylinders[i].p2.x - cylinders[i].p1.x);
+        v1.setY(cylinders[i].p2.y - cylinders[i].p1.y);
+        v1.setZ(cylinders[i].p2.z - cylinders[i].p1.z);
+        v2 = get_perp_vec3_(v1);
+        v1.normalize();
+        v3 = v1.cross(v2);
+        v3.normalize();
 
-void CloudProcessing::get_trajectories_of_interest_()
-{
-    btVector3 vec3, perp_vec3;
-    for(int i=0; i<cylinders.size(); i++)
-    {
-        for(int j=0; j<cylinders[i].pointsOfInterest.size(); j++)
-        {
-            vec3.setX(cylinders[i].p2.x - cylinders[i].p1.x);
-            vec3.setY(cylinders[i].p2.y - cylinders[i].p1.y);
-            vec3.setZ(cylinders[i].p2.z - cylinders[i].p1.z);
-            perp_vec3 = get_perp_vec3_(vec3);
-            for(int k=0; )
-        }
+        mat.setValue(v1.x(),v1.y(),v1.z(), v2.x(), v2.y(),v2.z(),v3.x(),v3.y(),v3.z());
+        mat.getRotation(q);
+        cylinders[i].pose_.orientation.x = q.x();
+        cylinders[i].pose_.orientation.y = q.y();
+        cylinders[i].pose_.orientation.z = q.z();
+        cylinders[i].pose_.orientation.w = q.w();
     }
 }
 
@@ -520,7 +534,7 @@ void CloudProcessing::displayCylinders(int sec)
         std::strstream ss;
         ss<<"Cylinder_"<<i;
         viewer->addCylinder(coeffs,ss.str());
-        ss<<"_weld";
+        /*ss<<"_weld";
         sum = coeffs.values[3]+coeffs.values[4]+coeffs.values[5];
         sum = 0.005/sum;
         if(!cylinders[i].pointsOfInterest.empty())
@@ -533,7 +547,7 @@ void CloudProcessing::displayCylinders(int sec)
             coeffs.values[5] *= sum;
             coeffs.values[6] = cylinders[i].radius + 0.0015;
             viewer->addCylinder(coeffs,ss.str());
-        }
+        }*/
     }
     viewer->addPointCloud<PointT> (axis_points_,"LinePoints");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "LinePoints");

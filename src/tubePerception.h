@@ -47,12 +47,14 @@ namespace TubePerception
     public:
         PointT p1;
         PointT p2;
+        PointT centerPoint;
         float radius;
         bool isStrong;
-        std::vector<PointT> pointsOfInterest;
+        geometry_msgs::Pose pose_;
         std::vector<int> neighbourCylinders;
-
         pcl::ModelCoefficients coefficients;
+        tf::Transform getTransform(void);
+        geometry_msgs::Pose getPose(void);
     };
 
     class Curve
@@ -66,8 +68,7 @@ namespace TubePerception
     public:
         Tube(sensor_msgs::PointCloud2 &tubeCloud);
         //~Tube();
-       std::vector<TubePerception::Cylinder> cylinders;
-       std::vector<Curve> curves;
+        std::vector<TubePerception::Cylinder> cylinders;
 
     protected:
         pcl::PointCloud<PointT>::Ptr tube_cloud_;
@@ -86,10 +87,12 @@ namespace TubePerception
             weak_line_thr_ = 0.1;
             min_points_ = 0.05;
             z_error_ = 0;
+
+            processCloud_();
         }
         //CloudProcessing(sensor_msgs::PointCloud2 &tubeCloud, geometry_msgs::Pose sensorPose);
         //~CloudProcessing();
-        void processCloud(void);
+
         void displayCloud(int sec);
         void displayAxisPoints(int sec);
         void displayCylinders(int sec);
@@ -98,6 +101,7 @@ namespace TubePerception
         bool writeAxisPointsOnFile(std::string fileName);
 
     private:
+        void processCloud_(void);
         void estimate_normals_(void);
         void get_radius_(void);
         void collaps_normals_(void);
@@ -112,10 +116,8 @@ namespace TubePerception
         void get_line_graph_(void);
         void print_line_graph_(void);
         void add_neighbour_(int cyl_ind, int neighbour_ind);
-        void get_point_of_interest_(void);
-        btVector3 get_perp_vec3_(btVector3 v3);
-        void get_trajectories_of_interest_(void);
-        btVector3 CloudProcessing::get_perp_vec3_(btVector3 v3);
+        tf::Vector3 get_perp_vec3_(tf::Vector3 v3);
+        void define_pose_(void);
         float r_;
         float strong_line_thr_;
         float min_points_;
