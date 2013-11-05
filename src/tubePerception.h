@@ -33,9 +33,7 @@
 #include <pcl/surface/mls.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/pcl_base.h>
-#include <pcl/filters/radius_outlier_removal.h>
 
-#include <boost/thread/thread.hpp>
 #include <sstream>
 
 typedef pcl::PointXYZRGBNormal PointT;
@@ -50,7 +48,8 @@ namespace TubePerception
         PointT centerPoint;
         float radius;
         bool isStrong;
-        geometry_msgs::Pose pose_;
+        geometry_msgs::Pose pose;
+        tf::Vector3 axisVector;
         std::vector<int> neighbourCylinders;
         pcl::ModelCoefficients coefficients;
         tf::Transform getTransform(void);
@@ -110,7 +109,7 @@ namespace TubePerception
         void remove_inliers_(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices);
         void get_line_points_(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2);
         void segmentize_axis_(void);
-        void compensateError(void);
+        void compensate_error_(void);
         void cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers);
         float is_in_cylinder_( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt );
         void get_line_graph_(void);
