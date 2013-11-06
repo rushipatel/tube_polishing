@@ -13,19 +13,6 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <visualization_msgs/MarkerArray.h>
 
-#include <pcl/pcl_base.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/filters/extract_indices.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
-#include <pcl_ros/transforms.h>
-#include <pcl_ros/io/pcd_io.h>
-#include <pcl/visualization/cloud_viewer.h>
-#include <pcl/octree/octree_search.h>
-
-#include <pcl/sample_consensus/sac_model_circle.h>
-
 #include <gazebo_msgs/SpawnModel.h>
 #include <stdio.h>
 #include <Eigen/Eigen>
@@ -33,6 +20,7 @@
 #include "dualArms.h"
 #include "robotHead.h"
 #include "tubePerception.h"
+#include "tubeGrasp.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
@@ -48,60 +36,7 @@ void tfToPose(tf::Transform &tf, geometry_msgs::Pose &pose )
     pose.orientation.z = tf.getRotation().getZ();
     pose.orientation.w = tf.getRotation().getW();
 }
-void generate_normal_marker(pcl::PointCloud<pcl::PointXYZ >::Ptr points, pcl::PointCloud<pcl::Normal>::Ptr normals, visualization_msgs::Marker &markers)
-{
-    if(points->points.size()!=normals->points.size())
-    {
-        ROS_ERROR("Size of Points and Normals is different. May be both are not from same dataset");
-        return;
-    }
 
-    visualization_msgs::Marker marker;
-    geometry_msgs::Point p;
-
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.lifetime = ros::Duration();
-
-    marker.type = visualization_msgs::Marker::SPHERE;
-    marker.scale.x = 1;
-    marker.scale.y = 0.001;
-    marker.scale.z = 0.001;
-
-    marker.color.r = ((double)rand())/RAND_MAX;
-    marker.color.g = ((double)rand())/RAND_MAX;
-    marker.color.b = ((double)rand())/RAND_MAX;
-    marker.color.a = 1.0;
-
-    marker.header = points->header;
-
-    unsigned int marker_id=1;
-    marker.ns = "tube_polishing_node";
-    marker.id = marker_id;
-    //marker.points.resize(2);
-
-    for(size_t i=0; i<points->points.size(); i++)
-    {
-        p.x = points->points[i].x;
-        p.y = points->points[i].y;
-        p.z = points->points[i].z;
-
-        marker.points.push_back(p);
-        /*marker.points[1]= p;
-
-        p.x += normals->points[i].normal_x/100;
-        p.y += normals->points[i].normal_y/100;
-        p.z += normals->points[i].normal_z/100;
-
-        marker.points[0] = p;*/
-
-        //marker.ns = "tube_polishing_node";
-
-        //marker_id++;
-        //marker.id = marker_id;
-        //markers->markers.push_back(marker);
-    }
-    markers = marker;
-}
 
 void rotateAroundCenter(ros::NodeHandle rh)
 {
@@ -229,12 +164,21 @@ int main(int argc, char **argv)
                     sensor_msgs::PointCloud2 pc2;
                     sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
                     ROS_INFO("Original cloud size: %d",pc2.height*pc2.width);
-                    TubePerception::CloudProcessing cp(pc2);
-                    cp.displayCloud(5);
-                    //cp.displayAxisPoints(5);
-                    //cp.displayLines(60);
-                    cp.displayCylinders(0);
-                    cp.writeAxisPointsOnFile("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/axis_points.pcd");
+
+                    TubePerception::Tube::Ptr tube(new TubePerception::Tube(pc2));
+                    TubePerception::CloudProcessing cp(tube);
+
+                    //cp.displayCloud();
+                    //cp.displayAxisPoints();
+                    //cp.displayLines();
+                    //cp.displayCylinders();
+                    cp.displayCylindersInLocalFrame();
+                    //cp.writeAxisPointsOnFile("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/axis_points.pcd");
+
+                    TubeGrasp::GraspArray::Ptr grasp_array(new TubeGrasp::GraspArray);
+                    TubeGrasp::GraspAnalysis grasp_analysis(grasp_array);
+                    grasp_analysis.generateGrasps(tube);
+                    TubeGrasp::diaplayGraspsInGlobalFrame(grasp_array, tube->getTransform());
                 }
             }
             else

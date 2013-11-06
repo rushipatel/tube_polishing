@@ -7,6 +7,7 @@
 #include <geometry_msgs/Pose.h>
 #include <pcl/ros/conversions.h>
 #include <Eigen/Core>
+#include <tf/LinearMath/Matrix3x3.h>
 
 #include <pcl/point_types.h>
 #include <pcl/common/io.h>
@@ -48,39 +49,47 @@ namespace TubePerception
         PointT centerPoint;
         float radius;
         bool isStrong;
-        geometry_msgs::Pose pose;
+
         tf::Vector3 axisVector;
         std::vector<int> neighbourCylinders;
         pcl::ModelCoefficients coefficients;
-        tf::Transform getTransform(void);
-        geometry_msgs::Pose getPose(void);
-    };
+        tf::Transform getGlobalTransform(void);
+        tf::Transform getLocalTransform(void); //tf to first cylinder in vector
+        geometry_msgs::Pose getGlobalPose(void);
+        geometry_msgs::Pose getLocalPose(void);
+        void setLocalTransform(tf::Transform &tf);
+        void setGlobalPose(geometry_msgs::Pose &pose);
 
-    class Curve
-    {
-    public:
-        std::vector<PointT> curve_points;
+    private:
+        geometry_msgs::Pose pose_; //global to frame that is point cloud frame (base_link)
+        tf::Transform local_tf_; //Local to first cylinder
     };
 
     class Tube
     {
     public:
-        Tube(sensor_msgs::PointCloud2 &tubeCloud);
+        Tube(sensor_msgs::PointCloud2 &rosTubeCloud);
         //~Tube();
         std::vector<TubePerception::Cylinder> cylinders;
+        geometry_msgs::Pose getPose(void);
+        tf::Transform getTransform(void);
+        void setPose(geometry_msgs::Pose &pose);
+        typedef boost::shared_ptr<TubePerception::Tube> Ptr;
+        pcl::PointCloud<PointT>::Ptr tubeCloud;
+        pcl::PointCloud<PointT>::Ptr axisPoints;
 
     protected:
-        pcl::PointCloud<PointT>::Ptr tube_cloud_;
-        pcl::PointCloud<PointT>::Ptr axis_points_;
-        int num_of_points_;
+        geometry_msgs::Pose pose_;  //in global(base_link) frame
     };
 
-    class CloudProcessing : public Tube
+    class CloudProcessing
     {
     public:
-        CloudProcessing(sensor_msgs::PointCloud2 &tubeCloud) : Tube(tubeCloud)
+
+        CloudProcessing(TubePerception::Tube::Ptr tube_ptr)
         {
-            num_of_points_ = tube_cloud_->points.size();
+            tube_ = tube_ptr;
+            num_of_points_ = tube_->tubeCloud->points.size();
             r_ = 0;
             strong_line_thr_ = 0.2;
             weak_line_thr_ = 0.1;
@@ -92,10 +101,11 @@ namespace TubePerception
         //CloudProcessing(sensor_msgs::PointCloud2 &tubeCloud, geometry_msgs::Pose sensorPose);
         //~CloudProcessing();
 
-        void displayCloud(int sec);
-        void displayAxisPoints(int sec);
-        void displayCylinders(int sec);
-        void displayLines(int sec);
+        void displayCloud(void);
+        void displayAxisPoints(void);
+        void displayCylinders(void);
+        void displayLines(void);
+        void displayCylindersInLocalFrame(void);
         void setZerror(float error);
         bool writeAxisPointsOnFile(std::string fileName);
 
@@ -123,6 +133,8 @@ namespace TubePerception
         float weak_line_thr_;
         pcl::PointCloud<PointT>::Ptr raw_axis_points_;
         float z_error_;
+        int num_of_points_;
+        TubePerception::Tube::Ptr tube_;
     };
 
 }
