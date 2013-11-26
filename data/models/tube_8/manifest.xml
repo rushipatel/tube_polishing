@@ -1,0 +1,6 @@
+<package>
+  <description brief="tube_8.SLDPRT">tube_8.SLDPRT</description>
+  <depend package="gazebo" />
+  <author>me</author>
+  <license>BSD</license>
+</package>

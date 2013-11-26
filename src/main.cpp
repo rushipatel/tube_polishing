@@ -168,17 +168,17 @@ int main(int argc, char **argv)
                     TubePerception::Tube::Ptr tube(new TubePerception::Tube(pc2));
                     TubePerception::CloudProcessing cp(tube);
 
-                    //cp.displayCloud();
-                    //cp.displayAxisPoints();
+                    cp.displayCloud();
+                    cp.displayAxisPoints();
                     //cp.displayLines();
-                    //cp.displayCylinders();
-                    cp.displayCylindersInLocalFrame();
+                    cp.displayCylinders();
+                    //cp.displayCylindersInLocalFrame();
                     //cp.writeAxisPointsOnFile("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/axis_points.pcd");
 
                     TubeGrasp::GraspArray::Ptr grasp_array(new TubeGrasp::GraspArray);
                     TubeGrasp::GraspAnalysis grasp_analysis(grasp_array);
                     grasp_analysis.generateGrasps(tube);
-                    TubeGrasp::diaplayGraspsInGlobalFrame(grasp_array, tube->getTransform());
+                    cp.displayCylinders(TubeGrasp::displayGrasps(grasp_array));
                 }
             }
             else

@@ -40,7 +40,8 @@ void GraspAnalysis::generateGrasps(TubePerception::Tube::Ptr tube)
                 quaternion.setEulerZYX(0.0, 0.0, k*circular_step_size);
                 step_tf.setRotation(quaternion);
                 tf_grasp_cyl = step_tf*wrist_axis_tf;
-                tf_grasp_tube = tube->cylinders[i].getLocalTransform() * tf_grasp_cyl;
+                //tf_grasp_tube = tube->cylinders[i].getLocalTransform() * tf_grasp_cyl;  //temp local transform is not working
+                tf_grasp_tube = tube->cylinders[i].getGlobalTransform() * tf_grasp_cyl;
                 tf::Vector3 orig = tf_grasp_tube.getOrigin();
                 tf::Quaternion q = tf_grasp_tube.getRotation();
                 grasp.wristPose.position.x = orig.x();
@@ -56,6 +57,11 @@ void GraspAnalysis::generateGrasps(TubePerception::Tube::Ptr tube)
         }
     }
     ROS_INFO("%d grasps generated",grasp_array_->grasps.size());
+}
+
+void generateGraspPairs(void)
+{
+    
 }
 
 void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Transform tube_tf)
@@ -133,7 +139,7 @@ void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Tran
     viewer->spin();
 }
 
-void displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array)
+boost::shared_ptr<pcl::visualization::PCLVisualizer> displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array)
 {
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
@@ -153,9 +159,10 @@ void displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array)
         viewer->addSphere(coeffs, ss.str());
     }
     //viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "Grasps");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
+    //viewer->addCoordinateSystem (1.0);
+    //viewer->initCameraParameters ();
+    //viewer->spin();
+    return viewer;
 }
 
 }// NAMESPACE TUBEGRASP

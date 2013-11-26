@@ -1,0 +1,43 @@
+<robot
+  name="tube_8.SLDPRT">
+  <link
+    name="tube_8">
+    <inertial>
+      <origin
+        xyz="0.0081692 -0.023985 0.023311"
+        rpy="0 0 0" />
+      <mass
+        value="0.75109" />
+      <inertia
+        ixx="0.00441097942441028"
+        ixy="-0.00344923235755753"
+        ixz="-0.00165240723313545"
+        iyy="0.016476514650314"
+        iyz="0.000149763267503729"
+        izz="0.0199105285143943" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 1.57" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_8/meshes/tube_8.stl" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.64706 0.61961 0.58824 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 1.57" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_8/meshes/tube_8.stl" />
+      </geometry>
+    </collision>
+  </link>
+</robot>
