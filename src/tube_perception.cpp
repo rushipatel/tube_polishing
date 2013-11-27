@@ -216,22 +216,22 @@ void CloudProcessing::define_pose_(void)
     {
         transf = tf::Transform::getIdentity();
         tube_->cylinders[0].setLocalTransform(transf);
-        //pose = tube_->cylinders[0].getGlobalPose();
+        /*//pose = tube_->cylinders[0].getGlobalPose();
         pose.position.x = tube_->cylinders[0].p1.x;
         pose.position.y = tube_->cylinders[0].p1.y;
         pose.position.z = tube_->cylinders[0].p1.z;
-        pose.orientation.w = 1;
-        pose.orientation.x = 0; pose.orientation.y = 0; pose.orientation.z = 0;
+        pose.orientation = tube_->cylinders[0]*/
+        pose = tube_->cylinders[0].getGlobalPose();
         tube_->setPose(pose);  //Tube's pose first cylinder's global pose
     }
 
     for(size_t i=1; i<tube_->cylinders.size(); i++)
     {
-        tf::Transform tf_tube,tf_cyl,tf_cyl_tube;
+        tf::Transform tf_tube,tf_cyl,tf_tube_cyl;
         tf_cyl = tube_->cylinders[i].getGlobalTransform();
         tf_tube = tube_->getTransform();
-        tf_cyl_tube = tf_tube.inverse() * tf_cyl;
-        tube_->cylinders[i].setLocalTransform(tf_cyl_tube);
+        tf_tube_cyl = tf_tube.inverse() * tf_cyl;
+        tube_->cylinders[i].setLocalTransform(tf_tube_cyl);
     }
 }
 
@@ -752,14 +752,12 @@ void CloudProcessing::displayCylindersInLocalFrame(void)
         colm3 = mat.getColumn(2);
 
         vec.setX(colm1.getX());
-        vec.setY(colm2.getX());
-        vec.setZ(colm3.getX());
+        vec.setY(colm1.getY());
+        vec.setZ(colm1.getZ());
 
         vec.normalize();
         float len = tube_->cylinders[i].axisVector.length();
-        vec.setX(vec.x()*len);
-        vec.setY(vec.y()*len);
-        vec.setZ(vec.z()*len);
+        vec = vec*len;
 
         coeffs.values[0] = pose.position.x;
         coeffs.values[1] = pose.position.y;

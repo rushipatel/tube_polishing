@@ -1,5 +1,6 @@
 <launch>
-    
+   
+  <include file="$(find pr2_description)/robots/upload_pr2.launch" />
   <!-- load pr2_empty_world -->
   <include file="$(find tube_polishing)/launch/pr2_table_object.launch" />
   

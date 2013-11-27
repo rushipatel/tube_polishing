@@ -7,9 +7,10 @@ Grasp::Grasp()
 {
 }
 
-GraspAnalysis::GraspAnalysis(TubeGrasp::GraspArray::Ptr grasp_array)
+GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube)
 {
-    grasp_array_ = grasp_array;
+    //grasp_array_ = grasp_array;
+    grasp_array_.reset(new (TubeGrasp::GraspArray));
     axis_step_size_ = 0.05;
     circular_steps_ = 8;
     wrist_axis_offset_ = 0.072; //72 mm from axis of cylinder to wrist origin
@@ -59,9 +60,16 @@ void GraspAnalysis::generateGrasps(TubePerception::Tube::Ptr tube)
     ROS_INFO("%d grasps generated",grasp_array_->grasps.size());
 }
 
-void generateGraspPairs(void)
+void generateGraspPairs(geometry_msgs::PoseArray::Ptr pose_array)
 {
-    
+    //P' = A + {(AB • AP) / || AB ||²} AB
+    geometry_msgs::Point p;
+    geometry_msgs::Pose pose;
+    for(int i=0; i<pose_array->poses.size(); i++)
+    {
+        pose = pose_array->poses[i];
+        pose.position
+    }
 }
 
 void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Transform tube_tf)
