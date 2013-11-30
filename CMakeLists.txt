@@ -21,6 +21,7 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #rosbuild_gensrv()
 #common commands for building c++ executables and libraries
 rosbuild_add_library(dual_arms_lib src/dual_arms.cpp src/robot_head.cpp)
+#rosbuild_add_library(dual_arms2_lib src/dual_arms2.cpp)
 rosbuild_add_library(tube_perception_lib src/tube_perception.cpp)
 rosbuild_add_library(tube_grasp_lib src/tube_grasp.cpp)
 rosbuild_add_executable(${PROJECT_NAME} src/main.cpp)

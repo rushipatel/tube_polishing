@@ -21,6 +21,7 @@
 #include "robotHead.h"
 #include "tubePerception.h"
 #include "tubeGrasp.h"
+#include "manipulability_matric.cpp"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
@@ -111,7 +112,7 @@ int main(int argc, char **argv)
     ros::AsyncSpinner spinner(1);
     spinner.start();
 
-    ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
+    /*ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
     ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
     //ros::Publisher cloud_pub = rh.advertise<sensor_msgs::PointCloud2>("tube_cloud",2);
     //ros::Publisher marker_pub = rh.advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
@@ -178,10 +179,11 @@ int main(int argc, char **argv)
                     //cp.displayCylindersInLocalFrame();
                     //cp.writeAxisPointsOnFile("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/axis_points.pcd");
 
-                    TubeGrasp::GraspArray::Ptr grasp_array(new TubeGrasp::GraspArray);
-                    TubeGrasp::GraspAnalysis grasp_analysis(grasp_array);
-                    grasp_analysis.generateGrasps(tube);
-                    cp.displayCylinders(TubeGrasp::displayGrasps(grasp_array));
+                    //TubeGrasp::GraspArray::Ptr grasp_array(new TubeGrasp::GraspArray);
+                    //TubeGrasp::GraspAnalysis grasp_analysis(grasp_array);
+                    //grasp_analysis.generateGrasps(tube);
+                    //cp.displayCylinders(TubeGrasp::displayGrasps(grasp_array));
+                    cp.dispalyWorkTraj();
                 }
             }
             else
@@ -190,6 +192,7 @@ int main(int argc, char **argv)
         else
             ROS_ERROR("Call to segmentation service failed");
     }
-  //ros::spin();
+  //ros::spin();*/
+    get_jacobian(false, rh);
   ros::shutdown();
 }

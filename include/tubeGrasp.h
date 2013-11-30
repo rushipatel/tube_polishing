@@ -42,7 +42,7 @@ namespace TubeGrasp
     class GraspAnalysis
     {
     public:
-        GraspAnalysis(TubeGrasp::GraspArray::Ptr tube);
+        GraspAnalysis(TubePerception::Tube::Ptr tube);
         void generateGrasps(TubePerception::Tube::Ptr tube);
         void generateGraspPairs(void);
 

@@ -804,4 +804,29 @@ void CloudProcessing::displayLines(void)
     viewer->spin();
 }
 
+void CloudProcessing::dispalyWorkTraj(void)
+{
+    geometry_msgs::PoseArray pa;
+    geometry_msgs::Pose pose;
+    pa = tube_->workTrajectories[0];
+    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
+    cloud->points.resize(pa.poses.size());
+    for(int i=0; i<pa.poses.size();i++)
+    {
+        pose = pa.poses[i];
+        cloud->points[i].x = pose.position.x;
+        cloud->points[i].y = pose.position.y;
+        cloud->points[i].z = pose.position.z;
+    }
+    
+    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    viewer->setBackgroundColor (0, 0, 0);
+    viewer->addPointCloud<PointT> (cloud,"traj_cloud");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "traj_cloud");
+    viewer->addCoordinateSystem (1.0);
+    viewer->initCameraParameters ();
+    viewer->spin();
+}
+
 }//TubePerception
+

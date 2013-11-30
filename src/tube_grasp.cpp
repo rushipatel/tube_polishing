@@ -65,10 +65,14 @@ void generateGraspPairs(geometry_msgs::PoseArray::Ptr pose_array)
     //P' = A + {(AB • AP) / || AB ||²} AB
     geometry_msgs::Point p;
     geometry_msgs::Pose pose;
+    pcl::PointCloud<PointT> point_cloud;
+    point_cloud.points.resize(pose_array->poses.size());
     for(int i=0; i<pose_array->poses.size(); i++)
     {
         pose = pose_array->poses[i];
-        pose.position
+        point_cloud.points[i].x = pose.position.x;
+        point_cloud.points[i].y = pose.position.y;
+        point_cloud.points[i].z = pose.position.z;
     }
 }
 

@@ -110,6 +110,7 @@ namespace TubePerception
         void displayCylindersInLocalFrame(void);
         void setZerror(float error);
         bool writeAxisPointsOnFile(std::string fileName);
+        void dispalyWorkTraj(void);
 
     private:
         void processCloud_(void);

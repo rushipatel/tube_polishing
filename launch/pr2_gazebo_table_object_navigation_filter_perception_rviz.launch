@@ -1,11 +1,14 @@
 <launch>
    
-  <include file="$(find pr2_description)/robots/upload_pr2.launch" />
+  <!--include file="$(find pr2_arm_navigation_tutorials)/launch/planning_scene_architecture.launch" /-->
+  <include file="$(find pr2_arm_navigation_config)/launch/pr2_planning_environment.launch" />
+  <!--include file="$(find pr2_arm_navigation_perception)/launch/laser-perception.launch" /-->
+  <include file="$(find planning_environment)/launch/environment_server.launch"/>
   <!-- load pr2_empty_world -->
   <include file="$(find tube_polishing)/launch/pr2_table_object.launch" />
   
   <!-- load both_arm_navigation -->
-  <include file="$(find pr2_3dnav)/both_arms_navigation.launch"/>
+  <!--include file="$(find pr2_3dnav)/both_arms_navigation.launch"/-->
 
   <!-- load trajectory_unnormalize -->
   <include file="$(find trajectory_filter_server)/launch/trajectory_unnormalize.launch"/>
