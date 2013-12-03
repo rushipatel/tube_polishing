@@ -15,7 +15,7 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube)
     circular_steps_ = 8;
     wrist_axis_offset_ = 0.072; //72 mm from axis of cylinder to wrist origin
 }
-
+//generate grasps in global frame usually base_link
 void GraspAnalysis::generateGrasps(TubePerception::Tube::Ptr tube)
 {
     TubeGrasp::Grasp grasp;
@@ -60,19 +60,28 @@ void GraspAnalysis::generateGrasps(TubePerception::Tube::Ptr tube)
     ROS_INFO("%d grasps generated",grasp_array_->grasps.size());
 }
 
-void generateGraspPairs(geometry_msgs::PoseArray::Ptr pose_array)
+void generateGraspPairs( TubeGrasp::GraspArray::Ptr grasp_array,
+                         TubePerception::Tube::Ptr tube,
+                         unsigned int workTrajIdx )
 {
-    //P' = A + {(AB • AP) / || AB ||²} AB
-    geometry_msgs::Point p;
     geometry_msgs::Pose pose;
-    pcl::PointCloud<PointT> point_cloud;
-    point_cloud.points.resize(pose_array->poses.size());
-    for(int i=0; i<pose_array->poses.size(); i++)
+    geometry_msgs::PoseArray pose_array = 
+            tube->workTrajectories[workTrajIdx].trajectory;
+    tf::Vector3 test_p, vec;
+    tf::Vector3 p_in_plane = tube->workTrajectories[workTrajIdx].pointInPlane;
+    tf::Vector3 perp_to_plane = tube->workTrajectories[workTrajIdx].perpToPlane;
+    
+    TubeGrasp::GraspArray grasps1, grasps2;
+    TubeGrasp::Grasp grasp;
+    
+    for(int i=0; i<grasp_array->grasps.size(); i++)
     {
-        pose = pose_array->poses[i];
-        point_cloud.points[i].x = pose.position.x;
-        point_cloud.points[i].y = pose.position.y;
-        point_cloud.points[i].z = pose.position.z;
+        test_p.x = grasp_array->grasps[i].wristPose.position.x;
+        test_p.y = grasp_array->grasps[i].wristPose.position.y;
+        test_p.z = grasp_array->grasps[i].wristPose.position.z;
+        vec = tesp_p - p_in_plane;
+        if(vec.dot(perp_to_plane)>0)
+            
     }
 }
 

@@ -133,7 +133,7 @@ void CloudProcessing::generate_work_trajectory_()
     vec3 = perp_vec.rotate(axis, ((double)rand()/RAND_MAX)*M_PI );
     for(int i=0; i<90; i++)
     {
-        vec3 = vec3.rotate(axis,i/(2*M_PI));
+        vec3 = vec3.rotate(axis,(i*M_PI)/180);
         vec3.normalize();
         point = at_point + vec3*tube_->cylinders[cylinder_idx].radius;
         pose.position.x = point.x();
@@ -152,7 +152,14 @@ void CloudProcessing::generate_work_trajectory_()
         pose.orientation.w = q.w();
         pa.poses.push_back(pose);
     }
-    tube_->workTrajectories.push_back(pa);
+    
+    TubePerception::WorkTrajectory wj;
+    wj.cylinderIdx = cylinder_idx;
+    wj.perpToPlane = tube_->cylinders[cylinder_idx].axisVector;
+    wj.perpToPlane.normalize();
+    wj.pointInPlane = at_point;
+    wj.trajectory = pa;
+    tube_->workTrajectories.push_back(wj);  
 }
 
 bool CloudProcessing::writeAxisPointsOnFile(std::string fileName)
@@ -808,7 +815,7 @@ void CloudProcessing::dispalyWorkTraj(void)
 {
     geometry_msgs::PoseArray pa;
     geometry_msgs::Pose pose;
-    pa = tube_->workTrajectories[0];
+    pa = tube_->workTrajectories[0].trajectory;
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
     cloud->points.resize(pa.poses.size());
     for(int i=0; i<pa.poses.size();i++)
@@ -822,6 +829,7 @@ void CloudProcessing::dispalyWorkTraj(void)
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
     viewer->addPointCloud<PointT> (cloud,"traj_cloud");
+    viewer->addPointCloud<PointT> (tube_->tubeCloud,"tube_cloud");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "traj_cloud");
     viewer->addCoordinateSystem (1.0);
     viewer->initCameraParameters ();

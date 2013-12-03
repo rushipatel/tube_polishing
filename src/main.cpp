@@ -21,7 +21,7 @@
 #include "robotHead.h"
 #include "tubePerception.h"
 #include "tubeGrasp.h"
-#include "manipulability_matric.cpp"
+#include "manip_analysis.cpp"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
@@ -193,6 +193,20 @@ int main(int argc, char **argv)
             ROS_ERROR("Call to segmentation service failed");
     }
   //ros::spin();*/
-    get_jacobian(false, rh);
+    manipAnalysis ma("right_arm", rh);
+    ma.setRotationAxis(tf::Vector3(1,0,0));
+    ma.setForceVec(tf::Vector3(1,0,0));
+    std::vector<double> q;
+    q.resize(7);
+    q[0] = -1.5;
+    q[1] =  0.0;
+    q[2] =  0.0;
+    q[3] =  0.0;
+    q[4] = -0.15;
+    q[5] = -0.1;
+    q[6] =  0.0;
+    ROS_INFO_STREAM("FORCE MATRIC   : "<<ma.getForceMatric(q));
+    ROS_INFO_STREAM("ROTATION MATRIC: "<<ma.getRotationMatric(q));
+    ROS_INFO_STREAM("K             : "<<ma.getManipIndex(q));
   ros::shutdown();
 }

@@ -64,7 +64,16 @@ namespace TubePerception
         geometry_msgs::Pose pose_; //global to frame that is point cloud frame (base_link)
         tf::Transform local_tf_; //Local to first cylinder
     };
-
+    
+    class WorkTrajectory
+    {
+    public:
+        geometry_msgs::PoseArray trajectory;
+        tf::Vector3 pointInPlane; //point in plane
+        tf::Vector3 perpToPlane; //plane perpendicular vector
+        unsigned int cylinderIdx;
+    };
+    
     class Tube
     {
     public:
@@ -77,7 +86,7 @@ namespace TubePerception
         typedef boost::shared_ptr<TubePerception::Tube> Ptr;
         pcl::PointCloud<PointT>::Ptr tubeCloud;
         pcl::PointCloud<PointT>::Ptr axisPoints;
-        std::vector<geometry_msgs::PoseArray> workTrajectories;
+        std::vector<TubePerception::WorkTrajectory> workTrajectories;
 
     protected:
         geometry_msgs::Pose pose_;  //in global(base_link) frame
