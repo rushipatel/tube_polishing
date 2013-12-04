@@ -43,15 +43,24 @@ namespace TubeGrasp
     {
     public:
         GraspAnalysis(TubePerception::Tube::Ptr tube);
-        void generateGrasps(TubePerception::Tube::Ptr tube);
-        void generateGraspPairs(void);
+        void setContactVector(tf::Vector3 contactVector);
+        void setWorkTrajIdx(int trajIdx);
+        void generateGrasps();
+        void generateGraspPairs();
 
     private:
+        TubePerception::Tube::Ptr tube_;
         TubeGrasp::GraspArray::Ptr grasp_array_;
-        TubeGrasp::GraspPairArray::Ptr grasp_pair_array_;
+        TubeGrasp::GraspPairArray::Ptr grasp_pairs_;
+        geometry_msgs::PoseArray trajectory_;
+        tf::Vector3 contact_vector_;
+        int traj_idx_;
         float axis_step_size_;
         int circular_steps_;
         float wrist_axis_offset_;
+        void generate_grasps_();
+        bool generate_work_trajectory_();
+        void generate_grasp_pairs_();
     };
     void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Transform tube_tf);
     boost::shared_ptr<pcl::visualization::PCLVisualizer> displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array);

@@ -44,35 +44,45 @@ namespace TubePerception
     class Cylinder// : public Line
     {
     public:
-        PointT p1;
-        PointT p2;
-        PointT centerPoint;
+        PointT p1; // global
+        PointT p2; // global
+        PointT centerPoint; //global
         float radius;
         bool isStrong;
 
-        tf::Vector3 axisVector;
+        tf::Vector3 axisVector; //Global
         std::vector<int> neighbourCylinders;
-        pcl::ModelCoefficients coefficients;
+        pcl::ModelCoefficients coefficients; // global
         tf::Transform getGlobalTransform(void);
-        tf::Transform getLocalTransform(void); //tf to first cylinder in vector
+        tf::Transform getLocalTransform(void); //tf to last (strong) cylinder in vector(array)
         geometry_msgs::Pose getGlobalPose(void);
         geometry_msgs::Pose getLocalPose(void);
         void setLocalTransform(tf::Transform &tf);
         void setGlobalPose(geometry_msgs::Pose &pose);
+        tf::Vector3 getLocalAxisVector(void); // in a tube frame
 
     private:
-        geometry_msgs::Pose pose_; //global to frame that is point cloud frame (base_link)
-        tf::Transform local_tf_; //Local to first cylinder
+        geometry_msgs::Pose pose_;//in global frame that is point cloud frame (base_link)
+        tf::Transform local_tf_;  //Local to last (strong) cylinder in vector(array)
     };
     
-    class WorkTrajectory
+    /*class WorkTrajectory
     {
     public:
         geometry_msgs::PoseArray trajectory;
         tf::Vector3 pointInPlane; //point in plane
         tf::Vector3 perpToPlane; //plane perpendicular vector
         unsigned int cylinderIdx;
+    };*/
+
+    struct Normal
+    {
+        tf::Point point;
+        tf::Vector3 vec;
+        unsigned int cylinderIdx;
     };
+
+    typedef std::vector<TubePerception::Normal> NormalArray;
     
     class Tube
     {
@@ -86,7 +96,10 @@ namespace TubePerception
         typedef boost::shared_ptr<TubePerception::Tube> Ptr;
         pcl::PointCloud<PointT>::Ptr tubeCloud;
         pcl::PointCloud<PointT>::Ptr axisPoints;
-        std::vector<TubePerception::WorkTrajectory> workTrajectories;
+        //in global frame, for current state of tube. Not actual pose of tube
+        //std::vector<TubePerception::WorkTrajectory> workTrajectories;
+        //work trajectories by NormalArray
+        std::vector<TubePerception::NormalArray> workTrajectories;
 
     protected:
         geometry_msgs::Pose pose_;  //in global(base_link) frame
@@ -139,7 +152,8 @@ namespace TubePerception
         void add_neighbour_(int cyl_ind, int neighbour_ind);
         tf::Vector3 get_perp_vec3_(tf::Vector3 v3);
         void define_pose_(void);
-        void generate_work_trajectory_();
+        void define_pose2_(void);
+        void generate_work_vectors_();
         float r_;
         float strong_line_thr_;
         float min_points_;

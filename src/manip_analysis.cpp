@@ -12,10 +12,10 @@
 
 //typedef boost::shared_ptr<std::vector<double>> JointValuePtr;
 
-class manipAnalysis
+class ManipAnalysis
 {
 public:
-    manipAnalysis(std::string which_arm, const ros::NodeHandle &nh);
+    ManipAnalysis(std::string whichArm, const ros::NodeHandle &nh);
     void setForceVec(tf::Vector3 vec);
     void setRotationAxis(tf::Vector3 vec);
     void setReferencePoint(tf::Vector3 pInTipFrame);
@@ -24,7 +24,7 @@ public:
     double getManipIndex(const std::vector<double> &q);
     
 private:
-    std::vector<double> q_;;
+    std::vector<double> q_;
     Eigen::MatrixXd jacobian_;
     Eigen::MatrixXd jacobian_t_;  //3x6 top 3 rows
     Eigen::MatrixXd jacobian_r_;  //3x6 bottom 3 rows
@@ -40,12 +40,12 @@ private:
     double get_manipulability_index_(void);
 };
 
-manipAnalysis::manipAnalysis(std::string which_arm, const ros::NodeHandle &nh)
+ManipAnalysis::ManipAnalysis(std::string whichArm, const ros::NodeHandle &nh)
 {
     bool right_arm;
-    if(which_arm.compare("right_arm"))
+    if(whichArm.compare("right_arm"))
         right_arm = true;
-    else if(which_arm.compare("left_arm"))
+    else if(whichArm.compare("left_arm"))
         right_arm = false;
     else
     {
@@ -95,7 +95,7 @@ manipAnalysis::manipAnalysis(std::string which_arm, const ros::NodeHandle &nh)
     ref_point_(2) = 0.0;
 }
 
-void manipAnalysis::update_jacobian_(void)
+void ManipAnalysis::update_jacobian_(void)
 {
     KDL::Jacobian jacob(chain_.getNrOfJoints());
     KDL::JntArray q_in(chain_.getNrOfJoints());
@@ -118,7 +118,7 @@ void manipAnalysis::update_jacobian_(void)
     jacobian_r_ = jacobian_.bottomRows(3);
 }
 
-double manipAnalysis::getForceMatric(const std::vector<double> &q)
+double ManipAnalysis::getForceMatric(const std::vector<double> &q)
 {
     q_=q;
     update_jacobian_();
@@ -127,7 +127,7 @@ double manipAnalysis::getForceMatric(const std::vector<double> &q)
     
 }
 
-double manipAnalysis::getRotationMatric(const std::vector<double> &q)
+double ManipAnalysis::getRotationMatric(const std::vector<double> &q)
 {
     q_=q;
     update_jacobian_();
@@ -135,7 +135,7 @@ double manipAnalysis::getRotationMatric(const std::vector<double> &q)
     return find_intersecting_len_(false);
 }
 
-double manipAnalysis::getManipIndex(const std::vector<double> &q)
+double ManipAnalysis::getManipIndex(const std::vector<double> &q)
 {
     q_ = q;
     update_jacobian_();
@@ -143,7 +143,7 @@ double manipAnalysis::getManipIndex(const std::vector<double> &q)
     return get_manipulability_index_();
 }
 
-double manipAnalysis::get_manipulability_index_()
+double ManipAnalysis::get_manipulability_index_()
 {
     Eigen::MatrixXd matrix = jacobian_ * jacobian_.transpose();
     Eigen::MatrixXd eigen_values;
@@ -153,7 +153,7 @@ double manipAnalysis::get_manipulability_index_()
     return (eigen_values.minCoeff()/eigen_values.maxCoeff());
 }
 
-double manipAnalysis::find_intersecting_len_(bool force)
+double ManipAnalysis::find_intersecting_len_(bool force)
 {
     Eigen::MatrixXd matrix;
     if(force)
@@ -202,21 +202,21 @@ double manipAnalysis::find_intersecting_len_(bool force)
     return l;
 }
 
-void manipAnalysis::setForceVec(tf::Vector3 vec)
+void ManipAnalysis::setForceVec(tf::Vector3 vec)
 {
     force_vec_(0) = vec.x();
     force_vec_(1) = vec.y();
     force_vec_(2) = vec.z();
 }
 
-void manipAnalysis::setRotationAxis(tf::Vector3 vec)
+void ManipAnalysis::setRotationAxis(tf::Vector3 vec)
 {
     axis_vec_(0) = vec.x();
     axis_vec_(1) = vec.y();
     axis_vec_(2) = vec.z();
 }
 
-void manipAnalysis::setReferencePoint(tf::Vector3 inTipFrame)
+void ManipAnalysis::setReferencePoint(tf::Vector3 inTipFrame)
 {
     ref_point_(0) = inTipFrame.x();
     ref_point_(1) = inTipFrame.y();

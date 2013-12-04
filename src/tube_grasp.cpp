@@ -10,13 +10,26 @@ Grasp::Grasp()
 GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube)
 {
     //grasp_array_ = grasp_array;
+    tube_ = tube;
     grasp_array_.reset(new (TubeGrasp::GraspArray));
+    grasp_pairs_.reset(new (TubeGrasp::GraspPairArray));
     axis_step_size_ = 0.05;
     circular_steps_ = 8;
     wrist_axis_offset_ = 0.072; //72 mm from axis of cylinder to wrist origin
 }
+
+void GraspAnalysis::setContactVector(tf::Vector3 contactVector)
+{
+    contact_vector_ = contactVector;
+}
+
+void GraspAnalysis::setWorkTrajIdx(int trajIdx)
+{
+    traj_idx_ = trajIdx;
+}
+
 //generate grasps in global frame usually base_link
-void GraspAnalysis::generateGrasps(TubePerception::Tube::Ptr tube)
+void GraspAnalysis::generate_grasps_()
 {
     TubeGrasp::Grasp grasp;
     TubePerception::Cylinder cyl;
@@ -24,25 +37,28 @@ void GraspAnalysis::generateGrasps(TubePerception::Tube::Ptr tube)
     tf::Quaternion quaternion;
     tf::Transform step_tf,wrist_axis_tf, tf_grasp_cyl, tf_grasp_tube;
 
-    wrist_axis_tf.setOrigin(tf::Vector3(0.0, wrist_axis_offset_,0.0)); // Y or Z doesn't matter as long as X is Cylinder Axis
+    // Y or Z doesn't matter as long as X is Cylinder Axis
+    wrist_axis_tf.setOrigin(tf::Vector3(0.0, wrist_axis_offset_,0.0));
     quaternion.setEulerZYX(-(M_PI/2), 0.0, (M_PI/2));
     wrist_axis_tf.setRotation(quaternion); //if offset is in Y then -90,0,90
 
-    for(size_t i=0; i<tube->cylinders.size(); i++)
+    for(size_t i=0; i<tube_->cylinders.size(); i++)
     {
-        int axis_steps = tube->cylinders[i].axisVector.length()/axis_step_size_; //floor value
+        //floor value
+        int axis_steps = tube_->cylinders[i].axisVector.length()/axis_step_size_;
 
         for(int j=1; j<=axis_steps; j++)
         {
-            step_tf.setOrigin( tf::Vector3( (j*axis_step_size_), 0.0, 0.0 ) ); // if X is Cylinder Axis
+            // if X is Cylinder Axis
+            step_tf.setOrigin( tf::Vector3( (j*axis_step_size_), 0.0, 0.0 ) );
             float circular_step_size = 2*M_PI/circular_steps_;
             for(int k=0; k<circular_steps_; k++)
             {
                 quaternion.setEulerZYX(0.0, 0.0, k*circular_step_size);
                 step_tf.setRotation(quaternion);
                 tf_grasp_cyl = step_tf*wrist_axis_tf;
-                //tf_grasp_tube = tube->cylinders[i].getLocalTransform() * tf_grasp_cyl;  //temp local transform is not working
-                tf_grasp_tube = tube->cylinders[i].getGlobalTransform() * tf_grasp_cyl;
+                //tf_grasp_tube_ = tube_->cylinders[i].getLocalTransform() * tf_grasp_cyl;  //temp local transform is not working
+                tf_grasp_tube = tube_->cylinders[i].getGlobalTransform() * tf_grasp_cyl;
                 tf::Vector3 orig = tf_grasp_tube.getOrigin();
                 tf::Quaternion q = tf_grasp_tube.getRotation();
                 grasp.wristPose.position.x = orig.x();
@@ -60,34 +76,57 @@ void GraspAnalysis::generateGrasps(TubePerception::Tube::Ptr tube)
     ROS_INFO("%d grasps generated",grasp_array_->grasps.size());
 }
 
-void generateGraspPairs( TubeGrasp::GraspArray::Ptr grasp_array,
-                         TubePerception::Tube::Ptr tube,
-                         unsigned int workTrajIdx )
+bool GraspAnalysis::generate_work_trajectory_()
 {
-    geometry_msgs::Pose pose;
-    geometry_msgs::PoseArray pose_array = 
-            tube->workTrajectories[workTrajIdx].trajectory;
-    tf::Vector3 test_p, vec;
-    tf::Vector3 p_in_plane = tube->workTrajectories[workTrajIdx].pointInPlane;
-    tf::Vector3 perp_to_plane = tube->workTrajectories[workTrajIdx].perpToPlane;
-    
-    TubeGrasp::GraspArray grasps1, grasps2;
-    TubeGrasp::Grasp grasp;
-    
-    for(int i=0; i<grasp_array->grasps.size(); i++)
+    TubePerception::Normal normal;
+    TubePerception::NormalArray normal_array;
+    if(traj_idx_>=tube_->workTrajectories.size())
     {
-        test_p.x = grasp_array->grasps[i].wristPose.position.x;
-        test_p.y = grasp_array->grasps[i].wristPose.position.y;
-        test_p.z = grasp_array->grasps[i].wristPose.position.z;
-        vec = tesp_p - p_in_plane;
-        if(vec.dot(perp_to_plane)>0)
-            
+        ROS_ERROR("GraspAnalysis - given trajectory index is not valid");
+        return false;
+    }
+    //normal_array = tube_->workTrajectories[i];
+    for(size_t i=0; i<normal_array.size(); i++)
+    {
+        normal = normal_array[i];
+        //normal.point
     }
 }
 
-void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Transform tube_tf)
+void GraspAnalysis::generate_grasp_pairs_()
 {
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    /*TubeGrasp::GraspPair grasp_pair;
+    TubeGrasp::GraspPairArray temp_pairs;
+    for(size_t i=0; i<grasp_array_->grasps.size(); i++)
+    {
+        for(size_t j=0; j<grasp_array_->grasps.size(); j++)
+        {
+            if(i!=j)
+            {
+                grasp_pair.rightGrasp = grasp_array->grasps[i];
+                grasp_pair.leftGrasp = grasp_array->grasps[j];
+                temp_pairs.graspPairs.push_back(grasp_pair);
+            }
+        }
+    }
+
+    for(size_t i=0; i<temp_pairs.graspPairs.size(); i++)
+    {
+        ;
+    }*/
+}
+
+//tf = current pose to machining pose
+void compute_matrics( tf::Transform tf, const TubeGrasp::GraspPair &grasp_pair )
+{
+    grasp_pair.leftGrasp;
+}
+
+void diaplayGraspsInGlobalFrame( TubeGrasp::GraspArray::Ptr grasp_array,
+                                 tf::Transform tube_tf )
+{
+    boost::shared_ptr<pcl::visualization::PCLVisualizer>
+            viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     pcl::PointXYZ p1,p2;
     viewer->setBackgroundColor (0, 0, 0);
     pcl::ModelCoefficients coeff;

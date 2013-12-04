@@ -112,7 +112,7 @@ int main(int argc, char **argv)
     ros::AsyncSpinner spinner(1);
     spinner.start();
 
-    /*ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
+    ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
     ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
     //ros::Publisher cloud_pub = rh.advertise<sensor_msgs::PointCloud2>("tube_cloud",2);
     //ros::Publisher marker_pub = rh.advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
@@ -172,18 +172,18 @@ int main(int argc, char **argv)
                     TubePerception::Tube::Ptr tube(new TubePerception::Tube(pc2));
                     TubePerception::CloudProcessing cp(tube);
 
-                    cp.displayCloud();
-                    cp.displayAxisPoints();
+                    //cp.displayCloud();
+                    //cp.displayAxisPoints();
                     //cp.displayLines();
-                    cp.displayCylinders();
-                    //cp.displayCylindersInLocalFrame();
+                    //cp.displayCylinders();
+                    cp.displayCylindersInLocalFrame();
                     //cp.writeAxisPointsOnFile("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/axis_points.pcd");
 
                     //TubeGrasp::GraspArray::Ptr grasp_array(new TubeGrasp::GraspArray);
                     //TubeGrasp::GraspAnalysis grasp_analysis(grasp_array);
                     //grasp_analysis.generateGrasps(tube);
                     //cp.displayCylinders(TubeGrasp::displayGrasps(grasp_array));
-                    cp.dispalyWorkTraj();
+                    //cp.dispalyWorkTraj();
                 }
             }
             else
@@ -192,8 +192,8 @@ int main(int argc, char **argv)
         else
             ROS_ERROR("Call to segmentation service failed");
     }
-  //ros::spin();*/
-    manipAnalysis ma("right_arm", rh);
+  //ros::spin();
+    ManipAnalysis ma("right_arm", rh);
     ma.setRotationAxis(tf::Vector3(1,0,0));
     ma.setForceVec(tf::Vector3(1,0,0));
     std::vector<double> q;
