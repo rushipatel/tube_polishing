@@ -45,7 +45,8 @@ void GraspAnalysis::generate_grasps_()
     for(size_t i=0; i<tube_->cylinders.size(); i++)
     {
         //floor value
-        int axis_steps = tube_->cylinders[i].axisVector.length()/axis_step_size_;
+        tf::Vector3 axis_vec = tube_->cylinders[i].getAxisVector();
+        int axis_steps = axis_vec.length()/axis_step_size_;
 
         for(int j=1; j<=axis_steps; j++)
         {

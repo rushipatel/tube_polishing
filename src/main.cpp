@@ -183,7 +183,7 @@ int main(int argc, char **argv)
                     //TubeGrasp::GraspAnalysis grasp_analysis(grasp_array);
                     //grasp_analysis.generateGrasps(tube);
                     //cp.displayCylinders(TubeGrasp::displayGrasps(grasp_array));
-                    //cp.dispalyWorkTraj();
+                    cp.dispalyWorkTraj();
                 }
             }
             else
