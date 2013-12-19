@@ -53,7 +53,7 @@ namespace TubePerception
         //tf::Vector3 axisVector; //Global
         tf::Vector3 getAxisVector();
         //std::vector<int> neighbourCylinders;
-        //pcl::ModelCoefficients coefficients; // global
+        pcl::ModelCoefficients coefficients; // global
         tf::Transform getGlobalTransform(void);
         //tf::Transform getLocalTransform(void); //tf to last (strong) cylinder in vector(array)
         geometry_msgs::Pose getGlobalPose(void);
@@ -93,7 +93,7 @@ namespace TubePerception
         //std::vector<TubePerception::WorkTrajectory> workTrajectories;
         //work trajectories by NormalArray
         std::vector<pcl::PointCloud<PointT>::Ptr> workPointsCluster;
-
+        unsigned int whichCylinder(PointT point);
     protected:
         geometry_msgs::Pose pose_;  //in global(base_link) frame
     };
