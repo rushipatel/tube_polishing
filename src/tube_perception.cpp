@@ -50,6 +50,31 @@ tf::Transform Tube::getTransform(void)
     return tf;
 }
 
+//point with normal
+unsigned int Tube::whichCylinder(PointT point)
+{
+    tf::Vector3 normal;
+    tf::Vector3 p;
+    normal.setValue(point.normal_x, point.normal_y, point.normal_z);
+    normal.normalize();
+    normal *= -0.005; // travel in reverse by 5 mm so it can lie inside some cylinder
+    point.x = point.x + normal.x();
+    point.y = point.y + normal.y();
+    point.z = point.z + normal.z();
+    for(size_t i=0; i<cylinders.size(); i++)
+    {
+        PointT p1 = cylinders[i].p1;
+        PointT p2 = cylinders[i].p2;
+
+        float l_sqr = ((p1.x - p2.x) * (p1.x - p2.x)) +
+                      ((p1.y - p2.y) * (p1.y - p2.y)) +
+                      ((p1.z - p2.z) * (p1.z - p2.z)) ;
+        if(isInCylinder(p1,p2,l_sqr,cylinders[i].radius,point))
+            return i;
+    }
+    return cylinders.size();
+}
+
 geometry_msgs::Pose Cylinder::getGlobalPose(void)
 {
     return global_pose_;
@@ -118,7 +143,7 @@ void CloudProcessing::processCloud_(void)
 
 //void CloudProcessing::
 
-//random 90degree circular trajectory
+//random 90degree circular trajectory. in global frame
 void CloudProcessing::generate_work_vectors_()
 {
 
@@ -141,20 +166,20 @@ void CloudProcessing::generate_work_vectors_()
 
     vec1 = perp_vec.rotate(axis, ((double)rand()/RAND_MAX)*M_PI );
     //vec1 = perp_vec;
-    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud);
+    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
     for(int i=0; i<45; i++)
     {
         vec2 = vec1.rotate(axis,(i*M_PI)/180);
         point = at_point + (vec2*tube_->cylinders[cylinder_idx].radius);
         vec2.normalize();
         PointT pointnormal;
-        pointnormal.x = point.x;
-        pointnormal.y = point.y;
-        pointnormal.z = point.z;
+        pointnormal.x = point.x();
+        pointnormal.y = point.y();
+        pointnormal.z = point.z();
         pointnormal.normal_x = vec2.x();
         pointnormal.normal_y = vec2.y();
         pointnormal.normal_z = vec2.z();
-        cloud.push_back(pointnormal);
+        cloud->points.push_back(pointnormal);
     }
     tube_->workPointsCluster.push_back(cloud);
 }
@@ -306,7 +331,7 @@ void CloudProcessing::define_pose2_(void)
 }
 
 
-void CloudProcessing::get_line_graph_(void)
+/*void CloudProcessing::get_line_graph_(void)
 {
     float dist;
     for(size_t i=0; i<tube_->cylinders.size(); i++)
@@ -345,7 +370,7 @@ void CloudProcessing::get_line_graph_(void)
             }
         }
     }
-}
+}*/
 
 //void CloudProcessing::add_neighbour_(int cyl_ind, int neighbour_ind)
 //{
@@ -603,7 +628,7 @@ void CloudProcessing::remove_inliers_(pcl::PointCloud<PointT>::Ptr points,  std:
     extract.filter(*points);
 }
 
-float CloudProcessing::is_in_cylinder_( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt )
+float isInCylinder( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt )
 {
     float dx, dy, dz;	// vector d  from line segment point 1 to point 2
     float pdx, pdy, pdz;	// vector pd from point 1 to test point
@@ -674,7 +699,7 @@ void CloudProcessing::cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Pt
 
     for(size_t i=0; i<cloud_in->points.size(); i++)
     {
-        if(is_in_cylinder_(p1, p2, l_sq, r_sq, cloud_in->points[i])>0)
+        if(isInCylinder_(p1, p2, l_sq, r_sq, cloud_in->points[i])>0)
         {
             inliers->indices.push_back(i);
             pts_cnt++;
@@ -823,10 +848,10 @@ void CloudProcessing::displayLines(void)
 
 void CloudProcessing::dispalyWorkTraj(void)
 {
-    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
+    pcl::PointCloud<PointT>::Ptr cloud;//(new pcl::PointCloud<PointT>);
     boost::shared_ptr<pcl::visualization::PCLVisualizer> 
             viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    for(int i=0; i<tube_->workPointsCluster; i++)
+    for(int i=0; i<tube_->workPointsCluster.size(); i++)
     {
         cloud = tube_->workPointsCluster[i];
         
@@ -853,7 +878,7 @@ void CloudProcessing::dispalyWorkTraj(void)
         std::strstream ss;
         ss.flush();
         ss<<"C"<<i;
-        viewer->addPointCloudNormals<PointT>(cloud,ss.str());
+        viewer->addPointCloud<PointT>(cloud,ss.str());
     }
     
     

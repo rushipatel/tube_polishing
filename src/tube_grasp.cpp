@@ -18,9 +18,17 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube)
     wrist_axis_offset_ = 0.072; //72 mm from axis of cylinder to wrist origin
 }
 
-void GraspAnalysis::setContactVector(tf::Vector3 contactVector)
+// contactVector: pointing towards axis of grinding wheel
+// axisVector: axis of grinding wheel. should be used in both directions
+/*void GraspAnalysis::setContactVectors(tf::Vector3 contactVector, tf::Vector3 axisVector)
 {
     contact_vector_ = contactVector;
+    axis_vector_ = axisVector;
+}*/
+
+void GraspAnalysis::setWorkPose(geometry_msgs::Pose pose)
+{
+    work_pose_ = pose;
 }
 
 void GraspAnalysis::setWorkTrajIdx(int trajIdx)
@@ -79,19 +87,31 @@ void GraspAnalysis::generate_grasps_()
 
 bool GraspAnalysis::generate_work_trajectory_()
 {
-    TubePerception::Normal normal;
-    TubePerception::NormalArray normal_array;
-    if(traj_idx_>=tube_->workTrajectories.size())
+    pcl::PointCloud<PointT>::Ptr cloud;
+    tf::Vector3 cyl_axis,x,y,z;
+
+    for(size_t i=0; i<tube_->workPointsCluster.size(); i++)
     {
-        ROS_ERROR("GraspAnalysis - given trajectory index is not valid");
-        return false;
+        cloud = tube_->workPointsCluster[i];
+        PointT point;
+        for(size_t j=0; j<cloud->points.size(); j++)
+        {
+            point = cloud->points[i];
+            unsigned int cyl_idx = tube_->whichCylinder(point);
+            if(cyl_idx != tube_->cylinders.size())
+                cyl_axis =tube_->cylinders[cyl_idx].getAxisVector();
+            else
+            {
+                ROS_ERROR("GraspAnalysis - Couldn't get cylinder index");
+                return false;
+            }
+            x.setValue(point.normal_x, point.normal_y, point.normal_z);
+            z = x.cross(cyl_axis);
+            y = x.cross(z);
+            //see if all three vectors form righthand frame
+        }
     }
-    //normal_array = tube_->workTrajectories[i];
-    for(size_t i=0; i<normal_array.size(); i++)
-    {
-        normal = normal_array[i];
-        //normal.point
-    }
+    return true;
 }
 
 void GraspAnalysis::generate_grasp_pairs_()

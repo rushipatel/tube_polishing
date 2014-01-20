@@ -43,7 +43,7 @@ namespace TubeGrasp
     {
     public:
         GraspAnalysis(TubePerception::Tube::Ptr tube);
-        void setContactVector(tf::Vector3 contactVector);
+        void setContactVector(tf::Vector3 contactVector, tf::Vector3 axisVector);
         void setWorkTrajIdx(int trajIdx);
         void generateGrasps();
         void generateGraspPairs();
@@ -53,7 +53,9 @@ namespace TubeGrasp
         TubeGrasp::GraspArray::Ptr grasp_array_;
         TubeGrasp::GraspPairArray::Ptr grasp_pairs_;
         geometry_msgs::PoseArray trajectory_;
-        tf::Vector3 contact_vector_;
+        //tf::Vector3 contact_vector_;
+        //tf::Vector3 axis_vector_;
+        geometry_msgs::Pose work_pose_;
         int traj_idx_;
         float axis_step_size_;
         int circular_steps_;
