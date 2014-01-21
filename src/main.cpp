@@ -116,6 +116,7 @@ int main(int argc, char **argv)
     ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
     //ros::Publisher cloud_pub = rh.advertise<sensor_msgs::PointCloud2>("tube_cloud",2);
     //ros::Publisher marker_pub = rh.advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
+    ros::Publisher pose_pub = rh.advertise<geometry_msgs::PoseStamped>("/tube_polishing/work_traj_pose",1);
     //ros::ServiceClient spawn_model_client = rh.serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_model");
     arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
@@ -154,6 +155,7 @@ int main(int argc, char **argv)
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     //write_kinect_output(rh);
     tabletop_object_detector::TabletopSegmentation seg_srv;
+    geometry_msgs::PoseStamped posearray;
     while(getchar()!='q')
     {
         if(seg_srv_client.call(seg_srv))
@@ -176,14 +178,22 @@ int main(int argc, char **argv)
                     //cp.displayAxisPoints();
                     //cp.displayLines();
                     //cp.displayCylinders();
-                    cp.displayCylindersInLocalFrame();
+                    //cp.displayCylindersInLocalFrame();
                     //cp.writeAxisPointsOnFile("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/axis_points.pcd");
 
                     //TubeGrasp::GraspArray::Ptr grasp_array(new TubeGrasp::GraspArray);
                     //TubeGrasp::GraspAnalysis grasp_analysis(grasp_array);
                     //grasp_analysis.generateGrasps(tube);
                     //cp.displayCylinders(TubeGrasp::displayGrasps(grasp_array));
-                    cp.dispalyWorkTraj();
+                    //cp.dispalyWorkTraj();
+                    TubeGrasp::GraspAnalysis ga(tube);
+                    ga.generateWorkTrajectory();
+                    geometry_msgs::Pose p;
+                    posearray.header = ga.trajectory_.header;
+                    posearray.pose = ga.trajectory_.poses[1];
+
+                    //ROS_INFO_STREAM("Size of trajectory = "<<posearray.poses.size());
+
                 }
             }
             else
@@ -191,6 +201,15 @@ int main(int argc, char **argv)
         }
         else
             ROS_ERROR("Call to segmentation service failed");
+    }
+
+    ros::Rate r(1); // 10 hz
+    while (getchar()!='q')
+    {
+      posearray.header.frame_id = "/base_link";
+      //posearray.header.stamp = ros::Time::now();
+      pose_pub.publish(posearray);
+      r.sleep();
     }
   //ros::spin();
     ManipAnalysis ma("right_arm", rh);
@@ -207,6 +226,8 @@ int main(int argc, char **argv)
     q[6] =  0.0;
     ROS_INFO_STREAM("FORCE MATRIC   : "<<ma.getForceMatric(q));
     ROS_INFO_STREAM("ROTATION MATRIC: "<<ma.getRotationMatric(q));
-    ROS_INFO_STREAM("K             : "<<ma.getManipIndex(q));
+    ROS_INFO_STREAM("K              : "<<ma.getManipIndex(q));
+
+
   ros::shutdown();
 }

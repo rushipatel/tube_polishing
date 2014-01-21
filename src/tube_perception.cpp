@@ -50,6 +50,61 @@ tf::Transform Tube::getTransform(void)
     return tf;
 }
 
+float isInCylinder( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt )
+{
+    float dx, dy, dz;	// vector d  from line segment point 1 to point 2
+    float pdx, pdy, pdz;	// vector pd from point 1 to test point
+    float dot, dsq;
+
+    dx = pt2.x - pt1.x;	// translate so pt1 is origin.  Make vector from
+    dy = pt2.y - pt1.y;     // pt1 to pt2.  Need for this is easily eliminated
+    dz = pt2.z - pt1.z;
+
+    pdx = testpt.x - pt1.x;		// vector from pt1 to test point.
+    pdy = testpt.y - pt1.y;
+    pdz = testpt.z - pt1.z;
+
+    // Dot the d and pd vectors to see if point lies behind the
+    // cylinder cap at pt1.x, pt1.y, pt1.z
+
+    dot = pdx * dx + pdy * dy + pdz * dz;
+
+    // If dot is less than zero the point is behind the pt1 cap.
+    // If greater than the cylinder axis line segment length squared
+    // then the point is outside the other end cap at pt2.
+
+    if( dot < 0.0f || dot > length_sq )
+    {
+        return( -1.0f );
+    }
+    else
+    {
+        // Point lies within the parallel caps, so find
+        // distance squared from point to line, using the fact that sin^2 + cos^2 = 1
+        // the dot = cos() * |d||pd|, and cross*cross = sin^2 * |d|^2 * |pd|^2
+        // Carefull: '*' means mult for scalars and dotproduct for vectors
+        // In short, where dist is pt distance to cyl axis:
+        // dist = sin( pd to d ) * |pd|
+        // distsq = dsq = (1 - cos^2( pd to d)) * |pd|^2
+        // dsq = ( 1 - (pd * d)^2 / (|pd|^2 * |d|^2) ) * |pd|^2
+        // dsq = pd * pd - dot * dot / lengthsq
+        //  where lengthsq is d*d or |d|^2 that is passed into this function
+
+        // distance squared to the cylinder axis:
+
+        dsq = (pdx*pdx + pdy*pdy + pdz*pdz) - dot*dot/length_sq;
+
+        if( dsq > radius_sq )
+        {
+            return( -1.0f );
+        }
+        else
+        {
+            return( dsq );		// return distance squared to axis
+        }
+    }
+}
+
 //point with normal
 unsigned int Tube::whichCylinder(PointT point)
 {
@@ -69,7 +124,8 @@ unsigned int Tube::whichCylinder(PointT point)
         float l_sqr = ((p1.x - p2.x) * (p1.x - p2.x)) +
                       ((p1.y - p2.y) * (p1.y - p2.y)) +
                       ((p1.z - p2.z) * (p1.z - p2.z)) ;
-        if(isInCylinder(p1,p2,l_sqr,cylinders[i].radius,point))
+        double r_sqr = cylinders[i].radius*cylinders[i].radius;
+        if(isInCylinder(p1,p2,l_sqr,r_sqr,point))
             return i;
     }
     return cylinders.size();
@@ -143,7 +199,7 @@ void CloudProcessing::processCloud_(void)
 
 //void CloudProcessing::
 
-//random 90degree circular trajectory. in global frame
+//random 45/90degree circular trajectory. in global frame
 void CloudProcessing::generate_work_vectors_()
 {
 
@@ -329,84 +385,6 @@ void CloudProcessing::define_pose2_(void)
                     <<pose.orientation.z<<" "
                     <<pose.orientation.w<<" ");*/
 }
-
-
-/*void CloudProcessing::get_line_graph_(void)
-{
-    float dist;
-    for(size_t i=0; i<tube_->cylinders.size(); i++)
-    {
-        for(size_t j=0; j<tube_->cylinders.size(); j++)
-        {
-            if(i!=j)
-            {
-                dist = pcl::euclideanDistance(tube_->cylinders[i].p1, tube_->cylinders[j].p1);
-                if( dist < (r_) )
-                {
-                    std::cout<<"adding "<<j<<" in "<<i<<std::endl;
-                    add_neighbour_(i, j);
-                }
-
-                dist = pcl::euclideanDistance(tube_->cylinders[i].p2, tube_->cylinders[j].p1);
-                if( dist < (r_) )
-                {
-                    std::cout<<"adding "<<j<<" in "<<i<<std::endl;
-                    add_neighbour_(i, j);
-                }
-
-                dist = pcl::euclideanDistance(tube_->cylinders[i].p1, tube_->cylinders[j].p2);
-                if( dist < (r_) )
-                {
-                    std::cout<<"adding "<<j<<" in "<<i<<std::endl;
-                    add_neighbour_(i, j);
-                }
-
-                dist = pcl::euclideanDistance(tube_->cylinders[i].p2, tube_->cylinders[j].p2);
-                if( dist < (r_) )
-                {
-                    std::cout<<"adding "<<j<<" in "<<i<<std::endl;
-                    add_neighbour_(i, j);
-                }
-            }
-        }
-    }
-}*/
-
-//void CloudProcessing::add_neighbour_(int cyl_ind, int neighbour_ind)
-//{
-//    for(size_t i=0; i<tube_->cylinders[cyl_ind].neighbourCylinders.size(); i++)
-//    {
-//        if(tube_->cylinders[cyl_ind].neighbourCylinders[i]==neighbour_ind)
-//            return;
-//    }
-//        tube_->cylinders[cyl_ind].neighbourCylinders.push_back(neighbour_ind);
-//}
-
-//void CloudProcessing::print_line_graph_(void)
-//{
-//    for(size_t i=0; i<tube_->cylinders.size(); i++)
-//    {
-//        std::cout<<std::endl<<"Cylinder "<<i<<" :";
-//        for(size_t j=0; j<tube_->cylinders[i].neighbourCylinders.size(); j++)
-//            std::cout<<std::endl<<"\t\t"<<tube_->cylinders[i].neighbourCylinders[j];
-//    }
-//}
-
-//void CloudProcessing::group_cylinders_(void)
-//{
-//    std::vector<int> cyl_ind_stack;
-
-//    int curve_ind = 0;
-//    int cyl_ind;
-//    for(size_t i=0; i<tube_->cylinders.size(); i++)
-//    {
-//        cyl_ind_stack.push_back(i);
-//        while(!cyl_ind_stack.empty())
-//        {
-//            cyl_ind = cyl_ind_stack.pop_back();
-//        }
-//    }
-//}
 
 void CloudProcessing::compensate_error_(void)
 {
@@ -628,60 +606,7 @@ void CloudProcessing::remove_inliers_(pcl::PointCloud<PointT>::Ptr points,  std:
     extract.filter(*points);
 }
 
-float isInCylinder( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt )
-{
-    float dx, dy, dz;	// vector d  from line segment point 1 to point 2
-    float pdx, pdy, pdz;	// vector pd from point 1 to test point
-    float dot, dsq;
 
-    dx = pt2.x - pt1.x;	// translate so pt1 is origin.  Make vector from
-    dy = pt2.y - pt1.y;     // pt1 to pt2.  Need for this is easily eliminated
-    dz = pt2.z - pt1.z;
-
-    pdx = testpt.x - pt1.x;		// vector from pt1 to test point.
-    pdy = testpt.y - pt1.y;
-    pdz = testpt.z - pt1.z;
-
-    // Dot the d and pd vectors to see if point lies behind the
-    // cylinder cap at pt1.x, pt1.y, pt1.z
-
-    dot = pdx * dx + pdy * dy + pdz * dz;
-
-    // If dot is less than zero the point is behind the pt1 cap.
-    // If greater than the cylinder axis line segment length squared
-    // then the point is outside the other end cap at pt2.
-
-    if( dot < 0.0f || dot > length_sq )
-    {
-        return( -1.0f );
-    }
-    else
-    {
-        // Point lies within the parallel caps, so find
-        // distance squared from point to line, using the fact that sin^2 + cos^2 = 1
-        // the dot = cos() * |d||pd|, and cross*cross = sin^2 * |d|^2 * |pd|^2
-        // Carefull: '*' means mult for scalars and dotproduct for vectors
-        // In short, where dist is pt distance to cyl axis:
-        // dist = sin( pd to d ) * |pd|
-        // distsq = dsq = (1 - cos^2( pd to d)) * |pd|^2
-        // dsq = ( 1 - (pd * d)^2 / (|pd|^2 * |d|^2) ) * |pd|^2
-        // dsq = pd * pd - dot * dot / lengthsq
-        //  where lengthsq is d*d or |d|^2 that is passed into this function
-
-        // distance squared to the cylinder axis:
-
-        dsq = (pdx*pdx + pdy*pdy + pdz*pdz) - dot*dot/length_sq;
-
-        if( dsq > radius_sq )
-        {
-            return( -1.0f );
-        }
-        else
-        {
-            return( dsq );		// return distance squared to axis
-        }
-    }
-}
 
 void CloudProcessing::cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers)
 {
@@ -699,7 +624,7 @@ void CloudProcessing::cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Pt
 
     for(size_t i=0; i<cloud_in->points.size(); i++)
     {
-        if(isInCylinder_(p1, p2, l_sq, r_sq, cloud_in->points[i])>0)
+        if(isInCylinder(p1, p2, l_sq, r_sq, cloud_in->points[i])>0)
         {
             inliers->indices.push_back(i);
             pts_cnt++;

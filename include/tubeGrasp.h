@@ -43,16 +43,19 @@ namespace TubeGrasp
     {
     public:
         GraspAnalysis(TubePerception::Tube::Ptr tube);
+        void setWorkPose(geometry_msgs::Pose pose);
         void setContactVector(tf::Vector3 contactVector, tf::Vector3 axisVector);
         void setWorkTrajIdx(int trajIdx);
         void generateGrasps();
         void generateGraspPairs();
+        void generateWorkTrajectory(); //temp. dev purpose
+        geometry_msgs::PoseArray trajectory_; //put this back in private after dbg/dev
 
     private:
         TubePerception::Tube::Ptr tube_;
         TubeGrasp::GraspArray::Ptr grasp_array_;
         TubeGrasp::GraspPairArray::Ptr grasp_pairs_;
-        geometry_msgs::PoseArray trajectory_;
+
         //tf::Vector3 contact_vector_;
         //tf::Vector3 axis_vector_;
         geometry_msgs::Pose work_pose_;

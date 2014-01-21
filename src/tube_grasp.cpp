@@ -36,6 +36,11 @@ void GraspAnalysis::setWorkTrajIdx(int trajIdx)
     traj_idx_ = trajIdx;
 }
 
+void GraspAnalysis::generateWorkTrajectory()
+{
+    generate_work_trajectory_();
+}
+
 //generate grasps in global frame usually base_link
 void GraspAnalysis::generate_grasps_()
 {
@@ -88,8 +93,11 @@ void GraspAnalysis::generate_grasps_()
 bool GraspAnalysis::generate_work_trajectory_()
 {
     pcl::PointCloud<PointT>::Ptr cloud;
-    tf::Vector3 cyl_axis,x,y,z;
-
+    //u1, u2 are two vectors to be arranged as y, z for right hand frame
+    tf::Vector3 cyl_axis,ux,uz,uy;  // right hand rule -> x, z, y
+    geometry_msgs::Pose pose;
+    trajectory_.header.frame_id = "base_link";
+    trajectory_.header.stamp= ros::Time::now();
     for(size_t i=0; i<tube_->workPointsCluster.size(); i++)
     {
         cloud = tube_->workPointsCluster[i];
@@ -105,10 +113,25 @@ bool GraspAnalysis::generate_work_trajectory_()
                 ROS_ERROR("GraspAnalysis - Couldn't get cylinder index");
                 return false;
             }
-            x.setValue(point.normal_x, point.normal_y, point.normal_z);
-            z = x.cross(cyl_axis);
-            y = x.cross(z);
-            //see if all three vectors form righthand frame
+            ux.setValue(point.normal_x, point.normal_y, point.normal_z);
+            uz = ux.cross(cyl_axis);
+            uy = ux.cross(uz);
+            //make sure that this forms a right hand frame
+            //forwarding with assumption that it does form right hand frame
+            tf::Matrix3x3 mat;
+            mat.setValue(ux.getX(), ux.getY(), ux.getZ(),
+                         uy.getX(), uy.getY(), uy.getZ(),
+                         uz.getX(), uz.getY(), uz.getZ()); //visually transpose
+            tf::Quaternion q;
+            mat.getRotation(q);
+            pose.orientation.x = q.getX();
+            pose.orientation.y = q.getY();
+            pose.orientation.z = q.getZ();
+            pose.orientation.w = q.getW();
+            pose.position.x = point.x;
+            pose.position.y = point.y;
+            pose.position.z = point.z;
+            trajectory_.poses.push_back(pose);
         }
     }
     return true;
