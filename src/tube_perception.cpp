@@ -108,14 +108,14 @@ float isInCylinder( const PointT & pt1, const PointT & pt2, float length_sq, flo
 //point with normal
 unsigned int Tube::whichCylinder(PointT point)
 {
-    tf::Vector3 normal;
+    //tf::Vector3 normal;
     tf::Vector3 p;
-    normal.setValue(point.normal_x, point.normal_y, point.normal_z);
+    /*normal.setValue(point.normal_x, point.normal_y, point.normal_z);
     normal.normalize();
     normal *= -0.005; // travel in reverse by 5 mm so it can lie inside some cylinder
     point.x = point.x + normal.x();
     point.y = point.y + normal.y();
-    point.z = point.z + normal.z();
+    point.z = point.z + normal.z();*/
     for(size_t i=0; i<cylinders.size(); i++)
     {
         PointT p1 = cylinders[i].p1;
@@ -124,11 +124,74 @@ unsigned int Tube::whichCylinder(PointT point)
         float l_sqr = ((p1.x - p2.x) * (p1.x - p2.x)) +
                       ((p1.y - p2.y) * (p1.y - p2.y)) +
                       ((p1.z - p2.z) * (p1.z - p2.z)) ;
-        double r_sqr = cylinders[i].radius*cylinders[i].radius;
-        if(isInCylinder(p1,p2,l_sqr,r_sqr,point))
+        //inflate cylinder so that point can lie inside in case of outlier.
+        //in other words, 3mm tollerance.
+        double r_sqr = (cylinders[i].radius+0.003)*(cylinders[i].radius+0.003);
+        if(isInCylinder(p1,p2,l_sqr,r_sqr,point)>0)
             return i;
     }
     return cylinders.size();
+}
+
+void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
+{
+    markerArray.markers.clear();
+
+    visualization_msgs::Marker marker;
+
+    //Axis Marker
+    marker.header.frame_id = "base_link";
+    marker.header.stamp = ros::Time::now();
+    marker.ns = "CylinderAxis";
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::CYLINDER;
+    marker.scale.x = 0.001;
+    marker.scale.y = 0.001;
+    marker.color.b = 1;
+    marker.color.a = 0.5;
+    for(size_t i=0; i<cylinders.size(); i++)
+    {
+        marker.scale.z = cylinders[i].getAxisLength();
+        marker.id = i+1;
+        //Assuming Z is cylindrical axis
+        marker.pose = cylinders[i].getGlobalPose();
+        markerArray.markers.push_back(marker);
+    }
+
+    //Cylinder it self
+    marker.header.frame_id = "base_link";
+    marker.header.stamp = ros::Time::now();
+    marker.ns = "Cylinder";
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::CYLINDER;
+    marker.color.r = 0.0;
+    marker.color.g = 0.3;
+    marker.color.b = 0.3;
+    marker.color.a = 0.2;
+    for(size_t i=0; i<cylinders.size(); i++)
+    {
+        marker.scale.x = marker.scale.y = cylinders[i].radius*2;
+        marker.scale.z = cylinders[i].getAxisLength();
+        marker.id = i+1;
+        //Assuming Z is cylindrical axis
+        marker.pose = cylinders[i].getGlobalPose();
+        markerArray.markers.push_back(marker);
+    }
+}
+
+void Tube::getCylinderPoses(geometry_msgs::PoseArray &pose_array)
+{
+    pose_array.poses.clear();
+    geometry_msgs::Pose pose;
+
+    pose_array.header.frame_id = "base_link";
+    pose_array.header.stamp = ros::Time::now();
+
+    for(size_t i=0; i<cylinders.size(); i++)
+    {
+        pose = cylinders[i].getGlobalPose();
+        pose_array.poses.push_back(pose);
+    }
 }
 
 geometry_msgs::Pose Cylinder::getGlobalPose(void)
@@ -183,6 +246,12 @@ tf::Vector3 Cylinder::getAxisVector()
     return vec;
 }
 
+float Cylinder::getAxisLength()
+{
+    tf::Vector3 vec = getAxisVector();
+    return vec.length();
+}
+
 void CloudProcessing::processCloud_(void)
 {
     compensate_error_();
@@ -206,16 +275,18 @@ void CloudProcessing::generate_work_vectors_()
     double l = (double)rand()/(double)RAND_MAX; // Not working. Always generates 0.840188
     l = 0.5;
     
-    int cylinder_idx = rand()%(tube_->cylinders.size()+1);
-    tf::Vector3 axis = tube_->cylinders[cylinder_idx].getAxisVector();
+    int cyl_idx = rand()%(tube_->cylinders.size()+1);
+    //cyl_idx = 1;
+    //ROS_INFO_STREAM("...Cylinder Idx is Always 1...");
+    tf::Vector3 axis = tube_->cylinders[cyl_idx].getAxisVector();
     axis.normalize();
 
     //in global frame
-    tf::Vector3 at_point = tube_->cylinders[cylinder_idx].getAxisVector();    
+    tf::Vector3 at_point = tube_->cylinders[cyl_idx].getAxisVector();
     at_point *= l;
-    at_point.setX(tube_->cylinders[cylinder_idx].p1.x+at_point.x());
-    at_point.setY(tube_->cylinders[cylinder_idx].p1.y+at_point.y());
-    at_point.setZ(tube_->cylinders[cylinder_idx].p1.z+at_point.z());
+    at_point.setX(tube_->cylinders[cyl_idx].p1.x+at_point.x());
+    at_point.setY(tube_->cylinders[cyl_idx].p1.y+at_point.y());
+    at_point.setZ(tube_->cylinders[cyl_idx].p1.z+at_point.z());
 
     tf::Vector3 perp_vec = get_perp_vec3_(axis);
     tf::Vector3 point, vec1,vec2;
@@ -223,10 +294,10 @@ void CloudProcessing::generate_work_vectors_()
     vec1 = perp_vec.rotate(axis, ((double)rand()/RAND_MAX)*M_PI );
     //vec1 = perp_vec;
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
-    for(int i=0; i<45; i++)
+    for(int i=0; i<90; i++)
     {
         vec2 = vec1.rotate(axis,(i*M_PI)/180);
-        point = at_point + (vec2*tube_->cylinders[cylinder_idx].radius);
+        point = at_point + (vec2*tube_->cylinders[cyl_idx].radius);
         vec2.normalize();
         PointT pointnormal;
         pointnormal.x = point.x();
@@ -318,30 +389,44 @@ tf::Vector3 CloudProcessing::get_perp_vec3_(tf::Vector3 v3)
 
 void CloudProcessing::define_pose2_(void)
 {
-    tf::Quaternion q;
 
-    //geometry_msgs::Pose pose;
     for(size_t i=0; i<tube_->cylinders.size(); i++)
     {
         geometry_msgs::Pose pose;
-        pose.position.x = (tube_->cylinders[i].p1.x); //+ tube_->cylinders[i].p2.x) / 2;
-        pose.position.y = (tube_->cylinders[i].p1.y); //+ tube_->cylinders[i].p2.y) / 2;
-        pose.position.z = (tube_->cylinders[i].p1.z); //+ tube_->cylinders[i].p2.z) / 2;
 
-        pose.orientation.x = 0;
-        pose.orientation.y = 0;
-        pose.orientation.z = 0;
-        pose.orientation.w = 1;
+        pose.position.x = (tube_->cylinders[i].p1.x + tube_->cylinders[i].p2.x) / 2;
+        pose.position.y = (tube_->cylinders[i].p1.y + tube_->cylinders[i].p2.y) / 2;
+        pose.position.z = (tube_->cylinders[i].p1.z + tube_->cylinders[i].p2.z) / 2;
+
+        tf::Vector3 ux, uy, uz = tube_->cylinders[i].getAxisVector();
+        uz.normalize();
+        ux = get_perp_vec3_(uz);
+        ux.normalize();
+        uy = uz.cross(ux);
+        uy.normalize();
+        tf::Matrix3x3 mat;
+        mat.setValue(ux.getX(), uy.getX(), uz.getX(),
+                     ux.getY(), uy.getY(), uz.getY(),
+                     ux.getZ(), uy.getZ(), uz.getZ() );
+
+        tf::Quaternion q;
+        mat.getRotation(q);
+
+        pose.orientation.x = q.getX();
+        pose.orientation.y = q.getY();
+        pose.orientation.z = q.getZ();
+        pose.orientation.w = q.getW();
+
         tube_->cylinders[i].setGlobalPose(pose);
     }
 
     if(!tube_->cylinders.empty())
     {
-        int idx = tube_->cylinders.size()-1;
+        int idx = 0;
         geometry_msgs::Pose pose;
         
         pose = tube_->cylinders[idx].getGlobalPose();
-        tube_->setPose(pose);  //Tube's pose = last (strong) cylinder's global pose
+        tube_->setPose(pose);  //Tube's pose = first (strong) cylinder's global pose
     }
 
     for(size_t i=0; i<(tube_->cylinders.size()); i++)
@@ -350,7 +435,7 @@ void CloudProcessing::define_pose2_(void)
         cyl = tube_->cylinders[i].getGlobalPose();
         
         tube = tube_->getPose();
-        
+        //Should use inverse transform for local pose
         pose.position.x = cyl.position.x - tube.position.x;
         pose.position.y = cyl.position.y - tube.position.y;
         pose.position.z = cyl.position.z - tube.position.z;

@@ -2,6 +2,7 @@
 #define TUBEGRASP_H
 
 #include <geometry_msgs/Pose.h>
+#include <visualization_msgs/Marker.h>
 #include <tf/tf.h>
 
 #include "tubePerception.h"
@@ -50,6 +51,9 @@ namespace TubeGrasp
         void generateGraspPairs();
         void generateWorkTrajectory(); //temp. dev purpose
         geometry_msgs::PoseArray trajectory_; //put this back in private after dbg/dev
+        visualization_msgs::Marker vismsg_workNormalsX;
+        visualization_msgs::Marker vismsg_workNormalsY;
+        visualization_msgs::Marker vismsg_workNormalsZ;
 
     private:
         TubePerception::Tube::Ptr tube_;
@@ -66,6 +70,7 @@ namespace TubeGrasp
         void generate_grasps_();
         bool generate_work_trajectory_();
         void generate_grasp_pairs_();
+        void normalize_worktrajectory();
     };
     void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Transform tube_tf);
     boost::shared_ptr<pcl::visualization::PCLVisualizer> displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array);

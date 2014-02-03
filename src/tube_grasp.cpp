@@ -1,4 +1,5 @@
 #include "tubeGrasp.h"
+#include "math.h"
 
 namespace TubeGrasp
 {
@@ -90,21 +91,88 @@ void GraspAnalysis::generate_grasps_()
     ROS_INFO("%d grasps generated",grasp_array_->grasps.size());
 }
 
+void GraspAnalysis::normalize_worktrajectory()
+{
+
+    geometry_msgs::Pose prev_pose,crnt_pose;
+    float theta_dist;
+    tf::Vector3 axis_dist;
+
+    for(size_t i=0; i<trajectory_.poses.size(); i++)
+    {
+        if(i==0)
+            prev_pose=trajectory_.poses[0];
+
+        crnt_pose = trajectory_.poses[i];
+        tf::Quaternion crnt_q, prev_q;
+
+        crnt_q.setValue(crnt_pose.orientation.x,
+                        crnt_pose.orientation.y,
+                        crnt_pose.orientation.z,
+                        crnt_pose.orientation.w );
+
+        prev_q.setValue(prev_pose.orientation.x,
+                        prev_pose.orientation.y,
+                        prev_pose.orientation.z,
+                        prev_pose.orientation.w );
+        theta_dist = crnt_q.getAngle() - prev_q.getAngle();
+        axis_dist  = crnt_q.getAxis() - prev_q.getAxis();
+        //ROS_INFO_STREAM("Angle: "<<theta_dist<<"  Axis: "<<axis_dist);
+    }
+}
+
 bool GraspAnalysis::generate_work_trajectory_()
 {
     pcl::PointCloud<PointT>::Ptr cloud;
-    //u1, u2 are two vectors to be arranged as y, z for right hand frame
     tf::Vector3 cyl_axis,ux,uz,uy;  // right hand rule -> x, z, y
     geometry_msgs::Pose pose;
     trajectory_.header.frame_id = "base_link";
     trajectory_.header.stamp= ros::Time::now();
+
+    //***visualization purpose only***
+    vismsg_workNormalsX.header.frame_id = "base_link";
+    vismsg_workNormalsX.header.stamp = ros::Time::now();
+    vismsg_workNormalsX.ns = "WorkNormalsX";
+    vismsg_workNormalsX.action = visualization_msgs::Marker::ADD;
+    vismsg_workNormalsX.id = 1;
+    vismsg_workNormalsX.type = visualization_msgs::Marker::LINE_LIST;
+    vismsg_workNormalsX.scale.x = 0.001;
+    vismsg_workNormalsX.color.r = 1.0;
+    vismsg_workNormalsX.color.a = 1.0;
+    //***Visualization purpose only***
+
+    //***visualization purpose only***
+    vismsg_workNormalsY.header.frame_id = "base_link";
+    vismsg_workNormalsY.header.stamp = ros::Time::now();
+    vismsg_workNormalsY.ns = "WorkNormalsY";
+    vismsg_workNormalsY.action = visualization_msgs::Marker::ADD;
+    vismsg_workNormalsY.id = 1;
+    vismsg_workNormalsY.type = visualization_msgs::Marker::LINE_LIST;
+    vismsg_workNormalsY.scale.x = 0.001;
+    vismsg_workNormalsY.color.g = 1.0;
+    vismsg_workNormalsY.color.a = 1.0;
+    //***Visualization purpose only***
+
+    //***visualization purpose only***
+    vismsg_workNormalsZ.header.frame_id = "base_link";
+    vismsg_workNormalsZ.header.stamp = ros::Time::now();
+    vismsg_workNormalsZ.ns = "WorkNormalsZ";
+    vismsg_workNormalsZ.action = visualization_msgs::Marker::ADD;
+    vismsg_workNormalsZ.id = 1;
+    vismsg_workNormalsZ.type = visualization_msgs::Marker::LINE_LIST;
+    vismsg_workNormalsZ.scale.x = 0.001;
+    vismsg_workNormalsZ.color.b = 1.0;
+    vismsg_workNormalsZ.color.a = 1.0;
+    //***Visualization purpose only***
+
     for(size_t i=0; i<tube_->workPointsCluster.size(); i++)
     {
         cloud = tube_->workPointsCluster[i];
-        PointT point;
+
         for(size_t j=0; j<cloud->points.size(); j++)
         {
-            point = cloud->points[i];
+            PointT point;
+            point = cloud->points[j];
             unsigned int cyl_idx = tube_->whichCylinder(point);
             if(cyl_idx != tube_->cylinders.size())
                 cyl_axis =tube_->cylinders[cyl_idx].getAxisVector();
@@ -113,17 +181,53 @@ bool GraspAnalysis::generate_work_trajectory_()
                 ROS_ERROR("GraspAnalysis - Couldn't get cylinder index");
                 return false;
             }
+            cyl_axis.normalize();
             ux.setValue(point.normal_x, point.normal_y, point.normal_z);
-            uz = ux.cross(cyl_axis);
-            uy = ux.cross(uz);
-            //make sure that this forms a right hand frame
-            //forwarding with assumption that it does form right hand frame
+            ux.normalize();
+            uy = ux.cross(cyl_axis);
+            uy.normalize();
+            uz = ux.cross(uy);
+            uz.normalize();
+
+
+            //***Visualization purpose only***
+            geometry_msgs::Point p;
+            p.x = point.x; p.y = point.y; p.z = point.z;
+            vismsg_workNormalsX.points.push_back(p);
+            p.x = point.x + (ux.x()*0.05);
+            p.y = point.y + (ux.y()*0.05);
+            p.z = point.z + (ux.z()*0.05);
+            vismsg_workNormalsX.points.push_back(p);
+
+            p.x = point.x; p.y = point.y; p.z = point.z;
+            vismsg_workNormalsY.points.push_back(p);
+            p.x = point.x + (uy.x()*0.05);
+            p.y = point.y + (uy.y()*0.05);
+            p.z = point.z + (uy.z()*0.05);
+            vismsg_workNormalsY.points.push_back(p);
+
+            p.x = point.x; p.y = point.y; p.z = point.z;
+            vismsg_workNormalsZ.points.push_back(p);
+            p.x = point.x + (uz.x()*0.05);
+            p.y = point.y + (uz.y()*0.05);
+            p.z = point.z + (uz.z()*0.05);
+            vismsg_workNormalsZ.points.push_back(p);
+            //***Visualization purpose only***
+
             tf::Matrix3x3 mat;
-            mat.setValue(ux.getX(), ux.getY(), ux.getZ(),
-                         uy.getX(), uy.getY(), uy.getZ(),
-                         uz.getX(), uz.getY(), uz.getZ()); //visually transpose
+
+            mat.setValue(ux.getX(), uy.getX(), uz.getX(),
+                         ux.getY(), uy.getY(), uz.getY(),
+                         ux.getZ(), uy.getZ(), uz.getZ());
+
+            /*mat.setValue(ux.getX(), ux.getY(), ux.getZ(),
+                           uy.getX(), uy.getY(), uy.getZ(),
+                           uz.getX(), uz.getY(), uz.getZ());*/
+
             tf::Quaternion q;
             mat.getRotation(q);
+            //Rotate +/- 90 degrees around X to align Y to Axis.
+            //Weird but only work around as of now.
             pose.orientation.x = q.getX();
             pose.orientation.y = q.getY();
             pose.orientation.z = q.getZ();
@@ -134,8 +238,10 @@ bool GraspAnalysis::generate_work_trajectory_()
             trajectory_.poses.push_back(pose);
         }
     }
+    normalize_worktrajectory();
     return true;
 }
+
 
 void GraspAnalysis::generate_grasp_pairs_()
 {
@@ -163,7 +269,7 @@ void GraspAnalysis::generate_grasp_pairs_()
 //tf = current pose to machining pose
 void compute_matrics( tf::Transform tf, const TubeGrasp::GraspPair &grasp_pair )
 {
-    grasp_pair.leftGrasp;
+    //grasp_pair.leftGrasp;
 }
 
 void diaplayGraspsInGlobalFrame( TubeGrasp::GraspArray::Ptr grasp_array,

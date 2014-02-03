@@ -6,6 +6,7 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <pcl/ros/conversions.h>
 #include <Eigen/Core>
 #include <tf/LinearMath/Matrix3x3.h>
@@ -52,6 +53,7 @@ namespace TubePerception
 
         //tf::Vector3 axisVector; //Global
         tf::Vector3 getAxisVector();
+        float getAxisLength();
         //std::vector<int> neighbourCylinders;
         pcl::ModelCoefficients coefficients; // global
         tf::Transform getGlobalTransform(void);
@@ -65,7 +67,9 @@ namespace TubePerception
 
     private:
         geometry_msgs::Pose global_pose_; //in global frame that is point cloud frame (base_link)
-        geometry_msgs::Pose local_pose_;  //Local to last (strong) cylinder in vector(array)
+
+        /********* CAUTION : Orientation is Identity for local_pose************/
+        geometry_msgs::Pose local_pose_;  //Local to first (strong) cylinder in vector(array)
     };
     
     /*class WorkTrajectory
@@ -94,6 +98,8 @@ namespace TubePerception
         //work trajectories by NormalArray
         std::vector<pcl::PointCloud<PointT>::Ptr> workPointsCluster;
         unsigned int whichCylinder(PointT point);
+        void getCylinderMarker(visualization_msgs::MarkerArray &markerArray);
+        void getCylinderPoses(geometry_msgs::PoseArray &pose_array);
     protected:
         geometry_msgs::Pose pose_;  //in global(base_link) frame
     };
