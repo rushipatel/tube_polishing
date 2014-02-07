@@ -138,7 +138,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     markerArray.markers.clear();
 
     visualization_msgs::Marker marker;
-
+    tf::Transform t, tube_tf = getTransform();
     //Axis Marker
     marker.header.frame_id = "base_link";
     marker.header.stamp = ros::Time::now();
@@ -154,7 +154,10 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
         marker.scale.z = cylinders[i].getAxisLength();
         marker.id = i+1;
         //Assuming Z is cylindrical axis
-        marker.pose = cylinders[i].getGlobalPose();
+        //marker.pose = cylinders[i].getGlobalPose();
+        t = cylinders[i].getLocalTransform();
+        t = tube_tf * t;
+        marker.pose = tf2pose(t);
         markerArray.markers.push_back(marker);
     }
 
@@ -167,14 +170,18 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.r = 0.0;
     marker.color.g = 0.3;
     marker.color.b = 0.3;
-    marker.color.a = 0.2;
+    marker.color.a = 0.5;
     for(size_t i=0; i<cylinders.size(); i++)
     {
         marker.scale.x = marker.scale.y = cylinders[i].radius*2;
         marker.scale.z = cylinders[i].getAxisLength();
         marker.id = i+1;
         //Assuming Z is cylindrical axis
-        marker.pose = cylinders[i].getGlobalPose();
+        //marker.pose = cylinders[i].getGlobalPose();
+        //marker.pose = cylinders[i].getLocalPose();
+        t = cylinders[i].getLocalTransform();
+        t = tube_tf * t;
+        marker.pose = tf2pose(t);
         markerArray.markers.push_back(marker);
     }
 }
@@ -204,6 +211,21 @@ geometry_msgs::Pose Cylinder::getLocalPose(void)
     return local_pose_;
 }
 
+tf::Transform Cylinder::getLocalTransform(void)
+{
+    tf::Transform t;
+    tf::Vector3 v(local_pose_.position.x,
+                  local_pose_.position.y,
+                  local_pose_.position.z);
+    tf::Quaternion q(local_pose_.orientation.x,
+                     local_pose_.orientation.y,
+                     local_pose_.orientation.z,
+                     local_pose_.orientation.w);
+    t.setOrigin(v);
+    t.setRotation(q);
+    return t;
+}
+
 tf::Transform Cylinder::getGlobalTransform(void)
 {
     tf::Transform tf;
@@ -231,10 +253,18 @@ void Cylinder::setLocalPose(geometry_msgs::Pose &pose)
     local_pose_ = pose;
 }
 
-/*void Cylinder::setLocalTransform(tf::Transform &tf)
+void Cylinder::setLocalPose(tf::Transform &t)
 {
-    local_tf_ = tf;
-}*/
+    tf::Vector3 vec = t.getOrigin();
+    tf::Quaternion q = t.getRotation();
+    local_pose_.position.x = vec.x();
+    local_pose_.position.y = vec.y();
+    local_pose_.position.z = vec.z();
+    local_pose_.orientation.x = q.x();
+    local_pose_.orientation.y = q.y();
+    local_pose_.orientation.z = q.z();
+    local_pose_.orientation.w = q.w();
+}
 
 tf::Vector3 Cylinder::getAxisVector()
 {
@@ -431,44 +461,25 @@ void CloudProcessing::define_pose2_(void)
 
     for(size_t i=0; i<(tube_->cylinders.size()); i++)
     {
-        geometry_msgs::Pose tube, cyl, pose;
-        cyl = tube_->cylinders[i].getGlobalPose();
+        tf::Transform tube_tf, cyl_tf, tube_cyl_tf;
+        cyl_tf = tube_->cylinders[i].getGlobalTransform();
+        tube_tf = tube_->getTransform();
+        tube_cyl_tf = tube_tf.inverseTimes(cyl_tf);
+        tube_->cylinders[i].setLocalPose(tube_cyl_tf);
         
-        tube = tube_->getPose();
+        //geometry_msgs::Pose tube, cyl, pose;
+        //tube = tube_->getPose();
+        //cyl = tube_->cylinders[i].getGlobalPose();
         //Should use inverse transform for local pose
-        pose.position.x = cyl.position.x - tube.position.x;
+        /*pose.position.x = cyl.position.x - tube.position.x;
         pose.position.y = cyl.position.y - tube.position.y;
         pose.position.z = cyl.position.z - tube.position.z;
         pose.orientation.x = 0;
         pose.orientation.y = 0;
         pose.orientation.z = 0;
         pose.orientation.w = 1;
-        tube_->cylinders[i].setLocalPose(pose);
+        tube_->cylinders[i].setLocalPose(pose);*/
     }
-
-    for(size_t i=0; i<tube_->cylinders.size(); i++)
-    {
-        geometry_msgs::Pose pose;
-        pose = tube_->cylinders[i].getLocalPose();
-
-        /*ROS_INFO_STREAM("Local Poses XYZ "<<pose.position.x<<" "
-                        <<pose.position.y<<" "
-                        <<pose.position.z<<"  XYZW "
-                        <<pose.orientation.x<<" "
-                        <<pose.orientation.y<<" "
-                        <<pose.orientation.z<<" "
-                        <<pose.orientation.w<<" ");*/
-    }
-    geometry_msgs::Pose pose;
-    pose = tube_->getPose();
-
-    /*ROS_INFO_STREAM("Tube Pose XYZ "<<pose.position.x<<" "
-                    <<pose.position.y<<" "
-                    <<pose.position.z<<"  XYZW "
-                    <<pose.orientation.x<<" "
-                    <<pose.orientation.y<<" "
-                    <<pose.orientation.z<<" "
-                    <<pose.orientation.w<<" ");*/
 }
 
 void CloudProcessing::compensate_error_(void)

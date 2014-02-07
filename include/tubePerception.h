@@ -37,6 +37,7 @@
 #include <pcl/pcl_base.h>
 
 #include <sstream>
+#include "utility.cpp"
 
 typedef pcl::PointXYZRGBNormal PointT;
 
@@ -57,12 +58,13 @@ namespace TubePerception
         //std::vector<int> neighbourCylinders;
         pcl::ModelCoefficients coefficients; // global
         tf::Transform getGlobalTransform(void);
-        //tf::Transform getLocalTransform(void); //tf to last (strong) cylinder in vector(array)
+        tf::Transform getLocalTransform(void); //tf to last (strong) cylinder in vector(array)
         geometry_msgs::Pose getGlobalPose(void);
         geometry_msgs::Pose getLocalPose(void);
         //void setLocalTransform(tf::Transform &tf);
         void setGlobalPose(geometry_msgs::Pose &pose);
         void setLocalPose(geometry_msgs::Pose &pose);
+        void setLocalPose(tf::Transform &t);
         tf::Vector3 getLocalAxisVector(void); // in a tube frame
 
     private:

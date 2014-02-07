@@ -6,6 +6,7 @@
 #include <tf/tf.h>
 
 #include "tubePerception.h"
+#include "utility.cpp"
 
 namespace TubeGrasp
 {
@@ -44,13 +45,15 @@ namespace TubeGrasp
     {
     public:
         GraspAnalysis(TubePerception::Tube::Ptr tube);
-        void setWorkPose(geometry_msgs::Pose pose);
+        void setWorkPose(geometry_msgs::Pose &p);
+        int getWorkPose(geometry_msgs::Pose &p);
         void setContactVector(tf::Vector3 contactVector, tf::Vector3 axisVector);
         void setWorkTrajIdx(int trajIdx);
         void generateGrasps();
         void generateGraspPairs();
         void generateWorkTrajectory(); //temp. dev purpose
-        geometry_msgs::PoseArray trajectory_; //put this back in private after dbg/dev
+        geometry_msgs::PoseArray work_traj_; //put this back in private after dbg/dev
+        geometry_msgs::PoseArray tube_traj_;
         visualization_msgs::Marker vismsg_workNormalsX;
         visualization_msgs::Marker vismsg_workNormalsY;
         visualization_msgs::Marker vismsg_workNormalsZ;
@@ -64,13 +67,15 @@ namespace TubeGrasp
         //tf::Vector3 axis_vector_;
         geometry_msgs::Pose work_pose_;
         int traj_idx_;
-        float axis_step_size_;
-        int circular_steps_;
+        float axis_step_size_; //in mm
+        int circular_steps_;  //in integer number
         float wrist_axis_offset_;
         void generate_grasps_();
         bool generate_work_trajectory_();
         void generate_grasp_pairs_();
-        void normalize_worktrajectory();
+        void normalize_worktrajectory_();
+        void xform_in_tubeframe_();
+        void work2tube_trajectory_();
     };
     void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Transform tube_tf);
     boost::shared_ptr<pcl::visualization::PCLVisualizer> displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array);

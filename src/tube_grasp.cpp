@@ -1,6 +1,7 @@
 #include "tubeGrasp.h"
 #include "math.h"
 
+
 namespace TubeGrasp
 {
 
@@ -27,9 +28,25 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube)
     axis_vector_ = axisVector;
 }*/
 
-void GraspAnalysis::setWorkPose(geometry_msgs::Pose pose)
+void GraspAnalysis::setWorkPose(geometry_msgs::Pose &p)
 {
-    work_pose_ = pose;
+    work_pose_ = p;
+}
+
+int GraspAnalysis::getWorkPose(geometry_msgs::Pose &p)
+{
+    if( !(work_pose_.orientation.x == 0 &&
+        work_pose_.orientation.y == 0 &&
+        work_pose_.orientation.z == 0 &&
+        work_pose_.orientation.w == 1 &&
+        work_pose_.position.x == 0 &&
+        work_pose_.position.y == 0 &&
+        work_pose_.position.z == 0) )
+    {
+        p = work_pose_;
+        return 1;
+    }
+    return 0;
 }
 
 void GraspAnalysis::setWorkTrajIdx(int trajIdx)
@@ -91,19 +108,19 @@ void GraspAnalysis::generate_grasps_()
     ROS_INFO("%d grasps generated",grasp_array_->grasps.size());
 }
 
-void GraspAnalysis::normalize_worktrajectory()
+void GraspAnalysis::normalize_worktrajectory_()
 {
 
-    geometry_msgs::Pose prev_pose,crnt_pose;
+    /*geometry_msgs::Pose prev_pose,crnt_pose;
     float theta_dist;
     tf::Vector3 axis_dist;
 
-    for(size_t i=0; i<trajectory_.poses.size(); i++)
+    for(size_t i=0; i<wotk_traj_.poses.size(); i++)
     {
         if(i==0)
-            prev_pose=trajectory_.poses[0];
+            prev_pose=wotk_traj_.poses[0];
 
-        crnt_pose = trajectory_.poses[i];
+        crnt_pose = wotk_traj_.poses[i];
         tf::Quaternion crnt_q, prev_q;
 
         crnt_q.setValue(crnt_pose.orientation.x,
@@ -118,6 +135,21 @@ void GraspAnalysis::normalize_worktrajectory()
         theta_dist = crnt_q.getAngle() - prev_q.getAngle();
         axis_dist  = crnt_q.getAxis() - prev_q.getAxis();
         //ROS_INFO_STREAM("Angle: "<<theta_dist<<"  Axis: "<<axis_dist);
+    }*/
+}
+
+void GraspAnalysis::xform_in_tubeframe_()
+{
+
+    geometry_msgs::Pose p;
+    tf::Transform point, tube, xform;
+    tube = tube_->getTransform();
+    for(size_t i=0; i<work_traj_.poses.size(); i++)
+    {
+        p = work_traj_.poses[i];
+        point = pose2tf(p);
+        xform = tube.inverseTimes(point);
+        work_traj_.poses[i] = tf2pose(xform);
     }
 }
 
@@ -126,8 +158,8 @@ bool GraspAnalysis::generate_work_trajectory_()
     pcl::PointCloud<PointT>::Ptr cloud;
     tf::Vector3 cyl_axis,ux,uz,uy;  // right hand rule -> x, z, y
     geometry_msgs::Pose pose;
-    trajectory_.header.frame_id = "base_link";
-    trajectory_.header.stamp= ros::Time::now();
+    work_traj_.header.frame_id = "base_link";
+    work_traj_.header.stamp= ros::Time::now();
 
     //***visualization purpose only***
     vismsg_workNormalsX.header.frame_id = "base_link";
@@ -224,22 +256,49 @@ bool GraspAnalysis::generate_work_trajectory_()
                            uy.getX(), uy.getY(), uy.getZ(),
                            uz.getX(), uz.getY(), uz.getZ());*/
 
-            tf::Quaternion q;
+            tf::Quaternion q,q2,q3;
             mat.getRotation(q);
+            tf::Vector3 vec(1, 0, 0);
+            q2.setRotation(vec, (M_PI/2));
+            q3 = q*q2;
             //Rotate +/- 90 degrees around X to align Y to Axis.
             //Weird but only work around as of now.
-            pose.orientation.x = q.getX();
-            pose.orientation.y = q.getY();
-            pose.orientation.z = q.getZ();
-            pose.orientation.w = q.getW();
+            pose.orientation.x = q3.getX();
+            pose.orientation.y = q3.getY();
+            pose.orientation.z = q3.getZ();
+            pose.orientation.w = q3.getW();
             pose.position.x = point.x;
             pose.position.y = point.y;
             pose.position.z = point.z;
-            trajectory_.poses.push_back(pose);
+            work_traj_.poses.push_back(pose);
         }
     }
-    normalize_worktrajectory();
+    normalize_worktrajectory_();
+    xform_in_tubeframe_();
+    work2tube_trajectory_();
     return true;
+}
+
+void GraspAnalysis::work2tube_trajectory_()
+{
+    tf::Transform W, t, p, tube = tube_->getTransform(), Wt;
+    geometry_msgs::Pose pose;
+    if(getWorkPose(pose))
+        W = pose2tf(pose);
+    else
+    {
+        ROS_ERROR("GraspAnalysis - WorkPose is not set yet.");
+        return;
+    }
+
+    tube_traj_.poses.resize(work_traj_.poses.size());
+    for(size_t i=0; i<work_traj_.poses.size(); i++)
+    {
+        p = pose2tf(work_traj_.poses[i]);
+        p = p.inverse();
+        t = W*p;
+        tube_traj_.poses[i] = tf2pose(t);
+    }
 }
 
 
