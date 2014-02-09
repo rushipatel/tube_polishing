@@ -9,7 +9,7 @@ Grasp::Grasp()
 {
 }
 
-GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube)
+GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh)
 {
     //grasp_array_ = grasp_array;
     tube_ = tube;
@@ -18,6 +18,7 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube)
     axis_step_size_ = 0.05;
     circular_steps_ = 8;
     wrist_axis_offset_ = 0.072; //72 mm from axis of cylinder to wrist origin
+    nodeHandle = nh;
 }
 
 // contactVector: pointing towards axis of grinding wheel
@@ -57,6 +58,8 @@ void GraspAnalysis::setWorkTrajIdx(int trajIdx)
 void GraspAnalysis::generateWorkTrajectory()
 {
     generate_work_trajectory_();
+    generate_grasps_();
+    generate_grasp_pairs_();
 }
 
 //generate grasps in global frame usually base_link
@@ -68,29 +71,33 @@ void GraspAnalysis::generate_grasps_()
     tf::Quaternion quaternion;
     tf::Transform step_tf,wrist_axis_tf, tf_grasp_cyl, tf_grasp_tube;
 
-    // Y or Z doesn't matter as long as X is Cylinder Axis
-    wrist_axis_tf.setOrigin(tf::Vector3(0.0, wrist_axis_offset_,0.0));
-    quaternion.setEulerZYX(-(M_PI/2), 0.0, (M_PI/2));
+    //wrist_axis_tf.setOrigin(tf::Vector3(0.0, wrist_axis_offset_,0.0));
+    //quaternion.setEulerZYX(-(M_PI/2), 0.0, (M_PI/2));
+    wrist_axis_tf.setOrigin(tf::Vector3(wrist_axis_offset_,0.0,0.0));
+    quaternion.setEulerZYX(M_PI, 0, 0);
     wrist_axis_tf.setRotation(quaternion); //if offset is in Y then -90,0,90
 
     for(size_t i=0; i<tube_->cylinders.size(); i++)
     {
         //floor value
         tf::Vector3 axis_vec = tube_->cylinders[i].getAxisVector();
-        int axis_steps = axis_vec.length()/axis_step_size_;
+        float axis_len = axis_vec.length();
+        int axis_steps = axis_len/axis_step_size_;
 
         for(int j=1; j<=axis_steps; j++)
         {
             // if X is Cylinder Axis
-            step_tf.setOrigin( tf::Vector3( (j*axis_step_size_), 0.0, 0.0 ) );
+            //step_tf.setOrigin( tf::Vector3( (j*axis_step_size_), 0.0, 0.0 ) );
+            // if Z is Cylinder Axis
+            step_tf.setOrigin(tf::Vector3( 0, 0, ((j*axis_step_size_)-(axis_len/2)) ) );
             float circular_step_size = 2*M_PI/circular_steps_;
             for(int k=0; k<circular_steps_; k++)
             {
-                quaternion.setEulerZYX(0.0, 0.0, k*circular_step_size);
+                quaternion.setEulerZYX(k*circular_step_size, 0, 0);
                 step_tf.setRotation(quaternion);
                 tf_grasp_cyl = step_tf*wrist_axis_tf;
-                //tf_grasp_tube_ = tube_->cylinders[i].getLocalTransform() * tf_grasp_cyl;  //temp local transform is not working
-                tf_grasp_tube = tube_->cylinders[i].getGlobalTransform() * tf_grasp_cyl;
+                tf_grasp_tube = tube_->cylinders[i].getLocalTransform() * tf_grasp_cyl;  //temp local transform is not working
+                //tf_grasp_tube = tube_->cylinders[i].getGlobalTransform() * tf_grasp_cyl;
                 tf::Vector3 orig = tf_grasp_tube.getOrigin();
                 tf::Quaternion q = tf_grasp_tube.getRotation();
                 grasp.wristPose.position.x = orig.x();
@@ -106,6 +113,16 @@ void GraspAnalysis::generate_grasps_()
         }
     }
     ROS_INFO("%d grasps generated",grasp_array_->grasps.size());
+
+    grasp_pose_array.header.frame_id = "\base_link";
+    grasp_pose_array.header.stamp = ros::Time::now();
+    grasp_pose_array.poses.resize(grasp_array_->grasps.size());
+    TubeGrasp::Grasp g;
+    for(size_t i=0; i<grasp_array_->grasps.size(); i++)
+    {
+        g = grasp_array_->grasps[i];
+        grasp_pose_array.poses[i] = g.wristPose;
+    }
 }
 
 void GraspAnalysis::normalize_worktrajectory_()
@@ -273,15 +290,15 @@ bool GraspAnalysis::generate_work_trajectory_()
             work_traj_.poses.push_back(pose);
         }
     }
-    normalize_worktrajectory_();
-    xform_in_tubeframe_();
+    //normalize_worktrajectory_();
+    //xform_in_tubeframe_();
     work2tube_trajectory_();
     return true;
 }
 
 void GraspAnalysis::work2tube_trajectory_()
 {
-    tf::Transform W, t, p, tube = tube_->getTransform(), Wt;
+    tf::Transform W, t, p;
     geometry_msgs::Pose pose;
     if(getWorkPose(pose))
         W = pose2tf(pose);
@@ -290,7 +307,8 @@ void GraspAnalysis::work2tube_trajectory_()
         ROS_ERROR("GraspAnalysis - WorkPose is not set yet.");
         return;
     }
-
+    tube_traj_.header.frame_id = "base_link";
+    tube_traj_.header.stamp = ros::Time::now();
     tube_traj_.poses.resize(work_traj_.poses.size());
     for(size_t i=0; i<work_traj_.poses.size(); i++)
     {
@@ -304,7 +322,7 @@ void GraspAnalysis::work2tube_trajectory_()
 
 void GraspAnalysis::generate_grasp_pairs_()
 {
-    /*TubeGrasp::GraspPair grasp_pair;
+    TubeGrasp::GraspPair grasp_pair;
     TubeGrasp::GraspPairArray temp_pairs;
     for(size_t i=0; i<grasp_array_->grasps.size(); i++)
     {
@@ -312,18 +330,143 @@ void GraspAnalysis::generate_grasp_pairs_()
         {
             if(i!=j)
             {
-                grasp_pair.rightGrasp = grasp_array->grasps[i];
-                grasp_pair.leftGrasp = grasp_array->grasps[j];
+                grasp_pair.rightGrasp = grasp_array_->grasps[i];
+                grasp_pair.leftGrasp = grasp_array_->grasps[j];
                 temp_pairs.graspPairs.push_back(grasp_pair);
             }
         }
     }
+    ROS_INFO_STREAM("Total Grasp Pairs : "<<temp_pairs.graspPairs.size());
+    ROS_INFO_STREAM("Total Trajectory Frames : "<<tube_traj_.poses.size());
 
-    for(size_t i=0; i<temp_pairs.graspPairs.size(); i++)
+    dualArms da(nodeHandle);
+    int idx;
+    for(size_t i=0; i<50; i++)
     {
-        ;
-    }*/
+        idx = rand()%(temp_pairs.graspPairs.size()+1);
+        da.rightWristOffset = pose2tf(temp_pairs.graspPairs[idx].rightGrasp.wristPose);
+        da.objPoseTraj = tube_traj_;
+        std::vector<double> traj;
+        if(da.genRightTrajectory(traj))
+            ROS_INFO_STREAM("Joint Trajectory Generated");
+        else
+            ROS_INFO_STREAM("GraspAnalysis - IK failed for "<<idx<<" grasp pair");
+        ROS_INFO_STREAM("size of q vector"<<traj.size());
+    }
 }
+
+void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
+{
+    visualization_msgs::Marker marker, x_axis, z_axis;
+
+    markerArray.markers.clear();
+
+    marker.header.frame_id = "base_link";
+    marker.header.stamp = ros::Time::now();
+    marker.ns = "GraspOrigins";
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::SPHERE;
+    marker.color.r = 1.0;
+    marker.color.g = 0.0;
+    marker.color.b = 0.0;
+    marker.color.a = 1.0;
+    marker.id = 1;
+    marker.scale.x = marker.scale.y = marker.scale.z = 0.005;
+
+    geometry_msgs::Pose pose;
+    TubeGrasp::Grasp g;
+    tf::Transform wrist;
+    for(size_t i=0; i<grasp_array_->grasps.size(); i++)
+    {
+        g = grasp_array_->grasps[i];
+        wrist = pose2tf(g.wristPose);
+        wrist = tube_->getTransform()*wrist;
+        pose = tf2pose(wrist);
+        marker.pose = pose;
+        markerArray.markers.push_back(marker);
+        marker.id++;
+    }
+
+    x_axis.header.frame_id = "base_link";
+    x_axis.header.stamp = ros::Time::now();
+    x_axis.ns = "Approach";
+    x_axis.action = visualization_msgs::Marker::ADD;
+    x_axis.id = 1;
+    x_axis.type = visualization_msgs::Marker::LINE_LIST;
+    x_axis.scale.x = 0.001;
+    x_axis.color.r = 1.0;
+    x_axis.color.a = 1.0;
+
+    geometry_msgs::Point p;
+    tf::Transform step,g_tf, r_tf;
+    tf::Vector3 vec;
+    for(size_t i=0; i<grasp_array_->grasps.size(); i++)
+    {
+        g = grasp_array_->grasps[i];
+        wrist = pose2tf(g.wristPose);
+        wrist = tube_->getTransform()*wrist;
+        pose = tf2pose(wrist);
+        p.x = pose.position.x;
+        p.y = pose.position.y;
+        p.z = pose.position.z;
+        x_axis.points.push_back(p);
+
+        step.setOrigin(tf::Vector3(0.02,0,0));
+        g_tf.setOrigin(tf::Vector3(pose.position.x,
+                                   pose.position.y,
+                                   pose.position.z ));
+        g_tf.setRotation(tf::Quaternion(pose.orientation.x,
+                                        pose.orientation.y,
+                                        pose.orientation.z,
+                                        pose.orientation.w ));
+        r_tf = g_tf*step;
+        vec = r_tf.getOrigin();
+        p.x = vec.x();
+        p.y = vec.y();
+        p.z = vec.z();
+        x_axis.points.push_back(p);
+    }
+
+    markerArray.markers.push_back(x_axis);
+
+    z_axis.header.frame_id = "base_link";
+    z_axis.header.stamp = ros::Time::now();
+    z_axis.ns = "Orientation";
+    z_axis.action = visualization_msgs::Marker::ADD;
+    z_axis.id = 1;
+    z_axis.type = visualization_msgs::Marker::LINE_LIST;
+    z_axis.scale.x = 0.001;
+    z_axis.color.b = 1.0;
+    z_axis.color.a = 1.0;
+    for(size_t i=0; i<grasp_array_->grasps.size(); i++)
+    {
+        g = grasp_array_->grasps[i];
+        wrist = pose2tf(g.wristPose);
+        wrist = tube_->getTransform()*wrist;
+        pose = tf2pose(wrist);
+        p.x = pose.position.x;
+        p.y = pose.position.y;
+        p.z = pose.position.z;
+        z_axis.points.push_back(p);
+
+        step.setOrigin(tf::Vector3(0,0,0.01));
+        g_tf.setOrigin(tf::Vector3(pose.position.x,
+                                   pose.position.y,
+                                   pose.position.z ));
+        g_tf.setRotation(tf::Quaternion(pose.orientation.x,
+                                        pose.orientation.y,
+                                        pose.orientation.z,
+                                        pose.orientation.w ));
+        r_tf = g_tf*step;
+        vec = r_tf.getOrigin();
+        p.x = vec.x();
+        p.y = vec.y();
+        p.z = vec.z();
+        z_axis.points.push_back(p);
+    }
+    markerArray.markers.push_back(z_axis);
+}
+
 
 //tf = current pose to machining pose
 void compute_matrics( tf::Transform tf, const TubeGrasp::GraspPair &grasp_pair )

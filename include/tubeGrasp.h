@@ -6,7 +6,9 @@
 #include <tf/tf.h>
 
 #include "tubePerception.h"
+#include "manip_analysis.cpp"
 #include "utility.cpp"
+#include "dualArms.h"
 
 namespace TubeGrasp
 {
@@ -44,7 +46,8 @@ namespace TubeGrasp
     class GraspAnalysis
     {
     public:
-        GraspAnalysis(TubePerception::Tube::Ptr tube);
+        ros::NodeHandle nodeHandle;
+        GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh);
         void setWorkPose(geometry_msgs::Pose &p);
         int getWorkPose(geometry_msgs::Pose &p);
         void setContactVector(tf::Vector3 contactVector, tf::Vector3 axisVector);
@@ -52,11 +55,13 @@ namespace TubeGrasp
         void generateGrasps();
         void generateGraspPairs();
         void generateWorkTrajectory(); //temp. dev purpose
+        void getGraspMarker(visualization_msgs::MarkerArray &markerArray);
         geometry_msgs::PoseArray work_traj_; //put this back in private after dbg/dev
         geometry_msgs::PoseArray tube_traj_;
         visualization_msgs::Marker vismsg_workNormalsX;
         visualization_msgs::Marker vismsg_workNormalsY;
         visualization_msgs::Marker vismsg_workNormalsZ;
+        geometry_msgs::PoseArray grasp_pose_array;
 
     private:
         TubePerception::Tube::Ptr tube_;

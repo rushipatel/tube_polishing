@@ -170,7 +170,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.r = 0.0;
     marker.color.g = 0.3;
     marker.color.b = 0.3;
-    marker.color.a = 0.5;
+    marker.color.a = 0.4;
     for(size_t i=0; i<cylinders.size(); i++)
     {
         marker.scale.x = marker.scale.y = cylinders[i].radius*2;
@@ -184,6 +184,33 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
         marker.pose = tf2pose(t);
         markerArray.markers.push_back(marker);
     }
+
+
+    //Cylinder end points
+    marker.header.frame_id = "base_link";
+    marker.header.stamp = ros::Time::now();
+    marker.ns = "CylinderEnds";
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::SPHERE;
+    marker.color.r = 1.0;
+    marker.color.g = 0.0;
+    marker.color.b = 0.0;
+    marker.color.a = 1.0;
+    marker.id = 1;
+    marker.scale.x = marker.scale.y = marker.scale.z = 0.01;
+    for(size_t i=0; i<cylinders.size(); i++)
+    {
+        marker.pose.position.x = cylinders[i].p1.x;
+        marker.pose.position.y = cylinders[i].p1.y;
+        marker.pose.position.z = cylinders[i].p1.z;
+        markerArray.markers.push_back(marker);
+        marker.id++;
+        marker.pose.position.x = cylinders[i].p2.x;
+        marker.pose.position.y = cylinders[i].p2.y;
+        marker.pose.position.z = cylinders[i].p2.z;
+        markerArray.markers.push_back(marker);
+        marker.id++;
+    }
 }
 
 void Tube::getCylinderPoses(geometry_msgs::PoseArray &pose_array)
@@ -194,16 +221,14 @@ void Tube::getCylinderPoses(geometry_msgs::PoseArray &pose_array)
     pose_array.header.frame_id = "base_link";
     pose_array.header.stamp = ros::Time::now();
 
+    tf::Transform t,tube = getTransform();
     for(size_t i=0; i<cylinders.size(); i++)
     {
-        pose = cylinders[i].getGlobalPose();
+        t = cylinders[i].getLocalTransform();
+        t = tube * t;
+        pose = tf2pose(t);
         pose_array.poses.push_back(pose);
     }
-}
-
-geometry_msgs::Pose Cylinder::getGlobalPose(void)
-{
-    return global_pose_;
 }
 
 geometry_msgs::Pose Cylinder::getLocalPose(void)
@@ -226,28 +251,11 @@ tf::Transform Cylinder::getLocalTransform(void)
     return t;
 }
 
-tf::Transform Cylinder::getGlobalTransform(void)
-{
-    tf::Transform tf;
-    tf.setOrigin(tf::Vector3(global_pose_.position.x, global_pose_.position.y, global_pose_.position.z));
-    tf::Quaternion q;
-    q.setX(global_pose_.orientation.x);
-    q.setY(global_pose_.orientation.y);
-    q.setZ(global_pose_.orientation.z);
-    q.setW(global_pose_.orientation.w);
-    tf.setRotation(q);
-    return tf;
-}
-
 /*tf::Transform Cylinder::getLocalTransform(void)
 {
     return local_tf_;
 }*/
 
-void Cylinder::setGlobalPose(geometry_msgs::Pose &pose)
-{
-    global_pose_ = pose;
-}
 void Cylinder::setLocalPose(geometry_msgs::Pose &pose)
 {
     local_pose_ = pose;
@@ -289,25 +297,22 @@ void CloudProcessing::processCloud_(void)
     get_radius_();
     collaps_normals_();
     segmentize_axis_();
-    define_pose2_();
+    define_pose_();       // <<<<<<< Cylinders gets converted in local frame including p1 and p2
     generate_work_vectors_();
-    //get_line_graph_();
-    //get_curves_();
-    //print_line_graph_();
 }
 
 //void CloudProcessing::
 
 //random 45/90degree circular trajectory. in global frame
+//now in local frame
 void CloudProcessing::generate_work_vectors_()
 {
-
     double l = (double)rand()/(double)RAND_MAX; // Not working. Always generates 0.840188
     l = 0.5;
     
     int cyl_idx = rand()%(tube_->cylinders.size()+1);
     //cyl_idx = 1;
-    //ROS_INFO_STREAM("...Cylinder Idx is Always 1...");
+
     tf::Vector3 axis = tube_->cylinders[cyl_idx].getAxisVector();
     axis.normalize();
 
@@ -364,60 +369,8 @@ tf::Vector3 CloudProcessing::get_perp_vec3_(tf::Vector3 v3)
     return perp_vec;
 }
 
-//cylindrical axis is X
-/*void CloudProcessing::define_pose_(void)
-{
-    tf::Vector3 v1, v2, v3;
-    tf::Matrix3x3 mat;
-    tf::Quaternion q;
-
-    geometry_msgs::Pose pose;
-    for(size_t i=0; i<tube_->cylinders.size(); i++)
-    {
-        pose.position.x = (tube_->cylinders[i].p1.x); //+ tube_->cylinders[i].p2.x) / 2;
-        pose.position.y = (tube_->cylinders[i].p1.y); //+ tube_->cylinders[i].p2.y) / 2;
-        pose.position.z = (tube_->cylinders[i].p1.z); //+ tube_->cylinders[i].p2.z) / 2;
-
-        v1.setX(tube_->cylinders[i].p2.x - tube_->cylinders[i].p1.x);
-        v1.setY(tube_->cylinders[i].p2.y - tube_->cylinders[i].p1.y);
-        v1.setZ(tube_->cylinders[i].p2.z - tube_->cylinders[i].p1.z);
-        tube_->cylinders[i].axisVector = v1;
-        v2 = get_perp_vec3_(v1);
-        v1.normalize();
-        v3 = v1.cross(v2);
-        v3.normalize();
-
-        mat.setValue( v1.x(), v1.y(), v1.z(), 
-                      v2.x(), v2.y(), v2.z(),
-                      v3.x(), v3.y(), v3.z() );
-        mat.getRotation(q);
-        pose.orientation.x = q.x();
-        pose.orientation.y = q.y();
-        pose.orientation.z = q.z();
-        pose.orientation.w = q.w();
-        tube_->cylinders[i].setGlobalPose(pose);
-    }
-
-    if(!tube_->cylinders.empty())
-    {
-        int idx = tube_->cylinders.size()-1;
-        tf::Transform transf = tf::Transform::getIdentity();
-        tube_->cylinders[idx].setLocalTransform(transf);
-        pose = tube_->cylinders[idx].getGlobalPose();
-        tube_->setPose(pose);  //Tube's pose = last (strong) cylinder's global pose
-    }
-
-    for(size_t i=0; i<(tube_->cylinders.size()-1); i++)
-    {
-        tf::Transform tf_tube,tf_cyl,tf_tube_cyl;
-        tf_cyl = tube_->cylinders[i].getGlobalTransform();
-        tf_tube = tube_->getTransform();
-        tf_tube_cyl = tf_tube.inverseTimes(tf_cyl);
-        tube_->cylinders[i].setLocalTransform(tf_tube_cyl);
-    }
-}*/
-
-void CloudProcessing::define_pose2_(void)
+//Also converts points in local frame (tube frame)
+void CloudProcessing::define_pose_(void)
 {
 
     for(size_t i=0; i<tube_->cylinders.size(); i++)
@@ -446,39 +399,49 @@ void CloudProcessing::define_pose2_(void)
         pose.orientation.y = q.getY();
         pose.orientation.z = q.getZ();
         pose.orientation.w = q.getW();
-
-        tube_->cylinders[i].setGlobalPose(pose);
+        //For temporary use only
+        tube_->cylinders[i].setLocalPose(pose);
     }
 
     if(!tube_->cylinders.empty())
     {
         int idx = 0;
         geometry_msgs::Pose pose;
-        
-        pose = tube_->cylinders[idx].getGlobalPose();
+
+        pose = tube_->cylinders[idx].getLocalPose();
         tube_->setPose(pose);  //Tube's pose = first (strong) cylinder's global pose
     }
 
+    // Convert cylinder from global to local
     for(size_t i=0; i<(tube_->cylinders.size()); i++)
     {
         tf::Transform tube_tf, cyl_tf, tube_cyl_tf;
-        cyl_tf = tube_->cylinders[i].getGlobalTransform();
+        cyl_tf = tube_->cylinders[i].getLocalTransform();
         tube_tf = tube_->getTransform();
         tube_cyl_tf = tube_tf.inverseTimes(cyl_tf);
         tube_->cylinders[i].setLocalPose(tube_cyl_tf);
-        
-        //geometry_msgs::Pose tube, cyl, pose;
-        //tube = tube_->getPose();
-        //cyl = tube_->cylinders[i].getGlobalPose();
-        //Should use inverse transform for local pose
-        /*pose.position.x = cyl.position.x - tube.position.x;
-        pose.position.y = cyl.position.y - tube.position.y;
-        pose.position.z = cyl.position.z - tube.position.z;
-        pose.orientation.x = 0;
-        pose.orientation.y = 0;
-        pose.orientation.z = 0;
-        pose.orientation.w = 1;
-        tube_->cylinders[i].setLocalPose(pose);*/
+        tf::Transform p1, p2;
+
+        p1.setIdentity();
+        p2.setIdentity();
+        p1.setOrigin(tf::Vector3( tube_->cylinders[i].p1.x,
+                                  tube_->cylinders[i].p1.y,
+                                  tube_->cylinders[i].p1.z ) );
+        p2.setOrigin(tf::Vector3( tube_->cylinders[i].p2.x,
+                                  tube_->cylinders[i].p2.y,
+                                  tube_->cylinders[i].p2.z ) );
+
+        p1 = tube_tf.inverseTimes(p1);
+        p2 = tube_tf.inverseTimes(p2);
+
+        tf::Vector3 vec = p1.getOrigin();
+        tube_->cylinders[i].p1.x = vec.getX();
+        tube_->cylinders[i].p1.y = vec.getY();
+        tube_->cylinders[i].p1.z = vec.getZ();
+        vec = p2.getOrigin();
+        tube_->cylinders[i].p2.x = vec.getX();
+        tube_->cylinders[i].p2.y = vec.getY();
+        tube_->cylinders[i].p2.z = vec.getZ();
     }
 }
 
@@ -703,7 +666,6 @@ void CloudProcessing::remove_inliers_(pcl::PointCloud<PointT>::Ptr points,  std:
 }
 
 
-
 void CloudProcessing::cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers)
 {
     PointT p1, p2;
@@ -734,7 +696,7 @@ void CloudProcessing::setZerror(float error)
     z_error_ = error;
 }
 
-void CloudProcessing::displayCloud(void)
+/*void CloudProcessing::displayCloud(void)
 {
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
@@ -875,27 +837,7 @@ void CloudProcessing::dispalyWorkTraj(void)
     for(int i=0; i<tube_->workPointsCluster.size(); i++)
     {
         cloud = tube_->workPointsCluster[i];
-        
-        /*pcl::PointXYZ p1, p2;
-        
-        for(size_t i=0; i<normal_array.size();i++)
-        {
-            normal = normal_array[i];
-            p1.x = normal.point.x();
-            p1.y = normal.point.y();
-            p1.z = normal.point.z();
-            
-            p2.x = normal.vec.x()*0.01;
-            p2.y = normal.vec.y()*0.01;
-            p2.z = normal.vec.z()*0.01;
-            p2.x = p2.x + p1.x;
-            p2.y = p2.y + p1.y;
-            p2.z = p2.z + p1.z;
-            std::strstream ss;
-            ss.flush();
-            ss<<"C"<<j<<"L"<<i;
-            viewer->addLine(p1,p2,ss.str());
-        }*/
+
         std::strstream ss;
         ss.flush();
         ss<<"C"<<i;
@@ -911,7 +853,7 @@ void CloudProcessing::dispalyWorkTraj(void)
     viewer->addCoordinateSystem (1.0);
     viewer->initCameraParameters ();
     viewer->spin();
-}
+}*/
 
 }//TubePerception
 

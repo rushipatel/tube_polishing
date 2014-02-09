@@ -95,9 +95,35 @@ void dualArms::get_current_left_joint_angles(double current_angles[7])
  */
 bool dualArms::genTrajectory()
 {
-    if(!call_right_arm_gpik_())
+    right_joint_traj_.clear();
+    left_joint_traj_.clear();
+    if(!call_right_arm_gpik_(right_joint_traj_))
         return 0;
-    if(!call_left_arm_gpik_())
+    if(!call_left_arm_gpik_(left_joint_traj_))
+        return 0;
+return 1;
+}
+
+/*! \brief Generates Left trajectory by calling IK service and stores output in double linear vector.
+ *
+ *  Returns false if IK fails at any trajectory point.
+ */
+bool dualArms::genLeftTrajectory(std::vector<double> &jointTrajectory)
+{
+    jointTrajectory.clear();
+    if(!call_left_arm_gpik_(jointTrajectory))
+        return 0;
+return 1;
+}
+
+/*! \brief Generates Right trajectory by calling IK service and stores output in double linear vector.
+ *
+ *  Returns false if IK fails at any trajectory point.
+ */
+bool dualArms::genRightTrajectory(std::vector<double> &jointTrajectory)
+{
+    jointTrajectory.clear();
+    if(!call_right_arm_gpik_(jointTrajectory))
         return 0;
 return 1;
 }
@@ -249,7 +275,7 @@ void dualArms::get_right_goal_()
 
     for(int j=0; j<7; j++)
     {
-        traj_point.positions[j] = rightJointTrajectory[j];
+        traj_point.positions[j] = left_joint_traj_[j];
         traj_point.velocities[j] = 0.0;
     }
     traj_point.time_from_start = ros::Duration(0.25);
@@ -259,7 +285,7 @@ void dualArms::get_right_goal_()
     {
         for(int j=0; j<7; j++)
         {
-            traj_point.positions[j] = rightJointTrajectory[(i*7)+j];
+            traj_point.positions[j] = left_joint_traj_[(i*7)+j];
             traj_point.velocities[j] = 0.0;
         }
         right_goal_.trajectory.points[i] = traj_point;
@@ -289,7 +315,7 @@ void dualArms::get_left_goal_()
 
     for(int j=0; j<7; j++)
     {
-        traj_point.positions[j] = leftJointTrajectory[j];
+        traj_point.positions[j] = left_joint_traj_[j];
         traj_point.velocities[j] = 0.0;
     }
     traj_point.time_from_start = ros::Duration(0.25);
@@ -299,7 +325,7 @@ void dualArms::get_left_goal_()
     {
         for(int j=0; j<7; j++)
         {
-            traj_point.positions[j] = leftJointTrajectory[(i*7)+j];
+            traj_point.positions[j] = left_joint_traj_[(i*7)+j];
             traj_point.velocities[j] = 0.0;
         }
         left_goal_.trajectory.points[i] = traj_point;
@@ -503,7 +529,7 @@ bool dualArms::moveLeftArm(geometry_msgs::Pose pose)
 /*! \brief Calls IK service.
  *
  */
-bool dualArms::call_right_arm_gpik_(void)
+bool dualArms::call_right_arm_gpik_(std::vector<double> &right_joint_trajectory)
 {
     kinematics_msgs::GetKinematicSolverInfo::Request request;
     kinematics_msgs::GetKinematicSolverInfo::Response response;
@@ -550,7 +576,7 @@ bool dualArms::call_right_arm_gpik_(void)
             for(unsigned int j=0; j<gpik_res.solution.joint_state.name.size(); j++)
             {
               //ROS_INFO("Joint: %s %f",gpik_res.solution.joint_state.name[i].c_str(),gpik_res.solution.joint_state.position[i]);
-              rightJointTrajectory.push_back(gpik_res.solution.joint_state.position[j]);
+              right_joint_trajectory.push_back(gpik_res.solution.joint_state.position[j]);
             }
             for( int l=0; l<7; l++)
                 last_right_joints[l] = gpik_res.solution.joint_state.position[l];
@@ -573,7 +599,7 @@ bool dualArms::call_right_arm_gpik_(void)
 /*! \brief Calls IK service.
  *
  */
-bool dualArms::call_left_arm_gpik_(void)
+bool dualArms::call_left_arm_gpik_(std::vector<double> &left_joint_trajectory)
 {
     kinematics_msgs::GetKinematicSolverInfo::Request request;
     kinematics_msgs::GetKinematicSolverInfo::Response response;
@@ -621,7 +647,7 @@ bool dualArms::call_left_arm_gpik_(void)
             for(unsigned int j=0; j<gpik_res.solution.joint_state.name.size(); j++)
             {
               //ROS_INFO("Joint: %s %f",gpik_res.solution.joint_state.name[i].c_str(),gpik_res.solution.joint_state.position[i]);
-              leftJointTrajectory.push_back(gpik_res.solution.joint_state.position[j]);
+              left_joint_trajectory.push_back(gpik_res.solution.joint_state.position[j]);
             }
             for( int l=0; l<7; l++)
                 last_left_joints[l] = gpik_res.solution.joint_state.position[l];
