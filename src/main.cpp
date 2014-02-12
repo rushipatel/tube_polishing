@@ -186,7 +186,7 @@ int main(int argc, char **argv)
                     TubeGrasp::GraspAnalysis ga(tube, rh);
                     ga.getGraspMarker(grasp_marker);
                     geometry_msgs::Pose work_pose;
-                    work_pose.position.x = 1.1;
+                    work_pose.position.x = 0.7;
                     work_pose.position.y = 0.0;
                     work_pose.position.z = 0.8;
                     work_pose.orientation.x = 0.0;
@@ -195,7 +195,6 @@ int main(int argc, char **argv)
                     work_pose.orientation.w = 1.0;
                     ga.setWorkPose(work_pose);
                     ga.generateWorkTrajectory();
-
 
                     //marker_pub.publish();
                     //marker_pub.publish(ga.vismsg_workNormalsY);
@@ -246,7 +245,7 @@ int main(int argc, char **argv)
     }
     //while (getchar()!='q');
     //ros::spin();
-    ManipAnalysis ma("right_arm", rh);
+    /*ManipAnalysis ma("right_arm", rh);
     ma.setRotationAxis(tf::Vector3(1,0,0));
     ma.setForceVec(tf::Vector3(1,0,0));
     std::vector<double> q;
@@ -258,9 +257,9 @@ int main(int argc, char **argv)
     q[4] = -0.15;
     q[5] = -0.1;
     q[6] =  0.0;
-    ROS_INFO_STREAM("FORCE MATRIC   : "<<ma.getForceMatric(q));
-    ROS_INFO_STREAM("ROTATION MATRIC: "<<ma.getRotationMatric(q));
-    ROS_INFO_STREAM("K              : "<<ma.getManipIndex(q));
+    ROS_INFO_STREAM("FORCE MATRIC   : "<<ma.getForceMetric(q));
+    ROS_INFO_STREAM("ROTATION MATRIC: "<<ma.getRotationMetric(q));
+    ROS_INFO_STREAM("K              : "<<ma.getManipIndex(q));*/
 
 
   ros::shutdown();

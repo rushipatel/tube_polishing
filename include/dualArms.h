@@ -12,6 +12,8 @@
 #include <arm_navigation_msgs/FilterJointTrajectory.h>
 #include <vector>
 
+#include <utility.cpp>
+
 #define MAX_JOINT_VEL 0.5
 
 /*! \brief  Simple action server client definition for JointTrajectoryAction */
@@ -31,9 +33,12 @@ public:
     geometry_msgs::PoseArray objPoseTraj; /*!< Pose trajectory of an object. */
     dualArms(ros::NodeHandle& rh);
     bool genTrajectory();
+    bool genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &lefttJointTraj);
     bool genLeftTrajectory(std::vector<double> &jointTrajectory);  //Prerequisites: leftWristOffset and objPoseTraj
     bool genRightTrajectory(std::vector<double> &jointTrajectory); //Prerequisites: rightWristOffset and objPoseTraj
     bool executeJointTrajectory();
+    bool executeJointTrajectory(std::vector<double> &qRight,
+                                std::vector<double> &qLeft);
     bool moveRightArm(geometry_msgs::Pose pose);
     bool moveLeftArm(geometry_msgs::Pose pose);
     void get_current_right_joint_angles(double current_angles[7]);
@@ -49,8 +54,6 @@ private:
     pr2_controllers_msgs::JointTrajectoryGoal right_goal_, left_goal_; /*!< Joint trajectory goal to execute joint trajectory. */
     std::vector<double> right_joint_traj_,left_joint_traj_; /*!< Double linear array to store joint trajectory. */
 
-    void tf2pose(tf::Transform &tf, geometry_msgs::Pose &pose);
-    void pose2tf(geometry_msgs::Pose &pose, tf::Transform &tf);
     void get_right_goal_();
     void get_left_goal_();
     void sync_start_times_(void);

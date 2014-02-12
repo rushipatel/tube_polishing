@@ -14,11 +14,14 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh)
     //grasp_array_ = grasp_array;
     tube_ = tube;
     grasp_array_.reset(new (TubeGrasp::GraspArray));
-    grasp_pairs_.reset(new (TubeGrasp::GraspPairArray));
+    test_pairs_.reset(new (TubeGrasp::GraspPairArray));
+    valid_pairs_.reset(new (TubeGrasp::GraspPairArray));
     axis_step_size_ = 0.05;
     circular_steps_ = 8;
     wrist_axis_offset_ = 0.072; //72 mm from axis of cylinder to wrist origin
     nodeHandle = nh;
+    MAX_TEST_GRASPS = 30;
+    MAX_ITERATION = 200;
 }
 
 // contactVector: pointing towards axis of grinding wheel
@@ -59,10 +62,12 @@ void GraspAnalysis::generateWorkTrajectory()
 {
     generate_work_trajectory_();
     generate_grasps_();
-    generate_grasp_pairs_();
+    generate_test_pairs_();
+    test_pairs_for_ik_();
+    compute_metric_();
 }
 
-//generate grasps in global frame usually base_link
+//generate grasps in global frame. usually base_link.
 void GraspAnalysis::generate_grasps_()
 {
     TubeGrasp::Grasp grasp;
@@ -77,6 +82,9 @@ void GraspAnalysis::generate_grasps_()
     quaternion.setEulerZYX(M_PI, 0, 0);
     wrist_axis_tf.setRotation(quaternion); //if offset is in Y then -90,0,90
 
+    // Circular group number. Grasps are devided in groups so that it reduces number of total pairs
+    unsigned int group_n = 0;
+
     for(size_t i=0; i<tube_->cylinders.size(); i++)
     {
         //floor value
@@ -86,6 +94,7 @@ void GraspAnalysis::generate_grasps_()
 
         for(int j=1; j<=axis_steps; j++)
         {
+            group_n++;
             // if X is Cylinder Axis
             //step_tf.setOrigin( tf::Vector3( (j*axis_step_size_), 0.0, 0.0 ) );
             // if Z is Cylinder Axis
@@ -107,6 +116,8 @@ void GraspAnalysis::generate_grasps_()
                 grasp.wristPose.orientation.y = q.y();
                 grasp.wristPose.orientation.z = q.z();
                 grasp.wristPose.orientation.w = q.w();
+
+                grasp.group = group_n;
 
                 grasp_array_->grasps.push_back(grasp);
             }
@@ -320,39 +331,165 @@ void GraspAnalysis::work2tube_trajectory_()
 }
 
 
-void GraspAnalysis::generate_grasp_pairs_()
+void GraspAnalysis::generate_test_pairs_()
 {
-    TubeGrasp::GraspPair grasp_pair;
-    TubeGrasp::GraspPairArray temp_pairs;
+    TubeGrasp::GraspPair gp;
     for(size_t i=0; i<grasp_array_->grasps.size(); i++)
     {
         for(size_t j=0; j<grasp_array_->grasps.size(); j++)
         {
-            if(i!=j)
+            if(i!=j &&
+               grasp_array_->grasps[i].group!=grasp_array_->grasps[j].group)
             {
-                grasp_pair.rightGrasp = grasp_array_->grasps[i];
-                grasp_pair.leftGrasp = grasp_array_->grasps[j];
-                temp_pairs.graspPairs.push_back(grasp_pair);
+                gp.rightGrasp = grasp_array_->grasps[i];
+                gp.leftGrasp = grasp_array_->grasps[j];
+                test_pairs_->graspPairs.push_back(gp);
             }
         }
     }
-    ROS_INFO_STREAM("Total Grasp Pairs : "<<temp_pairs.graspPairs.size());
-    ROS_INFO_STREAM("Total Trajectory Frames : "<<tube_traj_.poses.size());
+    ROS_INFO_STREAM("Total Grasp Pairs : "<<test_pairs_->graspPairs.size());
+}
 
+void GraspAnalysis::test_pairs_for_ik_()
+{
     dualArms da(nodeHandle);
+
     int idx;
-    for(size_t i=0; i<50; i++)
+    unsigned long test_grasps=1;
+
+    ROS_INFO_STREAM("Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
+    GraspPair gp;
+    da.objPoseTraj = tube_traj_;
+
+    unsigned long it=MAX_ITERATION;
+    valid_pairs_->graspPairs.reserve(MAX_TEST_GRASPS);
+    while(it>0)
     {
-        idx = rand()%(temp_pairs.graspPairs.size()+1);
-        da.rightWristOffset = pose2tf(temp_pairs.graspPairs[idx].rightGrasp.wristPose);
-        da.objPoseTraj = tube_traj_;
-        std::vector<double> traj;
-        if(da.genRightTrajectory(traj))
-            ROS_INFO_STREAM("Joint Trajectory Generated");
+        std::cout<<'.';
+        it--;
+        idx = rand()%(test_pairs_->graspPairs.size()+1);
+        gp = test_pairs_->graspPairs[idx];
+        da.rightWristOffset = pose2tf(gp.rightGrasp.wristPose);
+        da.leftWristOffset = pose2tf(gp.leftGrasp.wristPose);
+        //genTrajectory clears vectors(qRight, qLeft) in arguement
+        if(da.genTrajectory(gp.qRight, gp.qLeft))
+        {
+            gp.isValid = true;
+            valid_pairs_->graspPairs.push_back(gp);
+            test_grasps++;
+            if(test_grasps>MAX_TEST_GRASPS)
+                break;
+        }
         else
-            ROS_INFO_STREAM("GraspAnalysis - IK failed for "<<idx<<" grasp pair");
-        ROS_INFO_STREAM("size of q vector"<<traj.size());
+        {
+            std::cout<<" ";
+            //fail_cnt++;
+        }
     }
+    std::cout<<"\n";
+    if(!valid_pairs_->graspPairs.empty())
+    {
+        ROS_INFO_STREAM("GraspAnalysis - "<<valid_pairs_->graspPairs.size()
+                        <<" valid pairs found from "
+                        <<MAX_ITERATION<<" iteration");
+    }
+    else
+        ROS_WARN_STREAM("No pair found to be valid for IK");
+}
+
+
+//To compute manipulability metric and assign rank
+//for each trajectory point and ultimatlly accumulative rank
+void GraspAnalysis::compute_metric_()
+{
+    ManipAnalysis ma_right("right_arm",nodeHandle);
+    ManipAnalysis ma_left("left_arm",nodeHandle);
+    tf::Vector3 f_vec,axis,vec;
+    tf::Transform t, work = pose2tf(work_pose_);
+    t.setIdentity();
+    t.setOrigin(tf::Vector3(1,0,0));
+    t = work * t;
+    vec = t.getOrigin();
+    f_vec = work.getOrigin() - vec;
+    f_vec.normalize();
+
+    t.setIdentity();
+    t.setOrigin(tf::Vector3(0,1,0));
+    t = work * t;
+    vec = t.getOrigin();
+    axis = work.getOrigin() - vec;
+    axis.normalize();
+
+    ma_right.setReferencePoint(work.getOrigin());
+    ma_left.setReferencePoint(work.getOrigin());
+    ma_right.setRotationAxis(axis);
+    ma_left.setRotationAxis(axis);
+    ma_right.setForceVec(f_vec);
+    ma_left.setForceVec(f_vec);
+
+    unsigned int nr_of_joints;
+    TubeGrasp::GraspPair gp;
+    std::vector<double> q_r, q_l;
+    double rfm, lfm, rrm, lrm; //force metric and rotation metric
+
+    //For each valid pair
+    for(size_t i=0; i<valid_pairs_->graspPairs.size(); i++)
+    {
+        gp = valid_pairs_->graspPairs[i];
+        nr_of_joints = gp.qRight.size()/tube_traj_.poses.size();
+        //resize to total number of trajectory points
+        valid_pairs_->graspPairs[i].forceMetric.resize(tube_traj_.poses.size());
+        valid_pairs_->graspPairs[i].rotMetric.resize(tube_traj_.poses.size());
+
+        //For each pair, for each traj point, compute and store metrics
+        double f_min=1000, r_min=1000;
+        for(size_t j=0; j<tube_traj_.poses.size(); j++)
+        {
+            q_r.clear();
+            q_r.resize(nr_of_joints);
+            q_l.clear();
+            q_l.resize(nr_of_joints);
+            //Extract 7 joint values from linear qRight/qLeft vector.
+            for(size_t k=0; k<nr_of_joints; k++)
+            {
+                q_r[k] = gp.qRight[(j*nr_of_joints)+k];
+                q_l[k] = gp.qLeft[(j*nr_of_joints)+k];
+            }
+            rfm = ma_right.getForceMetric(q_r);
+            rrm = ma_right.getRotationMetric(q_r);
+            lfm = ma_left.getForceMetric(q_l);
+            lrm = ma_left.getRotationMetric(q_l);
+
+            valid_pairs_->graspPairs[i].forceMetric[j] = std::min(rfm,lfm);
+            if(std::min(rfm,lfm)<f_min)
+                f_min = std::min(rfm,lfm);
+            valid_pairs_->graspPairs[i].rotMetric[j] = std::min(rrm,lrm);
+            if(std::min(rrm,lrm)<r_min)
+                r_min = std::min(rrm,lrm);
+        }
+        valid_pairs_->graspPairs[i].minForce = f_min;
+        valid_pairs_->graspPairs[i].minRot = r_min;
+        valid_pairs_->graspPairs[i].rank = (f_min*0.5) + (r_min*0.5);
+        ROS_INFO_STREAM("Pair "<<i<<" (F,R): "<<f_min<<" "<<r_min);
+    }
+    double r = 0;
+    unsigned int best_grasp;
+    for(size_t i=0; i<valid_pairs_->graspPairs.size(); i++)
+    {
+        if(valid_pairs_->graspPairs[i].rank>r)
+        {
+            best_grasp = i;
+            r = valid_pairs_->graspPairs[i].rank;
+        }
+    }
+    ROS_WARN_STREAM("Best Grasp Pair index: "<<best_grasp);
+    dualArms da(nodeHandle);
+    da.objPoseTraj = tube_traj_;
+    da.rightWristOffset = pose2tf(valid_pairs_->graspPairs[best_grasp].rightGrasp.wristPose);
+    da.leftWristOffset = pose2tf(valid_pairs_->graspPairs[best_grasp].leftGrasp.wristPose);
+    while(getchar()!='q');
+    da.executeJointTrajectory(valid_pairs_->graspPairs[best_grasp].qRight,
+                              valid_pairs_->graspPairs[best_grasp].qRight);
 }
 
 void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
@@ -465,13 +602,6 @@ void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
         z_axis.points.push_back(p);
     }
     markerArray.markers.push_back(z_axis);
-}
-
-
-//tf = current pose to machining pose
-void compute_matrics( tf::Transform tf, const TubeGrasp::GraspPair &grasp_pair )
-{
-    //grasp_pair.leftGrasp;
 }
 
 void diaplayGraspsInGlobalFrame( TubeGrasp::GraspArray::Ptr grasp_array,

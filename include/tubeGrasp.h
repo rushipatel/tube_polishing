@@ -17,16 +17,29 @@ namespace TubeGrasp
     public:
         Grasp();
         geometry_msgs::Pose wristPose;
-        float quality;
-        unsigned int cylinderIdx;
+        unsigned int group; //circular group. it helps reduce pairs to test
+        //unsigned int cylinderIdx;
     };
     
     class GraspPair
     {
     public:
+        GraspPair()
+        {
+            isValid = false;
+            rank = 0;
+        }
         TubeGrasp::Grasp rightGrasp;
         TubeGrasp::Grasp leftGrasp;
+        bool isValid;
+        std::vector<double> qRight; //to store ik results (joint traj) for valid_pairs
+        std::vector<double> qLeft;
+        //Stores minimum of two, right and left, metric
+        std::vector<double> forceMetric; //Memory inefficient. Store accumulative rank only after dev/debug
+        std::vector<double> rotMetric;
         double rank;
+        double minForce;
+        double minRot;
     };
 
     class GraspArray
@@ -66,7 +79,8 @@ namespace TubeGrasp
     private:
         TubePerception::Tube::Ptr tube_;
         TubeGrasp::GraspArray::Ptr grasp_array_;
-        TubeGrasp::GraspPairArray::Ptr grasp_pairs_;
+        TubeGrasp::GraspPairArray::Ptr test_pairs_;
+        TubeGrasp::GraspPairArray::Ptr valid_pairs_;
 
         //tf::Vector3 contact_vector_;
         //tf::Vector3 axis_vector_;
@@ -75,12 +89,17 @@ namespace TubeGrasp
         float axis_step_size_; //in mm
         int circular_steps_;  //in integer number
         float wrist_axis_offset_;
+        unsigned long MAX_TEST_GRASPS; //Maximum valid grasps to store
+        //Maximum iteration for randomly selecting grasp to test
+        unsigned long MAX_ITERATION;  //Check the repetations in selecting random index in test_for_ik_
         void generate_grasps_();
         bool generate_work_trajectory_();
-        void generate_grasp_pairs_();
+        void generate_test_pairs_();
         void normalize_worktrajectory_();
         void xform_in_tubeframe_();
         void work2tube_trajectory_();
+        void test_pairs_for_ik_();
+        void compute_metric_();
     };
     void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Transform tube_tf);
     boost::shared_ptr<pcl::visualization::PCLVisualizer> displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array);
