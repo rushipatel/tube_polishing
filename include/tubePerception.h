@@ -99,6 +99,7 @@ namespace TubePerception
         //work trajectories by NormalArray
         std::vector<pcl::PointCloud<PointT>::Ptr> workPointsCluster;
         unsigned int whichCylinder(PointT point);
+        geometry_msgs::Pose getCylinderGlobalPose(unsigned int cylIdx);
         void getCylinderMarker(visualization_msgs::MarkerArray &markerArray);
         void getCylinderPoses(geometry_msgs::PoseArray &pose_array);
     protected:

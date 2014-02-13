@@ -50,6 +50,18 @@ tf::Transform Tube::getTransform(void)
     return tf;
 }
 
+geometry_msgs::Pose Tube::getCylinderGlobalPose(unsigned int cylIdx)
+{
+    tf::Transform c, t = getTransform();
+    geometry_msgs::Pose p;
+    p = cylinders[cylIdx].getLocalPose();
+    c = pose2tf(p);
+
+    c = t*c;
+
+    return tf2pose(c);
+}
+
 float isInCylinder( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt )
 {
     float dx, dy, dz;	// vector d  from line segment point 1 to point 2

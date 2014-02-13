@@ -23,6 +23,7 @@
 #include "tubeGrasp.h"
 #include "manip_analysis.cpp"
 #include "utility.cpp"
+#include "gripper.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
@@ -142,6 +143,13 @@ int main(int argc, char **argv)
     robotHead pr2_head;
     pr2_head.lookAt(0.75,0.0,0.5);
 
+    /*Gripper r_grpr("right_arm"),l_grpr("left_arm");
+    r_grpr.open();
+    l_grpr.open();
+    r_grpr.close();
+    l_grpr.close();*/
+
+
     pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     //write_kinect_output(rh);
@@ -184,7 +192,6 @@ int main(int argc, char **argv)
                     //cp.displayCylinders(TubeGrasp::displayGrasps(grasp_array));
                     //cp.dispalyWorkTraj();
                     TubeGrasp::GraspAnalysis ga(tube, rh);
-                    ga.getGraspMarker(grasp_marker);
                     geometry_msgs::Pose work_pose;
                     work_pose.position.x = 0.7;
                     work_pose.position.y = 0.0;
@@ -194,12 +201,10 @@ int main(int argc, char **argv)
                     work_pose.orientation.z = 0.0;
                     work_pose.orientation.w = 1.0;
                     ga.setWorkPose(work_pose);
-                    ga.generateWorkTrajectory();
-
-                    //marker_pub.publish();
-                    //marker_pub.publish(ga.vismsg_workNormalsY);
-                    //marker_pub.publish(ga.vismsg_workNormalsZ);
-                    //posearray = ga.work_traj_;
+                    ga.analyze();
+                    ga.getGraspMarker(grasp_marker);
+                    grasp_marker_pub.publish(grasp_marker);
+                    ga.getPickUpGrasp();
                     posearray = ga.tube_traj_;
                     //posearray = ga.grasp_pose_array;
                     posearray.poses.push_back(tube->getPose());

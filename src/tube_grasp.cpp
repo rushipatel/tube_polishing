@@ -24,14 +24,6 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh)
     MAX_ITERATION = 200;
 }
 
-// contactVector: pointing towards axis of grinding wheel
-// axisVector: axis of grinding wheel. should be used in both directions
-/*void GraspAnalysis::setContactVectors(tf::Vector3 contactVector, tf::Vector3 axisVector)
-{
-    contact_vector_ = contactVector;
-    axis_vector_ = axisVector;
-}*/
-
 void GraspAnalysis::setWorkPose(geometry_msgs::Pose &p)
 {
     work_pose_ = p;
@@ -58,20 +50,49 @@ void GraspAnalysis::setWorkTrajIdx(int trajIdx)
     traj_idx_ = trajIdx;
 }
 
-void GraspAnalysis::generateWorkTrajectory()
+void GraspAnalysis::analyze()
 {
-    generate_work_trajectory_();
-    generate_grasps_();
-    generate_test_pairs_();
-    test_pairs_for_ik_();
-    compute_metric_();
+    gen_work_trajectory_();
+    gen_grasps_(axis_step_size_, circular_steps_, grasp_array_);
+    gen_test_pairs_();
+    //test_pairs_for_ik_();
+    //compute_metric_();
 }
 
-//generate grasps in global frame. usually base_link.
-void GraspAnalysis::generate_grasps_()
+void GraspAnalysis::getPickUpGrasp()
+{
+    //will generate only vertical grasps
+    GraspArray::Ptr grasp_array;
+    grasp_array.reset(new (GraspArray));
+    gen_grasps_(axis_step_size_, 1, grasp_array);
+    std::vector<double> dist(grasp_array->grasps.size());
+    //tf::Vector3 ref_point;
+    geometry_msgs::Point ref_point;
+    ref_point.x = 0;
+    ref_point.y = 0;
+    ref_point.z = 0;
+    geometry_msgs::Pose pose;
+    for(size_t i=0; tube_->cylinders.size(); i++)
+    {
+        pose = tube_->getCylinderGlobalPose(i);
+        ref_point.x += pose.position.x;
+        ref_point.y += pose.position.y;
+        ref_point.z += pose.position.z;
+    }
+    ref_point.x /= tube_->cylinders.size();
+    ref_point.y /= tube_->cylinders.size();
+    ref_point.z /= tube_->cylinders.size();
+
+    ROS_INFO_STREAM("ref Point: "<<ref_point);
+    /*for(size_t i=0; i<grasp_array->grasps.size(); i++)
+    {
+        ;
+    }*/
+}
+
+void GraspAnalysis::gen_grasps_(double axis_step_size, int circular_steps, GraspArray::Ptr grasp_array)
 {
     TubeGrasp::Grasp grasp;
-    TubePerception::Cylinder cyl;
 
     tf::Quaternion quaternion;
     tf::Transform step_tf,wrist_axis_tf, tf_grasp_cyl, tf_grasp_tube;
@@ -90,17 +111,17 @@ void GraspAnalysis::generate_grasps_()
         //floor value
         tf::Vector3 axis_vec = tube_->cylinders[i].getAxisVector();
         float axis_len = axis_vec.length();
-        int axis_steps = axis_len/axis_step_size_;
+        int axis_steps = axis_len/axis_step_size;
 
         for(int j=1; j<=axis_steps; j++)
         {
             group_n++;
             // if X is Cylinder Axis
-            //step_tf.setOrigin( tf::Vector3( (j*axis_step_size_), 0.0, 0.0 ) );
+            //step_tf.setOrigin( tf::Vector3( (j*axis_step_size), 0.0, 0.0 ) );
             // if Z is Cylinder Axis
-            step_tf.setOrigin(tf::Vector3( 0, 0, ((j*axis_step_size_)-(axis_len/2)) ) );
-            float circular_step_size = 2*M_PI/circular_steps_;
-            for(int k=0; k<circular_steps_; k++)
+            step_tf.setOrigin(tf::Vector3( 0, 0, ((j*axis_step_size)-(axis_len/2)) ) );
+            float circular_step_size = 2*M_PI/circular_steps;
+            for(int k=0; k<circular_steps; k++)
             {
                 quaternion.setEulerZYX(k*circular_step_size, 0, 0);
                 step_tf.setRotation(quaternion);
@@ -118,22 +139,13 @@ void GraspAnalysis::generate_grasps_()
                 grasp.wristPose.orientation.w = q.w();
 
                 grasp.group = group_n;
+                grasp.cylinderIdx = i;
 
-                grasp_array_->grasps.push_back(grasp);
+                grasp_array->grasps.push_back(grasp);
             }
         }
     }
-    ROS_INFO("%d grasps generated",grasp_array_->grasps.size());
-
-    grasp_pose_array.header.frame_id = "\base_link";
-    grasp_pose_array.header.stamp = ros::Time::now();
-    grasp_pose_array.poses.resize(grasp_array_->grasps.size());
-    TubeGrasp::Grasp g;
-    for(size_t i=0; i<grasp_array_->grasps.size(); i++)
-    {
-        g = grasp_array_->grasps[i];
-        grasp_pose_array.poses[i] = g.wristPose;
-    }
+    ROS_INFO("%d grasps generated",grasp_array->grasps.size());
 }
 
 void GraspAnalysis::normalize_worktrajectory_()
@@ -181,7 +193,7 @@ void GraspAnalysis::xform_in_tubeframe_()
     }
 }
 
-bool GraspAnalysis::generate_work_trajectory_()
+bool GraspAnalysis::gen_work_trajectory_()
 {
     pcl::PointCloud<PointT>::Ptr cloud;
     tf::Vector3 cyl_axis,ux,uz,uy;  // right hand rule -> x, z, y
@@ -331,7 +343,7 @@ void GraspAnalysis::work2tube_trajectory_()
 }
 
 
-void GraspAnalysis::generate_test_pairs_()
+void GraspAnalysis::gen_test_pairs_()
 {
     TubeGrasp::GraspPair gp;
     for(size_t i=0; i<grasp_array_->grasps.size(); i++)
@@ -483,13 +495,13 @@ void GraspAnalysis::compute_metric_()
         }
     }
     ROS_WARN_STREAM("Best Grasp Pair index: "<<best_grasp);
-    dualArms da(nodeHandle);
+    /*dualArms da(nodeHandle);
     da.objPoseTraj = tube_traj_;
     da.rightWristOffset = pose2tf(valid_pairs_->graspPairs[best_grasp].rightGrasp.wristPose);
     da.leftWristOffset = pose2tf(valid_pairs_->graspPairs[best_grasp].leftGrasp.wristPose);
     while(getchar()!='q');
     da.executeJointTrajectory(valid_pairs_->graspPairs[best_grasp].qRight,
-                              valid_pairs_->graspPairs[best_grasp].qRight);
+                              valid_pairs_->graspPairs[best_grasp].qRight);*/
 }
 
 void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
@@ -603,108 +615,4 @@ void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
     }
     markerArray.markers.push_back(z_axis);
 }
-
-void diaplayGraspsInGlobalFrame( TubeGrasp::GraspArray::Ptr grasp_array,
-                                 tf::Transform tube_tf )
-{
-    boost::shared_ptr<pcl::visualization::PCLVisualizer>
-            viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    pcl::PointXYZ p1,p2;
-    viewer->setBackgroundColor (0, 0, 0);
-    pcl::ModelCoefficients coeff;
-    tf::Transform tf_p2inX,tf_p2inZ, tf_grasp, tf_grasp_tube,tf;
-    tf::Quaternion qtn;
-    tf::Vector3 orig;
-    tf_p2inX.setOrigin(tf::Vector3(0.01,0,0));
-    tf_p2inX.setRotation(tf::Quaternion::getIdentity());
-
-    tf_p2inZ.setOrigin(tf::Vector3(0,0,0.005));
-    tf_p2inZ.setRotation(tf::Quaternion::getIdentity());
-
-    coeff.values.resize(4);
-    coeff.values[3] = 0.002; //radius of sphere
-
-
-    for (size_t i=0; i<grasp_array->grasps.size(); i++)
-    {
-        // X, Y, Z
-                orig.setX(grasp_array->grasps[i].wristPose.position.x);
-        orig.setY(grasp_array->grasps[i].wristPose.position.y);
-        orig.setZ(grasp_array->grasps[i].wristPose.position.z);
-        tf_grasp_tube.setOrigin(orig);
-        qtn.setX(grasp_array->grasps[i].wristPose.orientation.x);
-        qtn.setY(grasp_array->grasps[i].wristPose.orientation.y);
-        qtn.setZ(grasp_array->grasps[i].wristPose.orientation.z);
-        qtn.setW(grasp_array->grasps[i].wristPose.orientation.w);
-        tf_grasp_tube.setRotation(qtn);
-
-        tf_grasp = tube_tf * tf_grasp_tube;
-
-        orig = tf_grasp.getOrigin();
-        coeff.values[0] = orig.x();
-        coeff.values[1] = orig.y();
-        coeff.values[2] = orig.z();
-
-        p1.x = orig.getX();
-        p1.y = orig.getY();
-        p1.z = orig.getZ();
-
-        std::strstream ss;
-        ss<<"g_"<<i;
-        viewer->addSphere(coeff, ss.str());
-
-        tf = tf_grasp*tf_p2inX;
-
-        orig = tf.getOrigin();
-        p2.x = orig.getX();
-        p2.y = orig.getY();
-        p2.z = orig.getZ();
-
-        ss.flush();
-        ss<<"a_"<<i;
-        viewer->addLine(p1, p2, ss.str());
-
-        tf = tf_grasp*tf_p2inZ;
-
-        orig = tf.getOrigin();
-        p2.x = orig.getX();
-        p2.y = orig.getY();
-        p2.z = orig.getZ();
-
-        ss.flush();
-        ss<<"o_"<<i;
-        viewer->addLine(p1, p2, ss.str());
-    }
-    //viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "Grasps");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
-}
-
-boost::shared_ptr<pcl::visualization::PCLVisualizer> displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array)
-{
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    viewer->setBackgroundColor (0, 0, 0);
-    pcl::ModelCoefficients coeffs;
-
-    coeffs.values.resize(4);
-
-    coeffs.values[3] = 0.002; //radius of sphere
-    for (size_t i=0; i<grasp_array->grasps.size(); i++)
-    {
-        // X, Y, Z
-        coeffs.values[0] = grasp_array->grasps[i].wristPose.position.x;
-        coeffs.values[1] = grasp_array->grasps[i].wristPose.position.y;
-        coeffs.values[2] = grasp_array->grasps[i].wristPose.position.z;
-        std::strstream ss;
-        ss<<"grasp_"<<i;
-        viewer->addSphere(coeffs, ss.str());
-    }
-    //viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "Grasps");
-    //viewer->addCoordinateSystem (1.0);
-    //viewer->initCameraParameters ();
-    //viewer->spin();
-    return viewer;
-}
-
 }// NAMESPACE TUBEGRASP

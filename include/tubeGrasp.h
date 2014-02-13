@@ -18,7 +18,7 @@ namespace TubeGrasp
         Grasp();
         geometry_msgs::Pose wristPose;
         unsigned int group; //circular group. it helps reduce pairs to test
-        //unsigned int cylinderIdx;
+        unsigned int cylinderIdx;
     };
     
     class GraspPair
@@ -63,12 +63,12 @@ namespace TubeGrasp
         GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh);
         void setWorkPose(geometry_msgs::Pose &p);
         int getWorkPose(geometry_msgs::Pose &p);
-        void setContactVector(tf::Vector3 contactVector, tf::Vector3 axisVector);
         void setWorkTrajIdx(int trajIdx);
-        void generateGrasps();
-        void generateGraspPairs();
-        void generateWorkTrajectory(); //temp. dev purpose
+        //void genGrasps();
+        //void genGraspPairs();
+        void analyze(); //temp. dev purpose
         void getGraspMarker(visualization_msgs::MarkerArray &markerArray);
+        void getPickUpGrasp();
         geometry_msgs::PoseArray work_traj_; //put this back in private after dbg/dev
         geometry_msgs::PoseArray tube_traj_;
         visualization_msgs::Marker vismsg_workNormalsX;
@@ -82,27 +82,24 @@ namespace TubeGrasp
         TubeGrasp::GraspPairArray::Ptr test_pairs_;
         TubeGrasp::GraspPairArray::Ptr valid_pairs_;
 
-        //tf::Vector3 contact_vector_;
-        //tf::Vector3 axis_vector_;
         geometry_msgs::Pose work_pose_;
         int traj_idx_;
-        float axis_step_size_; //in mm
-        int circular_steps_;  //in integer number
-        float wrist_axis_offset_;
+        double axis_step_size_; //in mm
+        int circular_steps_;  //integer number
+        double wrist_axis_offset_;
         unsigned long MAX_TEST_GRASPS; //Maximum valid grasps to store
         //Maximum iteration for randomly selecting grasp to test
         unsigned long MAX_ITERATION;  //Check the repetations in selecting random index in test_for_ik_
-        void generate_grasps_();
-        bool generate_work_trajectory_();
-        void generate_test_pairs_();
+        void gen_grasps_(double axis_step_size, int circular_steps,  GraspArray::Ptr grasp_array);
+        bool gen_work_trajectory_();
+        void gen_test_pairs_();
         void normalize_worktrajectory_();
         void xform_in_tubeframe_();
         void work2tube_trajectory_();
         void test_pairs_for_ik_();
         void compute_metric_();
+        void gen_pickup_grasps_(double axis_step_size, int circular_steps);
     };
-    void diaplayGraspsInGlobalFrame(TubeGrasp::GraspArray::Ptr grasp_array, tf::Transform tube_tf);
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> displayGrasps(TubeGrasp::GraspArray::Ptr grasp_array);
 }
 
 #endif // TUBEGRASP_H
