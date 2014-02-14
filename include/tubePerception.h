@@ -6,6 +6,7 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <pcl/ros/conversions.h>
 #include <Eigen/Core>
 #include <tf/LinearMath/Matrix3x3.h>
@@ -36,6 +37,7 @@
 #include <pcl/pcl_base.h>
 
 #include <sstream>
+#include "utility.cpp"
 
 typedef pcl::PointXYZRGBNormal PointT;
 
@@ -52,20 +54,23 @@ namespace TubePerception
 
         //tf::Vector3 axisVector; //Global
         tf::Vector3 getAxisVector();
+        float getAxisLength();
         //std::vector<int> neighbourCylinders;
         pcl::ModelCoefficients coefficients; // global
-        tf::Transform getGlobalTransform(void);
-        //tf::Transform getLocalTransform(void); //tf to last (strong) cylinder in vector(array)
-        geometry_msgs::Pose getGlobalPose(void);
+        tf::Transform getLocalTransform(void); //tf to last (strong) cylinder in vector(array)
         geometry_msgs::Pose getLocalPose(void);
-        //void setLocalTransform(tf::Transform &tf);
-        void setGlobalPose(geometry_msgs::Pose &pose);
-        void setLocalPose(geometry_msgs::Pose &pose);
         tf::Vector3 getLocalAxisVector(void); // in a tube frame
 
+        //tf::Transform getGlobalTransform(void);
+        void setLocalPose(geometry_msgs::Pose &pose);
+        void setLocalPose(tf::Transform &t);
+        geometry_msgs::Pose getGlobalPose(void);
+        //void setGlobalPose(geometry_msgs::Pose &pose);
+
     private:
-        geometry_msgs::Pose global_pose_; //in global frame that is point cloud frame (base_link)
-        geometry_msgs::Pose local_pose_;  //Local to last (strong) cylinder in vector(array)
+
+        //geometry_msgs::Pose global_pose_; //in global frame that is point cloud frame (base_link)
+        geometry_msgs::Pose local_pose_;  //Local to first (strong) cylinder in vector(array)
     };
     
     /*class WorkTrajectory
@@ -87,15 +92,19 @@ namespace TubePerception
         void setPose(geometry_msgs::Pose &pose);
         tf::Transform getTransform();
         typedef boost::shared_ptr<TubePerception::Tube> Ptr;
-        pcl::PointCloud<PointT>::Ptr tubeCloud;
-        pcl::PointCloud<PointT>::Ptr axisPoints;
+        pcl::PointCloud<PointT>::Ptr tubeCloud;  //Do NOT use outside of Perception
+        pcl::PointCloud<PointT>::Ptr axisPoints; //Do NOT use outside of Perception
         //in global frame, for current state of tube. Not actual pose of tube
         //std::vector<TubePerception::WorkTrajectory> workTrajectories;
         //work trajectories by NormalArray
         std::vector<pcl::PointCloud<PointT>::Ptr> workPointsCluster;
         unsigned int whichCylinder(PointT point);
+        geometry_msgs::Pose getCylinderGlobalPose(unsigned int cylIdx);
+        void getCylinderMarker(visualization_msgs::MarkerArray &markerArray);
+        void getCylinderPoses(geometry_msgs::PoseArray &pose_array);
     protected:
-        geometry_msgs::Pose pose_;  //in global(base_link) frame
+        geometry_msgs::Pose pose_;  //in global(base_link) frame. actual pose
+        geometry_msgs::Pose virtual_pose_;  //not actual pose
     };
 
     class CloudProcessing

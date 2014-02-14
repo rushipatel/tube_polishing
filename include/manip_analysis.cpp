@@ -1,3 +1,6 @@
+#ifndef MANIP_ANALYSIS_CPP
+#define MANIP_ANALYSIS_CPP
+
 #include <ros/ros.h>
 #include <kdl_parser/kdl_parser.hpp>
 #include <kdl/chain.hpp>
@@ -19,8 +22,8 @@ public:
     void setForceVec(tf::Vector3 vec);
     void setRotationAxis(tf::Vector3 vec);
     void setReferencePoint(tf::Vector3 pInTipFrame);
-    double getForceMatric(const std::vector<double> &q);
-    double getRotationMatric(const std::vector<double> &q);
+    double getForceMetric(const std::vector<double> &q);
+    double getRotationMetric(const std::vector<double> &q);
     double getManipIndex(const std::vector<double> &q);
     
 private:
@@ -90,6 +93,8 @@ ManipAnalysis::ManipAnalysis(std::string whichArm, const ros::NodeHandle &nh)
         q_default_[5] = -0.1;
         q_default_[6] =  0.0;
     }*/
+
+    //default reference point
     ref_point_(0) = 0.0;
     ref_point_(1) = 0.0;
     ref_point_(2) = 0.0;
@@ -102,9 +107,7 @@ void ManipAnalysis::update_jacobian_(void)
     
     
     if(q_.empty() || q_.size()!=7)
-    {
-        ROS_ERROR("maip_analysis - Joint values are not given or size is not 7.");
-    }
+        ROS_ERROR("ManipAnalysis - Joint values are not given or size is not %d.",chain_.getNrOfJoints());
     
     q_in(0) = 0.0; //Torso Lift joint
     for(int i=0; i<7; i++)
@@ -118,16 +121,16 @@ void ManipAnalysis::update_jacobian_(void)
     jacobian_r_ = jacobian_.bottomRows(3);
 }
 
-double ManipAnalysis::getForceMatric(const std::vector<double> &q)
+double ManipAnalysis::getForceMetric(const std::vector<double> &q)
 {
     q_=q;
     update_jacobian_();
     q_.clear();
     return find_intersecting_len_(true);
-    
 }
 
-double ManipAnalysis::getRotationMatric(const std::vector<double> &q)
+
+double ManipAnalysis::getRotationMetric(const std::vector<double> &q)
 {
     q_=q;
     update_jacobian_();
@@ -149,7 +152,6 @@ double ManipAnalysis::get_manipulability_index_()
     Eigen::MatrixXd eigen_values;
     Eigen::EigenSolver<Eigen::MatrixXd> eigensolver(matrix);
     eigen_values = eigensolver.eigenvalues().real();
-    ROS_INFO_STREAM("Eigen values : "<<eigen_values);
     return (eigen_values.minCoeff()/eigen_values.maxCoeff());
 }
 
@@ -222,3 +224,5 @@ void ManipAnalysis::setReferencePoint(tf::Vector3 inTipFrame)
     ref_point_(1) = inTipFrame.y();
     ref_point_(2) = inTipFrame.z();
 }
+
+#endif

@@ -29,30 +29,6 @@ dualArms::dualArms(ros::NodeHandle& rh)
     filter_trajectory_client_ = rh.serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
 }
 
-/*! \brief Helper function for conversion between tf::Transformation and geometry_msgs::Pose type.
- *
- */
-void dualArms::tf2pose(tf::Transform &tf, geometry_msgs::Pose &pose)
-{
-    pose.position.x = tf.getOrigin().getX();
-    pose.position.y = tf.getOrigin().getY();
-    pose.position.z = tf.getOrigin().getZ();
-    pose.orientation.x = tf.getRotation().getX();
-    pose.orientation.y = tf.getRotation().getY();
-    pose.orientation.z = tf.getRotation().getZ();
-    pose.orientation.w = tf.getRotation().getW();
-}
-
-/*! \brief Helper function for conversion between tf::Transformation and geometry_msgs::Pose type.
- *
- */
-void dualArms::pose2tf(geometry_msgs::Pose &pose, tf::Transform &tf)
-{
-    tf.setOrigin(tf::Vector3(pose.position.x, pose.position.y, pose.position.z));
-    tf.setRotation(tf::Quaternion(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w));
-}
-
-
 /*! \brief Gets current joint angle from pr2 controller topics for initial IK seeds.
  *
  */
@@ -95,9 +71,51 @@ void dualArms::get_current_left_joint_angles(double current_angles[7])
  */
 bool dualArms::genTrajectory()
 {
-    if(!call_right_arm_gpik_())
+    right_joint_traj_.clear();
+    left_joint_traj_.clear();
+    if(!call_right_arm_gpik_(right_joint_traj_))
         return 0;
-    if(!call_left_arm_gpik_())
+    if(!call_left_arm_gpik_(left_joint_traj_))
+        return 0;
+return 1;
+}
+
+/*! \brief Generates trajectory by calling IK service and stores output in double linear vector.
+ *
+ *  Returns false if IK fails at any trajectory point. This function must be called before calling executeTrajectory() function.
+ */
+bool dualArms::genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &lefttJointTraj)
+{
+    rightJointTraj.clear();
+    lefttJointTraj.clear();
+    if(!call_right_arm_gpik_(rightJointTraj))
+        return 0;
+    if(!call_left_arm_gpik_(lefttJointTraj))
+        return 0;
+return 1;
+}
+
+
+/*! \brief Generates Left trajectory by calling IK service and stores output in double linear vector.
+ *
+ *  Returns false if IK fails at any trajectory point.
+ */
+bool dualArms::genLeftTrajectory(std::vector<double> &jointTrajectory)
+{
+    jointTrajectory.clear();
+    if(!call_left_arm_gpik_(jointTrajectory))
+        return 0;
+return 1;
+}
+
+/*! \brief Generates Right trajectory by calling IK service and stores output in double linear vector.
+ *
+ *  Returns false if IK fails at any trajectory point.
+ */
+bool dualArms::genRightTrajectory(std::vector<double> &jointTrajectory)
+{
+    jointTrajectory.clear();
+    if(!call_right_arm_gpik_(jointTrajectory))
         return 0;
 return 1;
 }
@@ -151,7 +169,7 @@ void dualArms::call_right_joints_unnormalizer_()
         }
         else
         {
-            ROS_INFO("Requested right trajectory was not filtered. Error code: %d",res.error_code.val);
+            ROS_ERROR("Requested right trajectory was not filtered. Error code: %d",res.error_code.val);
             ros::shutdown();
             exit(-1);
         }
@@ -213,7 +231,7 @@ void dualArms::call_left_joints_unnormalizer_()
         }
         else
         {
-            ROS_INFO("Requested left trajectory was not filtered. Error code: %d",res.error_code.val);
+            ROS_ERROR("Requested left trajectory was not filtered. Error code: %d",res.error_code.val);
             ros::shutdown();
             exit(-1);
         }
@@ -249,7 +267,7 @@ void dualArms::get_right_goal_()
 
     for(int j=0; j<7; j++)
     {
-        traj_point.positions[j] = rightJointTrajectory[j];
+        traj_point.positions[j] = left_joint_traj_[j];
         traj_point.velocities[j] = 0.0;
     }
     traj_point.time_from_start = ros::Duration(0.25);
@@ -259,7 +277,7 @@ void dualArms::get_right_goal_()
     {
         for(int j=0; j<7; j++)
         {
-            traj_point.positions[j] = rightJointTrajectory[(i*7)+j];
+            traj_point.positions[j] = left_joint_traj_[(i*7)+j];
             traj_point.velocities[j] = 0.0;
         }
         right_goal_.trajectory.points[i] = traj_point;
@@ -289,7 +307,7 @@ void dualArms::get_left_goal_()
 
     for(int j=0; j<7; j++)
     {
-        traj_point.positions[j] = leftJointTrajectory[j];
+        traj_point.positions[j] = left_joint_traj_[j];
         traj_point.velocities[j] = 0.0;
     }
     traj_point.time_from_start = ros::Duration(0.25);
@@ -299,7 +317,7 @@ void dualArms::get_left_goal_()
     {
         for(int j=0; j<7; j++)
         {
-            traj_point.positions[j] = leftJointTrajectory[(i*7)+j];
+            traj_point.positions[j] = left_joint_traj_[(i*7)+j];
             traj_point.velocities[j] = 0.0;
         }
         left_goal_.trajectory.points[i] = traj_point;
@@ -350,6 +368,30 @@ void dualArms::sync_start_times_(void)
  */
 bool dualArms::executeJointTrajectory()
 {
+    get_right_goal_();
+    get_left_goal_();
+    call_right_joints_unnormalizer_();
+    call_left_joints_unnormalizer_();
+    sync_start_times_();
+
+    ros::Time time_to_start = ros::Time::now()+ros::Duration(1.0);
+    right_goal_.trajectory.header.stamp = time_to_start; //ros::Time::now()+ros::Duration(1.0);
+    left_goal_.trajectory.header.stamp = time_to_start; //ros::Time::now()+ros::Duration(1.0);
+    traj_client_r_->sendGoal(right_goal_);
+    traj_client_l_->sendGoal(left_goal_);
+    traj_client_r_->waitForResult();
+    traj_client_l_->waitForResult();
+    return(1);
+}
+
+/*! \brief Executes joint trajectory for both arms.
+ *
+ *  Note: genTrajectory() function must be called before calling this function.
+ */
+bool dualArms::executeJointTrajectory(std::vector<double> &qRight, std::vector<double> &qLeft)
+{
+    right_joint_traj_ = qRight;
+    left_joint_traj_ = qLeft;
     get_right_goal_();
     get_left_goal_();
     call_right_joints_unnormalizer_();
@@ -503,7 +545,7 @@ bool dualArms::moveLeftArm(geometry_msgs::Pose pose)
 /*! \brief Calls IK service.
  *
  */
-bool dualArms::call_right_arm_gpik_(void)
+bool dualArms::call_right_arm_gpik_(std::vector<double> &right_joint_trajectory)
 {
     kinematics_msgs::GetKinematicSolverInfo::Request request;
     kinematics_msgs::GetKinematicSolverInfo::Response response;
@@ -537,9 +579,9 @@ bool dualArms::call_right_arm_gpik_(void)
 
     for(unsigned int i=0; i<objPoseTraj.poses.size(); i++)
     {
-        pose2tf(objPoseTraj.poses[i],tf_base_obj);
+        tf_base_obj = pose2tf(objPoseTraj.poses[i]);
         tf_base_wrist = tf_base_obj*rightWristOffset;
-        tf2pose(tf_base_wrist, pose);
+        pose = tf2pose(tf_base_wrist);
         for(int k=0; k<7; k++)
             gpik_req.ik_request.ik_seed_state.joint_state.position[k] = last_right_joints[k];
         gpik_req.ik_request.pose_stamped.pose = pose;
@@ -550,14 +592,14 @@ bool dualArms::call_right_arm_gpik_(void)
             for(unsigned int j=0; j<gpik_res.solution.joint_state.name.size(); j++)
             {
               //ROS_INFO("Joint: %s %f",gpik_res.solution.joint_state.name[i].c_str(),gpik_res.solution.joint_state.position[i]);
-              rightJointTrajectory.push_back(gpik_res.solution.joint_state.position[j]);
+              right_joint_trajectory.push_back(gpik_res.solution.joint_state.position[j]);
             }
             for( int l=0; l<7; l++)
                 last_right_joints[l] = gpik_res.solution.joint_state.position[l];
           }
           else
           {
-            ROS_ERROR("right arm Inverse kinematics failed at pose no. %d",i);
+            ROS_DEBUG("right arm Inverse kinematics failed at pose no. %d",i);
             return 0;
           }
         }
@@ -573,7 +615,7 @@ bool dualArms::call_right_arm_gpik_(void)
 /*! \brief Calls IK service.
  *
  */
-bool dualArms::call_left_arm_gpik_(void)
+bool dualArms::call_left_arm_gpik_(std::vector<double> &left_joint_trajectory)
 {
     kinematics_msgs::GetKinematicSolverInfo::Request request;
     kinematics_msgs::GetKinematicSolverInfo::Response response;
@@ -608,9 +650,9 @@ bool dualArms::call_left_arm_gpik_(void)
 
     for(unsigned int i=0; i<objPoseTraj.poses.size(); i++)
     {
-        pose2tf(objPoseTraj.poses[i],tf_base_obj);
+        tf_base_obj = pose2tf(objPoseTraj.poses[i]);
         tf_base_wrist = tf_base_obj*leftWristOffset;
-        tf2pose(tf_base_wrist, pose);
+        pose = tf2pose(tf_base_wrist);
         for(int k=0; k<7; k++)
             gpik_req.ik_request.ik_seed_state.joint_state.position[k] = last_left_joints[k];
         gpik_req.ik_request.pose_stamped.pose = pose;
@@ -621,14 +663,14 @@ bool dualArms::call_left_arm_gpik_(void)
             for(unsigned int j=0; j<gpik_res.solution.joint_state.name.size(); j++)
             {
               //ROS_INFO("Joint: %s %f",gpik_res.solution.joint_state.name[i].c_str(),gpik_res.solution.joint_state.position[i]);
-              leftJointTrajectory.push_back(gpik_res.solution.joint_state.position[j]);
+              left_joint_trajectory.push_back(gpik_res.solution.joint_state.position[j]);
             }
             for( int l=0; l<7; l++)
                 last_left_joints[l] = gpik_res.solution.joint_state.position[l];
           }
           else
           {
-            ROS_ERROR("left_arm Inverse kinematics failed at pose no. %d",i);
+            ROS_DEBUG("left_arm Inverse kinematics failed at pose no. %d",i);
             return 0;
           }
         }

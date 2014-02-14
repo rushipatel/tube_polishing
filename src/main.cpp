@@ -22,24 +22,13 @@
 #include "tubePerception.h"
 #include "tubeGrasp.h"
 #include "manip_analysis.cpp"
+#include "utility.cpp"
+#include "gripper.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
 
-
-void tfToPose(tf::Transform &tf, geometry_msgs::Pose &pose )
-{
-    pose.position.x = tf.getOrigin().getX();
-    pose.position.y = tf.getOrigin().getY();
-    pose.position.z = tf.getOrigin().getZ();
-    pose.orientation.x = tf.getRotation().getX();
-    pose.orientation.y = tf.getRotation().getY();
-    pose.orientation.z = tf.getRotation().getZ();
-    pose.orientation.w = tf.getRotation().getW();
-}
-
-
-void rotateAroundCenter(ros::NodeHandle rh)
+/*void rotateAroundCenter(ros::NodeHandle rh)
 {
     dualArms dual_arms(rh);
     tf::Transform tfBaseObj;
@@ -58,7 +47,7 @@ void rotateAroundCenter(ros::NodeHandle rh)
     for(double i=-45; i<=45; i+=1)
     {
         tfBaseObj.setRotation(tf::Quaternion(i*M_PI/180,0,0));
-        tfToPose(tfBaseObj, pose);
+        pose = tf2pose(tfBaseObj);
         dual_arms.objPoseTraj.poses.push_back(pose);
     }
     /*for(double i=45; i>=-45; i-=1)
@@ -97,12 +86,12 @@ void rotateAroundCenter(ros::NodeHandle rh)
         pose = dual_arms.objPoseTraj.poses[i];
         ROS_INFO("Pose No. %d Origin = %f %f %f",i,pose.position.x, pose.position.y, pose.position.z);
     }*/
-    if(!dual_arms.genTrajectory())
+    /*if(!dual_arms.genTrajectory())
         ROS_ERROR("IK Failed");
     else
-        dual_arms.executeJointTrajectory();
+        dual_arms.executeJointTrajectory();*/
 
-}
+//}*/
 
 int main(int argc, char **argv)
 {
@@ -116,6 +105,10 @@ int main(int argc, char **argv)
     ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
     //ros::Publisher cloud_pub = rh.advertise<sensor_msgs::PointCloud2>("tube_cloud",2);
     //ros::Publisher marker_pub = rh.advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
+    ros::Publisher pose_pub = rh.advertise<geometry_msgs::PoseStamped>("/tube_polishing/work_traj_pose",10);
+    ros::Publisher marker_pub = rh.advertise<visualization_msgs::Marker>("/tube_polishing/marker", 2);
+    ros::Publisher tube_marker_pub = rh.advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
+    ros::Publisher grasp_marker_pub = rh.advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
     //ros::ServiceClient spawn_model_client = rh.serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_model");
     arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
@@ -150,10 +143,20 @@ int main(int argc, char **argv)
     robotHead pr2_head;
     pr2_head.lookAt(0.75,0.0,0.5);
 
+    /*Gripper r_grpr("right_arm"),l_grpr("left_arm");
+    r_grpr.open();
+    l_grpr.open();
+    r_grpr.close();
+    l_grpr.close();*/
+
+
     pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     //write_kinect_output(rh);
     tabletop_object_detector::TabletopSegmentation seg_srv;
+    geometry_msgs::PoseArray posearray;
+    TubePerception::Tube::Ptr tube;
+    visualization_msgs::MarkerArray marker_array, grasp_marker;
     while(getchar()!='q')
     {
         if(seg_srv_client.call(seg_srv))
@@ -169,21 +172,45 @@ int main(int argc, char **argv)
                     sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
                     ROS_INFO("Original cloud size: %d",pc2.height*pc2.width);
 
-                    TubePerception::Tube::Ptr tube(new TubePerception::Tube(pc2));
+                    tube.reset(new TubePerception::Tube(pc2));
                     TubePerception::CloudProcessing cp(tube);
+
+                    tube->getCylinderMarker(marker_array);
+                    tube_marker_pub.publish(marker_array);
+                    tube->getCylinderPoses(posearray);
 
                     //cp.displayCloud();
                     //cp.displayAxisPoints();
                     //cp.displayLines();
                     //cp.displayCylinders();
-                    cp.displayCylindersInLocalFrame();
+                    //cp.displayCylindersInLocalFrame();
                     //cp.writeAxisPointsOnFile("/home/wpi_robotics/fuerte_workspace/sandbox/tube_polishing/data/pcd_files/axis_points.pcd");
 
                     //TubeGrasp::GraspArray::Ptr grasp_array(new TubeGrasp::GraspArray);
                     //TubeGrasp::GraspAnalysis grasp_analysis(grasp_array);
                     //grasp_analysis.generateGrasps(tube);
                     //cp.displayCylinders(TubeGrasp::displayGrasps(grasp_array));
-                    cp.dispalyWorkTraj();
+                    //cp.dispalyWorkTraj();
+                    TubeGrasp::GraspAnalysis ga(tube, rh);
+                    geometry_msgs::Pose work_pose;
+                    work_pose.position.x = 0.7;
+                    work_pose.position.y = 0.0;
+                    work_pose.position.z = 0.8;
+                    work_pose.orientation.x = 0.0;
+                    work_pose.orientation.y = 0.0;
+                    work_pose.orientation.z = 0.0;
+                    work_pose.orientation.w = 1.0;
+                    ga.setWorkPose(work_pose);
+                    ga.analyze();
+                    ga.getGraspMarker(grasp_marker);
+                    grasp_marker_pub.publish(grasp_marker);
+                    ga.getPickUpGrasp();
+                    posearray = ga.tube_traj_;
+                    //posearray = ga.grasp_pose_array;
+                    posearray.poses.push_back(tube->getPose());
+                    posearray.poses.push_back(tube->getPose());
+                    posearray.poses.push_back(tube->getPose());
+                    //ROS_INFO_STREAM("Size of trajectory = "<<posearray.poses.size());
                 }
             }
             else
@@ -192,8 +219,38 @@ int main(int argc, char **argv)
         else
             ROS_ERROR("Call to segmentation service failed");
     }
-  //ros::spin();
-    ManipAnalysis ma("right_arm", rh);
+
+    geometry_msgs::Pose tube_pose;
+    tube_pose.orientation.x = 0;
+    tube_pose.orientation.y = 0;
+    tube_pose.orientation.z = 0;
+    tube_pose.orientation.w = 1;
+    tube_pose.position.x = 0;
+    tube_pose.position.y = 0;
+    tube_pose.position.z = 0;
+    tube->setPose(tube_pose);
+    tube->getCylinderMarker(marker_array);
+    tube_marker_pub.publish(marker_array);
+
+    geometry_msgs::PoseStamped posestamped;
+    posestamped.header.frame_id = "/base_link";
+    int cnt = -1;
+    while (getchar()!='q')
+    {
+        cnt++;
+        if(cnt>=posearray.poses.size())
+            cnt=0;
+        posestamped.pose = posearray.poses[cnt];
+        posestamped.header.stamp = ros::Time::now();
+        pose_pub.publish(posestamped);
+        ROS_INFO_STREAM(" "<<cnt);
+        tube->setPose(posearray.poses[cnt]);
+        tube->getCylinderMarker(marker_array);
+        tube_marker_pub.publish(marker_array);
+    }
+    //while (getchar()!='q');
+    //ros::spin();
+    /*ManipAnalysis ma("right_arm", rh);
     ma.setRotationAxis(tf::Vector3(1,0,0));
     ma.setForceVec(tf::Vector3(1,0,0));
     std::vector<double> q;
@@ -205,8 +262,10 @@ int main(int argc, char **argv)
     q[4] = -0.15;
     q[5] = -0.1;
     q[6] =  0.0;
-    ROS_INFO_STREAM("FORCE MATRIC   : "<<ma.getForceMatric(q));
-    ROS_INFO_STREAM("ROTATION MATRIC: "<<ma.getRotationMatric(q));
-    ROS_INFO_STREAM("K             : "<<ma.getManipIndex(q));
+    ROS_INFO_STREAM("FORCE MATRIC   : "<<ma.getForceMetric(q));
+    ROS_INFO_STREAM("ROTATION MATRIC: "<<ma.getRotationMetric(q));
+    ROS_INFO_STREAM("K              : "<<ma.getManipIndex(q));*/
+
+
   ros::shutdown();
 }
