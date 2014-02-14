@@ -9,6 +9,7 @@
 #include "manip_analysis.cpp"
 #include "utility.cpp"
 #include "dualArms.h"
+#include "gripper.h"
 
 namespace TubeGrasp
 {
@@ -68,7 +69,9 @@ namespace TubeGrasp
         //void genGraspPairs();
         void analyze(); //temp. dev purpose
         void getGraspMarker(visualization_msgs::MarkerArray &markerArray);
-        void getPickUpGrasp();
+        //returns grasp somewhere closer to center of object. very rough approximation.
+        geometry_msgs::Pose getPickUpPose();
+        void pickUpTube();
         geometry_msgs::PoseArray work_traj_; //put this back in private after dbg/dev
         geometry_msgs::PoseArray tube_traj_;
         visualization_msgs::Marker vismsg_workNormalsX;

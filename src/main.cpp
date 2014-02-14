@@ -204,7 +204,7 @@ int main(int argc, char **argv)
                     ga.analyze();
                     ga.getGraspMarker(grasp_marker);
                     grasp_marker_pub.publish(grasp_marker);
-                    ga.getPickUpGrasp();
+                    ga.pickUpTube();
                     posearray = ga.tube_traj_;
                     //posearray = ga.grasp_pose_array;
                     posearray.poses.push_back(tube->getPose());

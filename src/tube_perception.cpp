@@ -52,13 +52,12 @@ tf::Transform Tube::getTransform(void)
 
 geometry_msgs::Pose Tube::getCylinderGlobalPose(unsigned int cylIdx)
 {
-    tf::Transform c, t = getTransform();
-    geometry_msgs::Pose p;
-    p = cylinders[cylIdx].getLocalPose();
-    c = pose2tf(p);
-
+    if(cylinders.empty())
+        ROS_ERROR("cylinders object is empty");
+    tf::Transform c, t = this->getTransform();
+    TubePerception::Cylinder cyl = this->cylinders.at(cylIdx);
+    c = cyl.getLocalTransform();
     c = t*c;
-
     return tf2pose(c);
 }
 

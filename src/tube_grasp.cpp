@@ -59,20 +59,41 @@ void GraspAnalysis::analyze()
     //compute_metric_();
 }
 
-void GraspAnalysis::getPickUpGrasp()
+void GraspAnalysis::pickUpTube()
+{
+    geometry_msgs::Pose pick_pose, aprh_pose;
+    pick_pose = getPickUpPose();
+    
+    tf::Transform p, a;
+    a.setIdentity();
+    a.setOrigin(tf::Vector3(-0.01, 0, 0));
+    p = pose2tf(pick_pose);
+    a = p*a;
+    aprh_pose = tf2pose(a);
+    
+    Gripper r_grpr("right_arm");
+    r_grpr.open();
+    dualArms da(nodeHandle);
+    da.moveRightArm(aprh_pose);
+    //r_grpr.open();
+    //da.moveRightArm(pick_pose);
+    //r_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
+}
+
+geometry_msgs::Pose GraspAnalysis::getPickUpPose()
 {
     //will generate only vertical grasps
     GraspArray::Ptr grasp_array;
     grasp_array.reset(new (GraspArray));
     gen_grasps_(axis_step_size_, 1, grasp_array);
-    std::vector<double> dist(grasp_array->grasps.size());
+    
     //tf::Vector3 ref_point;
     geometry_msgs::Point ref_point;
     ref_point.x = 0;
     ref_point.y = 0;
     ref_point.z = 0;
     geometry_msgs::Pose pose;
-    for(size_t i=0; tube_->cylinders.size(); i++)
+    for(size_t i=0; i<tube_->cylinders.size(); i++)
     {
         pose = tube_->getCylinderGlobalPose(i);
         ref_point.x += pose.position.x;
@@ -83,11 +104,24 @@ void GraspAnalysis::getPickUpGrasp()
     ref_point.y /= tube_->cylinders.size();
     ref_point.z /= tube_->cylinders.size();
 
-    ROS_INFO_STREAM("ref Point: "<<ref_point);
-    /*for(size_t i=0; i<grasp_array->grasps.size(); i++)
+    std::vector<double> dist(grasp_array->grasps.size());
+    tf::Vector3 c,r(ref_point.x, ref_point.y, ref_point.z);
+    double max = 1000;
+    unsigned int grasp_idx = 0;
+    for(size_t i=0; i<grasp_array->grasps.size(); i++)
     {
-        ;
-    }*/
+        c.setValue(grasp_array->grasps[i].wristPose.position.x,
+                   grasp_array->grasps[i].wristPose.position.y,
+                   grasp_array->grasps[i].wristPose.position.z );
+        dist[i] = c.distance(r);
+        if(dist[i] < max)
+        {
+            grasp_idx = i;
+            max = dist[i];
+        }
+    }
+    geometry_msgs::Pose grasp_pose = grasp_array->grasps[grasp_idx].wristPose;
+    return grasp_pose;
 }
 
 void GraspAnalysis::gen_grasps_(double axis_step_size, int circular_steps, GraspArray::Ptr grasp_array)
