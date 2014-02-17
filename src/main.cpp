@@ -204,12 +204,18 @@ int main(int argc, char **argv)
                     ga.analyze();
                     ga.getGraspMarker(grasp_marker);
                     grasp_marker_pub.publish(grasp_marker);
-                    ga.pickUpTube();
-                    posearray = ga.tube_traj_;
-                    //posearray = ga.grasp_pose_array;
-                    posearray.poses.push_back(tube->getPose());
-                    posearray.poses.push_back(tube->getPose());
-                    posearray.poses.push_back(tube->getPose());
+                    geometry_msgs::Pose pick_pose;
+                    ga.pickUpTube(pick_pose);
+                    geometry_msgs::PoseStamped ps;
+                    ps.header.frame_id = "base_link";
+                    ps.header.stamp = ros::Time::now();
+                    ps.pose = pick_pose;
+                    pose_pub.publish(ps);
+                    //posearray = ga.tube_traj_;
+                    posearray = ga.grasp_pose_array;
+                    //posearray.poses.push_back(tube->getPose());
+                    //posearray.poses.push_back(tube->getPose());
+                    //posearray.poses.push_back(tube->getPose());
                     //ROS_INFO_STREAM("Size of trajectory = "<<posearray.poses.size());
                 }
             }

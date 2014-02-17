@@ -71,7 +71,7 @@ namespace TubeGrasp
         void getGraspMarker(visualization_msgs::MarkerArray &markerArray);
         //returns grasp somewhere closer to center of object. very rough approximation.
         geometry_msgs::Pose getPickUpPose();
-        void pickUpTube();
+        void pickUpTube(geometry_msgs::Pose &pickPose);
         geometry_msgs::PoseArray work_traj_; //put this back in private after dbg/dev
         geometry_msgs::PoseArray tube_traj_;
         visualization_msgs::Marker vismsg_workNormalsX;
@@ -94,6 +94,7 @@ namespace TubeGrasp
         //Maximum iteration for randomly selecting grasp to test
         unsigned long MAX_ITERATION;  //Check the repetations in selecting random index in test_for_ik_
         void gen_grasps_(double axis_step_size, int circular_steps,  GraspArray::Ptr grasp_array);
+        void gen_pickup_grasps_(double axis_step_size, int circular_steps, GraspArray::Ptr grasp_array);
         bool gen_work_trajectory_();
         void gen_test_pairs_();
         void normalize_worktrajectory_();

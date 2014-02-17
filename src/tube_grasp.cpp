@@ -53,21 +53,22 @@ void GraspAnalysis::setWorkTrajIdx(int trajIdx)
 void GraspAnalysis::analyze()
 {
     gen_work_trajectory_();
+    grasp_array_->grasps.clear();
     gen_grasps_(axis_step_size_, circular_steps_, grasp_array_);
     gen_test_pairs_();
     //test_pairs_for_ik_();
     //compute_metric_();
 }
 
-void GraspAnalysis::pickUpTube()
+void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
 {
     geometry_msgs::Pose pick_pose, aprh_pose;
     pick_pose = getPickUpPose();
     
     tf::Transform p, a;
     a.setIdentity();
-    a.setOrigin(tf::Vector3(-0.01, 0, 0));
-    p = pose2tf(pick_pose);
+    a.setOrigin(tf::Vector3(-0.1, 0, 0));
+    p = tube_->getTransform() * pose2tf(pick_pose);
     a = p*a;
     aprh_pose = tf2pose(a);
     
@@ -75,6 +76,8 @@ void GraspAnalysis::pickUpTube()
     r_grpr.open();
     dualArms da(nodeHandle);
     da.moveRightArm(aprh_pose);
+    pickPose = pick_pose;
+    //ROS_INFO_STREAM("apr_pose"<<aprh_pose);
     //r_grpr.open();
     //da.moveRightArm(pick_pose);
     //r_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
@@ -85,8 +88,39 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
     //will generate only vertical grasps
     GraspArray::Ptr grasp_array;
     grasp_array.reset(new (GraspArray));
-    gen_grasps_(axis_step_size_, 1, grasp_array);
-    
+    gen_grasps_(axis_step_size_, 180, grasp_array);
+
+    tf::Transform g,t = tube_->getTransform();
+
+    //Convert all grasps in world frame so vertical grasps can be tested
+    for(size_t i=0; i<grasp_array->grasps.size(); i++)
+    {
+        g = pose2tf(grasp_array->grasps[i].wristPose);
+        g = t * g;
+        grasp_array->grasps[i].wristPose = tf2pose(g);
+    }
+
+    int prev_grp;
+    double angle = M_PI*2;
+    // neg_z is to compare grasp's x axis with to check downward grasps
+    tf::Vector3 neg_z(0,0,-1), grasp_x;
+    tf::Transform x_step;
+    x_step.setOrigin(1,0,0);
+    x_step.setRotation(tf::Quaternion(0,0,0,1);
+    for(size_t i=0; i<grasp_array->grasps.size(); i++)
+    {
+        while(grasp_array->grasps[i].group==prev_grp)
+        {
+            grasp_x;
+            prev_grp = grasp_array->grasps[i].group;
+            i++;
+        }
+    }
+
+    //store sorted(close to negative Z axis)
+    GraspArray::Ptr grasp_sorted;
+    grasp_sorted.reset(new (GraspArray));
+
     //tf::Vector3 ref_point;
     geometry_msgs::Point ref_point;
     ref_point.x = 0;
@@ -108,8 +142,10 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
     tf::Vector3 c,r(ref_point.x, ref_point.y, ref_point.z);
     double max = 1000;
     unsigned int grasp_idx = 0;
+    grasp_pose_array.poses.clear();
     for(size_t i=0; i<grasp_array->grasps.size(); i++)
     {
+        grasp_pose_array.poses.push_back(grasp_array->grasps[i].wristPose);
         c.setValue(grasp_array->grasps[i].wristPose.position.x,
                    grasp_array->grasps[i].wristPose.position.y,
                    grasp_array->grasps[i].wristPose.position.z );
@@ -124,6 +160,8 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
     return grasp_pose;
 }
 
+
+//grasps are in tube frame
 void GraspAnalysis::gen_grasps_(double axis_step_size, int circular_steps, GraspArray::Ptr grasp_array)
 {
     TubeGrasp::Grasp grasp;
@@ -143,8 +181,7 @@ void GraspAnalysis::gen_grasps_(double axis_step_size, int circular_steps, Grasp
     for(size_t i=0; i<tube_->cylinders.size(); i++)
     {
         //floor value
-        tf::Vector3 axis_vec = tube_->cylinders[i].getAxisVector();
-        float axis_len = axis_vec.length();
+        float axis_len = tube_->cylinders[i].getAxisLength();
         int axis_steps = axis_len/axis_step_size;
 
         for(int j=1; j<=axis_steps; j++)
@@ -160,8 +197,7 @@ void GraspAnalysis::gen_grasps_(double axis_step_size, int circular_steps, Grasp
                 quaternion.setEulerZYX(k*circular_step_size, 0, 0);
                 step_tf.setRotation(quaternion);
                 tf_grasp_cyl = step_tf*wrist_axis_tf;
-                tf_grasp_tube = tube_->cylinders[i].getLocalTransform() * tf_grasp_cyl;  //temp local transform is not working
-                //tf_grasp_tube = tube_->cylinders[i].getGlobalTransform() * tf_grasp_cyl;
+                tf_grasp_tube = tube_->cylinders[i].getLocalTransform() * tf_grasp_cyl;
                 tf::Vector3 orig = tf_grasp_tube.getOrigin();
                 tf::Quaternion q = tf_grasp_tube.getRotation();
                 grasp.wristPose.position.x = orig.x();
@@ -235,42 +271,6 @@ bool GraspAnalysis::gen_work_trajectory_()
     work_traj_.header.frame_id = "base_link";
     work_traj_.header.stamp= ros::Time::now();
 
-    //***visualization purpose only***
-    vismsg_workNormalsX.header.frame_id = "base_link";
-    vismsg_workNormalsX.header.stamp = ros::Time::now();
-    vismsg_workNormalsX.ns = "WorkNormalsX";
-    vismsg_workNormalsX.action = visualization_msgs::Marker::ADD;
-    vismsg_workNormalsX.id = 1;
-    vismsg_workNormalsX.type = visualization_msgs::Marker::LINE_LIST;
-    vismsg_workNormalsX.scale.x = 0.001;
-    vismsg_workNormalsX.color.r = 1.0;
-    vismsg_workNormalsX.color.a = 1.0;
-    //***Visualization purpose only***
-
-    //***visualization purpose only***
-    vismsg_workNormalsY.header.frame_id = "base_link";
-    vismsg_workNormalsY.header.stamp = ros::Time::now();
-    vismsg_workNormalsY.ns = "WorkNormalsY";
-    vismsg_workNormalsY.action = visualization_msgs::Marker::ADD;
-    vismsg_workNormalsY.id = 1;
-    vismsg_workNormalsY.type = visualization_msgs::Marker::LINE_LIST;
-    vismsg_workNormalsY.scale.x = 0.001;
-    vismsg_workNormalsY.color.g = 1.0;
-    vismsg_workNormalsY.color.a = 1.0;
-    //***Visualization purpose only***
-
-    //***visualization purpose only***
-    vismsg_workNormalsZ.header.frame_id = "base_link";
-    vismsg_workNormalsZ.header.stamp = ros::Time::now();
-    vismsg_workNormalsZ.ns = "WorkNormalsZ";
-    vismsg_workNormalsZ.action = visualization_msgs::Marker::ADD;
-    vismsg_workNormalsZ.id = 1;
-    vismsg_workNormalsZ.type = visualization_msgs::Marker::LINE_LIST;
-    vismsg_workNormalsZ.scale.x = 0.001;
-    vismsg_workNormalsZ.color.b = 1.0;
-    vismsg_workNormalsZ.color.a = 1.0;
-    //***Visualization purpose only***
-
     for(size_t i=0; i<tube_->workPointsCluster.size(); i++)
     {
         cloud = tube_->workPointsCluster[i];
@@ -294,31 +294,6 @@ bool GraspAnalysis::gen_work_trajectory_()
             uy.normalize();
             uz = ux.cross(uy);
             uz.normalize();
-
-
-            //***Visualization purpose only***
-            geometry_msgs::Point p;
-            p.x = point.x; p.y = point.y; p.z = point.z;
-            vismsg_workNormalsX.points.push_back(p);
-            p.x = point.x + (ux.x()*0.05);
-            p.y = point.y + (ux.y()*0.05);
-            p.z = point.z + (ux.z()*0.05);
-            vismsg_workNormalsX.points.push_back(p);
-
-            p.x = point.x; p.y = point.y; p.z = point.z;
-            vismsg_workNormalsY.points.push_back(p);
-            p.x = point.x + (uy.x()*0.05);
-            p.y = point.y + (uy.y()*0.05);
-            p.z = point.z + (uy.z()*0.05);
-            vismsg_workNormalsY.points.push_back(p);
-
-            p.x = point.x; p.y = point.y; p.z = point.z;
-            vismsg_workNormalsZ.points.push_back(p);
-            p.x = point.x + (uz.x()*0.05);
-            p.y = point.y + (uz.y()*0.05);
-            p.z = point.z + (uz.z()*0.05);
-            vismsg_workNormalsZ.points.push_back(p);
-            //***Visualization purpose only***
 
             tf::Matrix3x3 mat;
 
