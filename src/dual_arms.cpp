@@ -530,13 +530,13 @@ bool dualArms::moveLeftArm(geometry_msgs::Pose pose)
       }
       else
       {
-        ROS_ERROR("Right arm Inverse kinematics failed for given pose.");
+        ROS_ERROR("Left arm Inverse kinematics failed for given pose.");
         return 0;
       }
     }
     else
     {
-      ROS_ERROR("Right arm Inverse kinematics service call failed.");
+      ROS_ERROR("Left arm Inverse kinematics service call failed.");
       return 0;
     }
     return 1;

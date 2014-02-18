@@ -234,7 +234,7 @@ int main(int argc, char **argv)
     tube_pose.position.x = 0;
     tube_pose.position.y = 0;
     tube_pose.position.z = 0;
-    tube->setPose(tube_pose);
+    //tube->setPose(tube_pose);
     tube->getCylinderMarker(marker_array);
     tube_marker_pub.publish(marker_array);
 

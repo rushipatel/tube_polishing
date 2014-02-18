@@ -18,7 +18,7 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh)
     valid_pairs_.reset(new (TubeGrasp::GraspPairArray));
     axis_step_size_ = 0.05;
     circular_steps_ = 8;
-    wrist_axis_offset_ = 0.072; //72 mm from axis of cylinder to wrist origin
+    wrist_axis_offset_ = 0.2; //72 mm from axis of cylinder to wrist origin
     nodeHandle = nh;
     MAX_TEST_GRASPS = 30;
     MAX_ITERATION = 200;
@@ -67,22 +67,32 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     
     tf::Transform p, a;
     a.setIdentity();
-    a.setOrigin(tf::Vector3(-0.1, 0, 0));
-    p = tube_->getTransform() * pose2tf(pick_pose);
+    a.setOrigin(tf::Vector3(-0.2, 0, 0));
+    p = pose2tf(pick_pose);
     a = p*a;
     aprh_pose = tf2pose(a);
     
-    Gripper r_grpr("right_arm");
+    Gripper r_grpr("right_arm"), l_grpr("left_arm");
     r_grpr.open();
+    l_grpr.open();
     dualArms da(nodeHandle);
-    da.moveRightArm(aprh_pose);
-    pickPose = pick_pose;
-    //ROS_INFO_STREAM("apr_pose"<<aprh_pose);
-    //r_grpr.open();
-    //da.moveRightArm(pick_pose);
-    //r_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
+    if(!da.moveLeftArm(aprh_pose))
+    {
+        da.moveRightArm(aprh_pose);
+        da.moveRightArm(pick_pose);
+        l_grpr.open();
+        l_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
+    }
+    else
+    {
+        r_grpr.open();
+        da.moveLeftArm(pick_pose);
+        r_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
+    }
 }
 
+
+//returns global pick pose
 geometry_msgs::Pose GraspAnalysis::getPickUpPose()
 {
     //will generate only vertical grasps
@@ -157,17 +167,17 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
     ref_point.y /= tube_->cylinders.size();
     ref_point.z /= tube_->cylinders.size();
 
-    std::vector<double> dist(grasp_array->grasps.size());
+    std::vector<double> dist(grasp_sorted->grasps.size());
     tf::Vector3 c,r(ref_point.x, ref_point.y, ref_point.z);
     double max = 1000;
     unsigned int grasp_idx = 0;
     grasp_pose_array.poses.clear();
-    for(size_t i=0; i<grasp_array->grasps.size(); i++)
+    for(size_t i=0; i<grasp_sorted->grasps.size(); i++)
     {
-        grasp_pose_array.poses.push_back(grasp_array->grasps[i].wristPose);
-        c.setValue(grasp_array->grasps[i].wristPose.position.x,
-                   grasp_array->grasps[i].wristPose.position.y,
-                   grasp_array->grasps[i].wristPose.position.z );
+        grasp_pose_array.poses.push_back(grasp_sorted->grasps[i].wristPose);
+        c.setValue(grasp_sorted->grasps[i].wristPose.position.x,
+                   grasp_sorted->grasps[i].wristPose.position.y,
+                   grasp_sorted->grasps[i].wristPose.position.z );
         dist[i] = c.distance(r);
         if(dist[i] < max)
         {
@@ -175,7 +185,7 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
             max = dist[i];
         }
     }
-    geometry_msgs::Pose grasp_pose = grasp_array->grasps[grasp_idx].wristPose;
+    geometry_msgs::Pose grasp_pose = grasp_sorted->grasps[grasp_idx].wristPose;
     return grasp_pose;
 }
 
