@@ -100,26 +100,45 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
         grasp_array->grasps[i].wristPose = tf2pose(g);
     }
 
-    int prev_grp;
-    double angle = M_PI*2;
-    // neg_z is to compare grasp's x axis with to check downward grasps
-    tf::Vector3 neg_z(0,0,-1), grasp_x;
-    tf::Transform x_step;
-    x_step.setOrigin(1,0,0);
-    x_step.setRotation(tf::Quaternion(0,0,0,1);
-    for(size_t i=0; i<grasp_array->grasps.size(); i++)
-    {
-        while(grasp_array->grasps[i].group==prev_grp)
-        {
-            grasp_x;
-            prev_grp = grasp_array->grasps[i].group;
-            i++;
-        }
-    }
-
     //store sorted(close to negative Z axis)
     GraspArray::Ptr grasp_sorted;
     grasp_sorted.reset(new (GraspArray));
+    
+    int prev_grp=0;
+    if(!grasp_array->grasps.empty())
+        prev_grp = grasp_array->grasps[0].group;
+    // neg_z is to compare grasp's x axis with to check downward grasps
+    tf::Vector3 neg_z(0,0,-1), grasp_x, vec;
+    tf::Transform x_step, grasp_step;
+    x_step.setOrigin(tf::Vector3(1,0,0));
+    x_step.setRotation(tf::Quaternion(0,0,0,1));
+    int idx;
+    double angle, max_angle = M_PI*2;
+    for(size_t i=0; i<grasp_array->grasps.size(); i++)
+    {
+        if(grasp_array->grasps[i].group==prev_grp)
+        {
+            grasp_step = pose2tf(grasp_array->grasps[i].wristPose)*x_step;
+            vec.setValue(grasp_array->grasps[i].wristPose.position.x,
+                         grasp_array->grasps[i].wristPose.position.y,
+                         grasp_array->grasps[i].wristPose.position.z);
+            grasp_x = grasp_step.getOrigin();
+            grasp_x = grasp_x - vec;
+            angle = grasp_x.angle(neg_z);
+            if(angle<max_angle)
+            {
+                max_angle = angle;
+                idx = i;
+            }
+        }
+        else
+        {
+
+            grasp_sorted->grasps.push_back(grasp_array->grasps[idx]);
+            max_angle = M_PI*2;
+        }
+        prev_grp = grasp_array->grasps[i].group;
+    }
 
     //tf::Vector3 ref_point;
     geometry_msgs::Point ref_point;
