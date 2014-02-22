@@ -12,10 +12,16 @@
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <geometric_shapes/shapes.h>
 
 #include <gazebo_msgs/SpawnModel.h>
 #include <stdio.h>
 #include <Eigen/Eigen>
+
+#include <moveit/kinematics_base/kinematics_base.h>
+#include <moveit/robot_model/robot_model.h>
+#include <moveit/robot_model_loader/robot_model_loader.h>
+#include <moveit/robot_state/robot_state.h>
 
 #include "dualArms.h"
 #include "robotHead.h"
@@ -27,71 +33,6 @@
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
-
-/*void rotateAroundCenter(ros::NodeHandle rh)
-{
-    dualArms dual_arms(rh);
-    tf::Transform tfBaseObj;
-    tf::Transform tfObjWrist_r, tfObjWrist_l;
-    geometry_msgs::Pose pose;
-
-    tfObjWrist_r.setOrigin(tf::Vector3(-0.15,-0.2,0));
-    tfObjWrist_r.setRotation(tf::Quaternion(0,M_PI/2,0));
-    tfObjWrist_l.setOrigin(tf::Vector3(-0.15,0.2,0));
-    tfObjWrist_l.setRotation(tf::Quaternion(0,M_PI/2,0));
-    dual_arms.rightWristOffset = tfObjWrist_r;
-    dual_arms.leftWristOffset = tfObjWrist_l;
-
-
-    tfBaseObj.setOrigin(tf::Vector3(0.7,0,0.7));
-    for(double i=-45; i<=45; i+=1)
-    {
-        tfBaseObj.setRotation(tf::Quaternion(i*M_PI/180,0,0));
-        pose = tf2pose(tfBaseObj);
-        dual_arms.objPoseTraj.poses.push_back(pose);
-    }
-    /*for(double i=45; i>=-45; i-=1)
-    {
-        tfBaseObj.setRotation(tf::Quaternion(i*M_PI/180,0,0));
-        tfToPose(tfBaseObj, pose);
-        dual_arms.objPoseTraj.poses.push_back(pose);
-    }
-    for(double i=-45; i<=45; i+=1)
-    {
-        tfBaseObj.setRotation(tf::Quaternion(0,i*M_PI/180,0));
-        tfToPose(tfBaseObj, pose);
-        dual_arms.objPoseTraj.poses.push_back(pose);
-    }
-    for(double i=45; i>=-45; i-=1)
-    {
-        tfBaseObj.setRotation(tf::Quaternion(0,i*M_PI/180,0));
-        tfToPose(tfBaseObj, pose);
-        dual_arms.objPoseTraj.poses.push_back(pose);
-    }
-    for(double i=-45; i<=45; i+=1)
-    {
-        tfBaseObj.setRotation(tf::Quaternion(0,0,i*M_PI/180));
-        tfToPose(tfBaseObj, pose);
-        dual_arms.objPoseTraj.poses.push_back(pose);
-    }
-    for(double i=45; i>=-45; i-=1)
-    {
-        tfBaseObj.setRotation(tf::Quaternion(0,0,i*M_PI/180));
-        tfToPose(tfBaseObj, pose);
-        dual_arms.objPoseTraj.poses.push_back(pose);
-    }*/
-
-    /*for(int i=0; i<dual_arms.objPoseTraj.poses.size(); i++)
-    {
-        pose = dual_arms.objPoseTraj.poses[i];
-        ROS_INFO("Pose No. %d Origin = %f %f %f",i,pose.position.x, pose.position.y, pose.position.z);
-    }*/
-    /*if(!dual_arms.genTrajectory())
-        ROS_ERROR("IK Failed");
-    else
-        dual_arms.executeJointTrajectory();*/
-
-//}*/
 
 int main(int argc, char **argv)
 {
@@ -117,40 +58,14 @@ int main(int argc, char **argv)
         ROS_WARN("Can't get planning scene");
         return -1;
     }
-    //ros::service::waitForService("/gazebo/spawn_urdf_model");
 
-    //rotateAroundCenter(rh);
-
-    dualArms dual_arms(rh);
-    geometry_msgs::Pose pose;
-    pose.position.x = 0.1;
-    pose.position.y = -0.6;
-    pose.position.z = 0.8;
-    pose.orientation.x = 0.0;
-    pose.orientation.y = 0.0;
-    pose.orientation.z = 0.0;
-    pose.orientation.w = 1.0;
-    dual_arms.moveRightArm(pose);
-    pose.position.x = 0.1;
-    pose.position.y = 0.6;
-    pose.position.z = 0.8;
-    pose.orientation.x = 0.0;
-    pose.orientation.y = 0.0;
-    pose.orientation.z = 0.0;
-    pose.orientation.w = 1.0;
-    dual_arms.moveLeftArm(pose);
-
-    robotHead pr2_head;
-    pr2_head.lookAt(0.75,0.0,0.5);
-
-    /*Gripper r_grpr("right_arm"),l_grpr("left_arm");
-    r_grpr.open();
-    l_grpr.open();
-    r_grpr.close();
-    l_grpr.close();*/
+    robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
+    robot_model::RobotModelPtr kinematic_model = robot_model_loader.getModel();
+    ROS_INFO("Model frame: %s", kinematic_model->getModelFrame().c_str());
 
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
+
+    /*pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     //write_kinect_output(rh);
     tabletop_object_detector::TabletopSegmentation seg_srv;
@@ -256,21 +171,7 @@ int main(int argc, char **argv)
     }
     //while (getchar()!='q');
     //ros::spin();
-    /*ManipAnalysis ma("right_arm", rh);
-    ma.setRotationAxis(tf::Vector3(1,0,0));
-    ma.setForceVec(tf::Vector3(1,0,0));
-    std::vector<double> q;
-    q.resize(7);
-    q[0] = -1.5;
-    q[1] =  0.0;
-    q[2] =  0.0;
-    q[3] =  0.0;
-    q[4] = -0.15;
-    q[5] = -0.1;
-    q[6] =  0.0;
-    ROS_INFO_STREAM("FORCE MATRIC   : "<<ma.getForceMetric(q));
-    ROS_INFO_STREAM("ROTATION MATRIC: "<<ma.getRotationMetric(q));
-    ROS_INFO_STREAM("K              : "<<ma.getManipIndex(q));*/
+*/
 
 
   ros::shutdown();
