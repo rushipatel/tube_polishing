@@ -18,11 +18,6 @@
 #include <stdio.h>
 #include <Eigen/Eigen>
 
-#include <moveit/kinematics_base/kinematics_base.h>
-#include <moveit/robot_model/robot_model.h>
-#include <moveit/robot_model_loader/robot_model_loader.h>
-#include <moveit/robot_state/robot_state.h>
-
 #include "dualArms.h"
 #include "robotHead.h"
 #include "tubePerception.h"
@@ -37,20 +32,20 @@
 int main(int argc, char **argv)
 {
     ros::init (argc, argv, "tube_polishing");
-    ros::NodeHandle rh;
+    ros::NodeHandlePtr rh(new ros::NodeHandle);
 
     ros::AsyncSpinner spinner(1);
     spinner.start();
 
-    ros::ServiceClient seg_srv_client = rh.serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
-    ros::ServiceClient set_planning_scene_diff_client = rh.serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
-    //ros::Publisher cloud_pub = rh.advertise<sensor_msgs::PointCloud2>("tube_cloud",2);
-    //ros::Publisher marker_pub = rh.advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
-    ros::Publisher pose_pub = rh.advertise<geometry_msgs::PoseStamped>("/tube_polishing/work_traj_pose",10);
-    ros::Publisher marker_pub = rh.advertise<visualization_msgs::Marker>("/tube_polishing/marker", 2);
-    ros::Publisher tube_marker_pub = rh.advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
-    ros::Publisher grasp_marker_pub = rh.advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
-    //ros::ServiceClient spawn_model_client = rh.serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_model");
+    ros::ServiceClient seg_srv_client = rh->serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
+    ros::ServiceClient set_planning_scene_diff_client = rh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
+    //ros::Publisher cloud_pub = rh->advertise<sensor_msgs::PointCloud2>("tube_cloud",2);
+    //ros::Publisher marker_pub = rh->advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
+    ros::Publisher pose_pub = rh->advertise<geometry_msgs::PoseStamped>("/tube_polishing/work_traj_pose",10);
+    ros::Publisher marker_pub = rh->advertise<visualization_msgs::Marker>("/tube_polishing/marker", 2);
+    ros::Publisher tube_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
+    ros::Publisher grasp_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
+    //ros::ServiceClient spawn_model_client = rh->serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_model");
     arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
     if(!set_planning_scene_diff_client.call(planning_scene_req, planning_scene_res))
@@ -59,13 +54,29 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
-    robot_model::RobotModelPtr kinematic_model = robot_model_loader.getModel();
-    ROS_INFO("Model frame: %s", kinematic_model->getModelFrame().c_str());
+    dualArms dual_arms(rh);
+    geometry_msgs::Pose pose;
+    pose.position.x = 0.1;
+    pose.position.y = -0.6;
+    pose.position.z = 0.8;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
+    dual_arms.moveRightArm(pose);
+    pose.position.x = 0.1;
+    pose.position.y = 0.6;
+    pose.position.z = 0.8;
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
+    dual_arms.moveLeftArm(pose);
 
+    robotHead pr2_head;
+    pr2_head.lookAt(0.75,0.0,0.5);
 
-
-    /*pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     //write_kinect_output(rh);
     tabletop_object_detector::TabletopSegmentation seg_srv;
@@ -171,7 +182,6 @@ int main(int argc, char **argv)
     }
     //while (getchar()!='q');
     //ros::spin();
-*/
 
 
   ros::shutdown();

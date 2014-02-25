@@ -9,7 +9,7 @@ Grasp::Grasp()
 {
 }
 
-GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh)
+GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh)
 {
     //grasp_array_ = grasp_array;
     tube_ = tube;
@@ -71,22 +71,25 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     p = pose2tf(pick_pose);
     a = p*a;
     aprh_pose = tf2pose(a);
+
+    robotHead pr2_head;
+    pr2_head.lookAt(1,0.0,3);
     
     Gripper r_grpr("right_arm"), l_grpr("left_arm");
     r_grpr.open();
     l_grpr.open();
     dualArms da(nodeHandle);
-    if(!da.moveLeftArm(aprh_pose))
+    if(!da.simpleMoveLeftArm(aprh_pose))
     {
-        da.moveRightArm(aprh_pose);
-        da.moveRightArm(pick_pose);
+        da.simpleMoveRightArm(aprh_pose);
+        da.simpleMoveRightArm(pick_pose);
         l_grpr.open();
         l_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
     }
     else
     {
         r_grpr.open();
-        da.moveLeftArm(pick_pose);
+        da.simpleMoveLeftArm(pick_pose);
         r_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
     }
 }

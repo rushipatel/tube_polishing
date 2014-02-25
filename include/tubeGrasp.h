@@ -10,6 +10,7 @@
 #include "utility.cpp"
 #include "dualArms.h"
 #include "gripper.h"
+#include "robotHead.h"
 
 namespace TubeGrasp
 {
@@ -60,8 +61,8 @@ namespace TubeGrasp
     class GraspAnalysis
     {
     public:
-        ros::NodeHandle nodeHandle;
-        GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh);
+        ros::NodeHandlePtr nodeHandle;
+        GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh);
         void setWorkPose(geometry_msgs::Pose &p);
         int getWorkPose(geometry_msgs::Pose &p);
         void setWorkTrajIdx(int trajIdx);

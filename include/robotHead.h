@@ -1,3 +1,5 @@
+#ifndef ROBOTHEAD_H
+#define ROBOTHEAD_H
 #include <ros/ros.h>
 
 #include <actionlib/client/simple_action_client.h>
@@ -19,3 +21,5 @@ public:
   };
   void lookAt(double x, double y, double z);
 };
+
+#endif

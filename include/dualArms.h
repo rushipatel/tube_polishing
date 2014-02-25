@@ -5,6 +5,7 @@
 #include <pr2_controllers_msgs/JointTrajectoryControllerState.h>
 #include <actionlib/client/simple_action_client.h>
 #include <kinematics_msgs/GetConstraintAwarePositionIK.h>
+#include <kinematics_msgs/GetPositionIK.h>
 #include <kinematics_msgs/GetKinematicSolverInfo.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/Pose.h>
@@ -31,7 +32,7 @@ public:
     tf::Transform leftWristOffset; /*!< Offset of left arm wrist_roll link from object. */
     tf::Transform rightWristOffset; /*!< Offset of right arm wrist_roll link from object. */
     geometry_msgs::PoseArray objPoseTraj; /*!< Pose trajectory of an object. */
-    dualArms(ros::NodeHandle& rh);
+    dualArms(ros::NodeHandlePtr rh);
     bool genTrajectory();
     bool genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &lefttJointTraj);
     bool genLeftTrajectory(std::vector<double> &jointTrajectory);  //Prerequisites: leftWristOffset and objPoseTraj
@@ -40,7 +41,9 @@ public:
     bool executeJointTrajectory(std::vector<double> &qRight,
                                 std::vector<double> &qLeft);
     bool moveRightArm(geometry_msgs::Pose pose);
+    bool simpleMoveRightArm(geometry_msgs::Pose pose);
     bool moveLeftArm(geometry_msgs::Pose pose);
+    bool simpleMoveLeftArm(geometry_msgs::Pose pose);
     void get_current_right_joint_angles(double current_angles[7]);
     void get_current_left_joint_angles(double current_angles[7]);
 private:
@@ -48,6 +51,8 @@ private:
     TrajClient* traj_client_l_; /*!< Left arm trajectory action client. */
     ros::ServiceClient ik_client_r_; /*!< Right arm IK client. */
     ros::ServiceClient ik_client_l_; /*!< Left arm IK client. */
+    ros::ServiceClient simple_ik_client_r_; /*!< Left arm IK client. */
+    ros::ServiceClient simple_ik_client_l_; /*!< Left arm IK client. */
     ros::ServiceClient query_client_r_; /*!< Right arm kinematic solver info query client. */
     ros::ServiceClient query_client_l_; /*!< Left arm kinematic solver info query client. */
     ros::ServiceClient filter_trajectory_client_; /*!< Joint trajectory unnormalizer filter client. */

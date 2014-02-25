@@ -4,9 +4,8 @@
 /*! \brief Constructor. Subscribes to various services.
  *
  */
-dualArms::dualArms(ros::NodeHandle& rh)
+dualArms::dualArms(ros::NodeHandlePtr rh)
 {
-    //rh_ = rh;
     traj_client_r_  = new TrajClient("r_arm_controller/joint_trajectory_action", true);
     traj_client_l_  = new TrajClient("l_arm_controller/joint_trajectory_action", true);
     while(!traj_client_r_->waitForServer(ros::Duration(5.0)))
@@ -18,15 +17,19 @@ dualArms::dualArms(ros::NodeHandle& rh)
         ROS_INFO("Waiting for the left_arm_controller/joint_trajectory_action server");
     }
     ros::service::waitForService("pr2_right_arm_kinematics/get_ik_solver_info");
-    ros::service::waitForService("pr2_right_arm_kinematics/get_constraint_aware_ik");
+    //ros::service::waitForService("pr2_right_arm_kinematics/get_constraint_aware_ik");
+    ros::service::waitForService("pr2_right_arm_kinematics/get_ik");
     ros::service::waitForService("pr2_left_arm_kinematics/get_ik_solver_info");
-    ros::service::waitForService("pr2_left_arm_kinematics/get_constraint_aware_ik");
+    //ros::service::waitForService("pr2_left_arm_kinematics/get_constraint_aware_ik");
+    ros::service::waitForService("pr2_left_arm_kinematics/get_ik");
     ros::service::waitForService("trajectory_filter_unnormalizer/filter_trajectory");
-    ik_client_r_ = rh.serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_right_arm_kinematics/get_constraint_aware_ik");
-    query_client_r_ = rh.serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_right_arm_kinematics/get_ik_solver_info");
-    ik_client_l_ = rh.serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_left_arm_kinematics/get_constraint_aware_ik");
-    query_client_l_ = rh.serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_left_arm_kinematics/get_ik_solver_info");
-    filter_trajectory_client_ = rh.serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
+    ik_client_r_ = rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_right_arm_kinematics/get_constraint_aware_ik");
+    simple_ik_client_r_ = rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_right_arm_kinematics/get_ik");
+    query_client_r_ = rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_right_arm_kinematics/get_ik_solver_info");
+    ik_client_l_ = rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_left_arm_kinematics/get_constraint_aware_ik");
+    simple_ik_client_l_ = rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_left_arm_kinematics/get_ik");
+    query_client_l_ = rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_left_arm_kinematics/get_ik_solver_info");
+    filter_trajectory_client_ = rh->serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
 }
 
 /*! \brief Gets current joint angle from pr2 controller topics for initial IK seeds.
@@ -504,6 +507,140 @@ bool dualArms::moveLeftArm(geometry_msgs::Pose pose)
     ik_req.ik_request.pose_stamped.pose = pose;
 
     if(ik_client_l_.call(ik_req, ik_res))
+    {
+      if(ik_res.error_code.val == ik_res.error_code.SUCCESS)
+      {
+          traj_goal.trajectory.points.resize(1);
+          traj_goal.trajectory.joint_names.push_back("l_shoulder_pan_joint");
+          traj_goal.trajectory.joint_names.push_back("l_shoulder_lift_joint");
+          traj_goal.trajectory.joint_names.push_back("l_upper_arm_roll_joint");
+          traj_goal.trajectory.joint_names.push_back("l_elbow_flex_joint");
+          traj_goal.trajectory.joint_names.push_back("l_forearm_roll_joint");
+          traj_goal.trajectory.joint_names.push_back("l_wrist_flex_joint");
+          traj_goal.trajectory.joint_names.push_back("l_wrist_roll_joint");
+          goal.positions.resize(7);
+          goal.velocities.resize(7);
+        for(int j=0; j<7; j++)
+        {
+            goal.positions[j] = ik_res.solution.joint_state.position[j];
+            goal.velocities[j] = 0.0;
+        }
+        goal.time_from_start = ros::Duration(0.0);
+        traj_goal.trajectory.points[0] = goal;
+        ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
+        traj_goal.trajectory.header.stamp = time_to_start;
+        traj_client_l_->sendGoalAndWait(traj_goal);
+      }
+      else
+      {
+        ROS_ERROR("Left arm Inverse kinematics failed for given pose.");
+        return 0;
+      }
+    }
+    else
+    {
+      ROS_ERROR("Left arm Inverse kinematics service call failed.");
+      return 0;
+    }
+    return 1;
+}
+
+/*! \brief Simple move arm function to move individual arm for given pose.
+ *
+ *
+ */
+bool dualArms::simpleMoveRightArm(geometry_msgs::Pose pose)
+{
+    double crnt_joints[7];
+    pr2_controllers_msgs::JointTrajectoryGoal traj_goal;
+    trajectory_msgs::JointTrajectoryPoint goal;
+    kinematics_msgs::GetPositionIK::Request  ik_req;
+    kinematics_msgs::GetPositionIK::Response ik_res;
+
+    ik_req.timeout = ros::Duration(5.0);
+    ik_req.ik_request.ik_link_name = "r_wrist_roll_link";
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_shoulder_pan_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_shoulder_lift_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_upper_arm_roll_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_elbow_flex_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_forearm_roll_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_wrist_flex_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_wrist_roll_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.position.resize(7);
+    dualArms::get_current_right_joint_angles(crnt_joints);
+    for(unsigned int i=0; i<7; i++)
+        ik_req.ik_request.ik_seed_state.joint_state.position[i] = crnt_joints[i];
+    ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
+    ik_req.ik_request.pose_stamped.pose = pose;
+
+    if(simple_ik_client_r_.call(ik_req, ik_res))
+    {
+      if(ik_res.error_code.val == ik_res.error_code.SUCCESS)
+      {
+          traj_goal.trajectory.points.resize(1);
+          traj_goal.trajectory.joint_names.push_back("r_shoulder_pan_joint");
+          traj_goal.trajectory.joint_names.push_back("r_shoulder_lift_joint");
+          traj_goal.trajectory.joint_names.push_back("r_upper_arm_roll_joint");
+          traj_goal.trajectory.joint_names.push_back("r_elbow_flex_joint");
+          traj_goal.trajectory.joint_names.push_back("r_forearm_roll_joint");
+          traj_goal.trajectory.joint_names.push_back("r_wrist_flex_joint");
+          traj_goal.trajectory.joint_names.push_back("r_wrist_roll_joint");
+          goal.positions.resize(7);
+          goal.velocities.resize(7);
+        for(int j=0; j<7; j++)
+        {
+            goal.positions[j] = ik_res.solution.joint_state.position[j];
+            goal.velocities[j] = 0.0;
+        }
+        goal.time_from_start = ros::Duration(0.0);
+        traj_goal.trajectory.points[0] = goal;
+        ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
+        traj_goal.trajectory.header.stamp = time_to_start;
+        traj_client_r_->sendGoalAndWait(traj_goal);
+      }
+      else
+      {
+        ROS_ERROR("Right arm Inverse kinematics failed for given pose.");
+        return 0;
+      }
+    }
+    else
+    {
+      ROS_ERROR("Right arm Inverse kinematics service call failed.");
+      return 0;
+    }
+    return 1;
+}
+
+/*! \brief Simple move arm function to move individual arm for given pose.
+ *
+ *
+ */
+bool dualArms::simpleMoveLeftArm(geometry_msgs::Pose pose)
+{
+    double crnt_joints[7];
+    pr2_controllers_msgs::JointTrajectoryGoal traj_goal;
+    trajectory_msgs::JointTrajectoryPoint goal;
+    kinematics_msgs::GetPositionIK::Request  ik_req;
+    kinematics_msgs::GetPositionIK::Response ik_res;
+
+    ik_req.timeout = ros::Duration(5.0);
+    ik_req.ik_request.ik_link_name = "l_wrist_roll_link";
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_shoulder_pan_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_shoulder_lift_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_upper_arm_roll_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_elbow_flex_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_forearm_roll_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_wrist_flex_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_wrist_roll_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.position.resize(7);
+    get_current_left_joint_angles(crnt_joints);
+    for(unsigned int i=0; i<7; i++)
+        ik_req.ik_request.ik_seed_state.joint_state.position[i] = crnt_joints[i];
+    ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
+    ik_req.ik_request.pose_stamped.pose = pose;
+
+    if(simple_ik_client_l_.call(ik_req, ik_res))
     {
       if(ik_res.error_code.val == ik_res.error_code.SUCCESS)
       {

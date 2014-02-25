@@ -18,7 +18,7 @@
 class ManipAnalysis
 {
 public:
-    ManipAnalysis(std::string whichArm, const ros::NodeHandle &nh);
+    ManipAnalysis(std::string whichArm, const ros::NodeHandlePtr nh);
     void setForceVec(tf::Vector3 vec);
     void setRotationAxis(tf::Vector3 vec);
     void setReferencePoint(tf::Vector3 pInTipFrame);
@@ -43,7 +43,7 @@ private:
     double get_manipulability_index_(void);
 };
 
-ManipAnalysis::ManipAnalysis(std::string whichArm, const ros::NodeHandle &nh)
+ManipAnalysis::ManipAnalysis(std::string whichArm, const ros::NodeHandlePtr nh)
 {
     bool right_arm;
     if(whichArm.compare("right_arm"))
@@ -61,7 +61,7 @@ ManipAnalysis::ManipAnalysis(std::string whichArm, const ros::NodeHandle &nh)
        ROS_ERROR("Failed to construct kdl tree from file");
     }*/
     std::string robot_desc;
-    nh.getParam("robot_description", robot_desc);
+    nh->getParam("robot_description", robot_desc);
     if (!kdl_parser::treeFromString(robot_desc,pr2))
     {
         ROS_ERROR("Failed to construct kdl tree from parameter server");

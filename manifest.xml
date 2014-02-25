@@ -29,8 +29,6 @@
   <depend package="bullet"/>
   <depend package="kdl"/>
   <depend package="kdl_parser"/>
-  <depend package="moveit_core"/>
-  <depend package="geometric_shapes"/>
   <platform os="ubuntu" version="9.04"/>
   <platform os="ubuntu" version="9.10"/>
   <platform os="ubuntu" version="10.04"/>
