@@ -9,7 +9,7 @@ Grasp::Grasp()
 {
 }
 
-GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh)
+GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh)
 {
     //grasp_array_ = grasp_array;
     tube_ = tube;
@@ -18,7 +18,7 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandle nh)
     valid_pairs_.reset(new (TubeGrasp::GraspPairArray));
     axis_step_size_ = 0.05;
     circular_steps_ = 8;
-    wrist_axis_offset_ = 0.2; //72 mm from axis of cylinder to wrist origin
+    wrist_axis_offset_ = 0.18; //72 mm from axis of cylinder to wrist origin
     nodeHandle = nh;
     MAX_TEST_GRASPS = 30;
     MAX_ITERATION = 200;
@@ -75,22 +75,29 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     Gripper r_grpr("right_arm"), l_grpr("left_arm");
     r_grpr.open();
     l_grpr.open();
-    dualArms da(nodeHandle);
-    if(!da.moveLeftArm(aprh_pose))
+    TubeManipulation da(nodeHandle);
+    if(!da.simpleMoveLeftArm(aprh_pose))
     {
-        da.moveRightArm(aprh_pose);
-        da.moveRightArm(pick_pose);
+        da.simpleMoveRightArm(aprh_pose);
+        ros::Duration(5).sleep();
+        da.simpleMoveRightArm(pick_pose);
+        ros::Duration(3).sleep();
         l_grpr.open();
-        l_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
+        l_grpr.setPosition(tube_->cylinders[0].radius*1.95,100);
+        ros::Duration(5).sleep();
+        da.simpleMoveRightArm(aprh_pose);
     }
     else
     {
+        ros::Duration(5).sleep();
         r_grpr.open();
-        da.moveLeftArm(pick_pose);
-        r_grpr.setPosition(tube_->cylinders[0].radius*1.7,100);
+        ros::Duration(3).sleep();
+        da.simpleMoveLeftArm(pick_pose);
+        r_grpr.setPosition(tube_->cylinders[0].radius*1.95,100);
+        ros::Duration(5).sleep();
+        da.simpleMoveLeftArm(aprh_pose);
     }
 }
-
 
 //returns global pick pose
 geometry_msgs::Pose GraspAnalysis::getPickUpPose()
@@ -402,14 +409,14 @@ void GraspAnalysis::gen_test_pairs_()
 
 void GraspAnalysis::test_pairs_for_ik_()
 {
-    dualArms da(nodeHandle);
+    TubeManipulation da(nodeHandle);
 
     int idx;
     unsigned long test_grasps=1;
 
     ROS_INFO_STREAM("Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
     GraspPair gp;
-    da.objPoseTraj = tube_traj_;
+    da.setObjPoseTrajectory(tube_traj_);
 
     unsigned long it=MAX_ITERATION;
     valid_pairs_->graspPairs.reserve(MAX_TEST_GRASPS);
@@ -419,8 +426,7 @@ void GraspAnalysis::test_pairs_for_ik_()
         it--;
         idx = rand()%(test_pairs_->graspPairs.size()+1);
         gp = test_pairs_->graspPairs[idx];
-        da.rightWristOffset = pose2tf(gp.rightGrasp.wristPose);
-        da.leftWristOffset = pose2tf(gp.leftGrasp.wristPose);
+        da.setWristOffset(gp.rightGrasp.wristPose, gp.leftGrasp.wristPose);
         //genTrajectory clears vectors(qRight, qLeft) in arguement
         if(da.genTrajectory(gp.qRight, gp.qLeft))
         {
