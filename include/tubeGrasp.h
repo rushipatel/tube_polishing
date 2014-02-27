@@ -6,9 +6,9 @@
 #include <tf/tf.h>
 
 #include "tubePerception.h"
-#include "manip_analysis.cpp"
-#include "utility.cpp"
-#include "dualArms.h"
+#include "manipAnalysis.h"
+#include "utility.h"
+#include "tubeManipulation.h"
 #include "gripper.h"
 #include "robotHead.h"
 

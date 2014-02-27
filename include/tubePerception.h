@@ -37,7 +37,7 @@
 #include <pcl/pcl_base.h>
 
 #include <sstream>
-#include "utility.cpp"
+#include "utility.h"
 
 typedef pcl::PointXYZRGBNormal PointT;
 

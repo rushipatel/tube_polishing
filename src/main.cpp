@@ -18,12 +18,12 @@
 #include <stdio.h>
 #include <Eigen/Eigen>
 
-#include "dualArms.h"
+#include "tubeManipulation.h"
 #include "robotHead.h"
 #include "tubePerception.h"
 #include "tubeGrasp.h"
-#include "manip_analysis.cpp"
-#include "utility.cpp"
+#include "manipAnalysis.h"
+#include "utility.h"
 #include "gripper.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
@@ -54,7 +54,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    dualArms dual_arms(rh);
+    TubeManipulation manip(rh);
     geometry_msgs::Pose pose;
     pose.position.x = 0.1;
     pose.position.y = -0.6;
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
-    dual_arms.moveRightArm(pose);
+    manip.moveRightArm(pose);
     pose.position.x = 0.1;
     pose.position.y = 0.6;
     pose.position.z = 0.8;
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
-    dual_arms.moveLeftArm(pose);
+    manip.moveLeftArm(pose);
 
     robotHead pr2_head;
     pr2_head.lookAt(0.75,0.0,0.5);
