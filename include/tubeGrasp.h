@@ -73,37 +73,35 @@ namespace TubeGrasp
         //returns grasp somewhere closer to center of object. very rough approximation.
         geometry_msgs::Pose getPickUpPose();
         void pickUpTube(geometry_msgs::Pose &pickPose);
-        geometry_msgs::PoseArray work_traj_; //put this back in private after dbg/dev
-        geometry_msgs::PoseArray tube_traj_;
+        geometry_msgs::PoseArray _work_traj; //put this back in private after dbg/dev
+        geometry_msgs::PoseArray _tube_traj;
         visualization_msgs::Marker vismsg_workNormalsX;
         visualization_msgs::Marker vismsg_workNormalsY;
         visualization_msgs::Marker vismsg_workNormalsZ;
         geometry_msgs::PoseArray grasp_pose_array;
 
     private:
-        TubePerception::Tube::Ptr tube_;
-        TubeGrasp::GraspArray::Ptr grasp_array_;
-        TubeGrasp::GraspPairArray::Ptr test_pairs_;
-        TubeGrasp::GraspPairArray::Ptr valid_pairs_;
+        TubePerception::Tube::Ptr _tube;
+        TubeGrasp::GraspArray::Ptr _grasp_array;
+        TubeGrasp::GraspPairArray::Ptr _test_pairs;
+        TubeGrasp::GraspPairArray::Ptr _valid_pairs;
 
-        geometry_msgs::Pose work_pose_;
-        int traj_idx_;
-        double axis_step_size_; //in mm
-        int circular_steps_;  //integer number
-        double wrist_axis_offset_;
+        geometry_msgs::Pose _work_pose;
+        int _traj_idx;
+        double _axis_step_size; //in mm
+        int _circular_steps;  //integer number
+        double _wrist_axis_offset;
         unsigned long MAX_TEST_GRASPS; //Maximum valid grasps to store
         //Maximum iteration for randomly selecting grasp to test
         unsigned long MAX_ITERATION;  //Check the repetations in selecting random index in test_for_ik_
-        void gen_grasps_(double axis_step_size, int circular_steps,  GraspArray::Ptr grasp_array);
-        void gen_pickup_grasps_(double axis_step_size, int circular_steps, GraspArray::Ptr grasp_array);
-        bool gen_work_trajectory_();
-        void gen_test_pairs_();
-        void normalize_worktrajectory_();
-        void xform_in_tubeframe_();
-        void work2tube_trajectory_();
-        void test_pairs_for_ik_();
-        void compute_metric_();
-        void gen_pickup_grasps_(double axis_step_size, int circular_steps);
+        void _gen_grasps(double axis_step_size, int circular_steps,  GraspArray::Ptr grasp_array);
+        bool _gen_work_trajectory();
+        void _gen_test_pairs();
+        void _normalize_worktrajectory();
+        void _xform_in_tubeframe();
+        void _work2tube_trajectory();
+        void _test_pairs_for_ik();
+        void _compute_metric();
     };
 }
 

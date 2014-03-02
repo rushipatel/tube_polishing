@@ -1,8 +1,6 @@
 #include <ros/ros.h>
 #include <kinematics_msgs/GetKinematicSolverInfo.h>
 #include <kinematics_msgs/GetConstraintAwarePositionIK.h>
-#include <arm_navigation_msgs/PlanningScene.h>
-#include <arm_navigation_msgs/SetPlanningSceneDiff.h>
 #include <tf/tf.h>
 #include <visualization_msgs/Marker.h>
 #include <pr2_controllers_msgs/JointTrajectoryAction.h>
@@ -27,7 +25,6 @@
 #include "gripper.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
-#define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
 
 int main(int argc, char **argv)
 {
@@ -38,7 +35,6 @@ int main(int argc, char **argv)
     spinner.start();
 
     ros::ServiceClient seg_srv_client = rh->serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
-    ros::ServiceClient set_planning_scene_diff_client = rh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
     //ros::Publisher cloud_pub = rh->advertise<sensor_msgs::PointCloud2>("tube_cloud",2);
     //ros::Publisher marker_pub = rh->advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
     ros::Publisher pose_pub = rh->advertise<geometry_msgs::PoseStamped>("/tube_polishing/work_traj_pose",10);
@@ -46,13 +42,6 @@ int main(int argc, char **argv)
     ros::Publisher tube_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
     ros::Publisher grasp_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
     //ros::ServiceClient spawn_model_client = rh->serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_model");
-    arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
-    arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
-    if(!set_planning_scene_diff_client.call(planning_scene_req, planning_scene_res))
-    {
-        ROS_WARN("Can't get planning scene");
-        return -1;
-    }
 
     TubeManipulation manip(rh);
     geometry_msgs::Pose pose;
@@ -100,7 +89,6 @@ int main(int argc, char **argv)
 
                     tube.reset(new TubePerception::Tube(pc2));
                     TubePerception::CloudProcessing cp(tube);
-
                     tube->getCylinderMarker(marker_array);
                     tube_marker_pub.publish(marker_array);
                     tube->getCylinderPoses(posearray);
@@ -137,7 +125,7 @@ int main(int argc, char **argv)
                     ps.header.stamp = ros::Time::now();
                     ps.pose = pick_pose;
                     pose_pub.publish(ps);
-                    //posearray = ga.tube_traj_;
+                    //posearray = ga._tube_traj;
                     posearray = ga.grasp_pose_array;
                     //posearray.poses.push_back(tube->getPose());
                     //posearray.poses.push_back(tube->getPose());

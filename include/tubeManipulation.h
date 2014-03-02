@@ -11,11 +11,16 @@
 #include <geometry_msgs/Pose.h>
 #include <tf/tf.h>
 #include <arm_navigation_msgs/FilterJointTrajectory.h>
+#include <arm_navigation_msgs/PlanningScene.h>
+#include <arm_navigation_msgs/SetPlanningSceneDiff.h>
+#include <arm_navigation_msgs/GetPlanningScene.h>
+#include <planning_environment/models/collision_models.h>
 #include <vector>
 
 #include "utility.h"
 
 #define MAX_JOINT_VEL 0.5
+#define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
 
 /*! \brief  Simple action server client definition for JointTrajectoryAction */
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryAction> TrajClient;
@@ -52,10 +57,13 @@ public:
     void setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array);
     void setWristOffset(tf::Transform &right_offset, tf::Transform &left_offset);
     void setWristOffset(geometry_msgs::Pose &right_offset, geometry_msgs::Pose &left_offset);
+    bool isStateValid(arm_navigation_msgs::AttachedCollisionObject &attachedObj);
 
 private:
     TrajClient* _traj_client_r; /*!< Right arm trajectory action client. */
     TrajClient* _traj_client_l; /*!< Left arm trajectory action client. */
+    ros::ServiceClient _set_pln_scn_client; /*!< set planning scene diff */
+    ros::ServiceClient _get_pln_scn_client; /*!< get planning scene diff */
     ros::ServiceClient _ik_client_r; /*!< Right arm IK client. */
     ros::ServiceClient _ik_client_l; /*!< Left arm IK client. */
     ros::ServiceClient _smpl_ik_client_r; /*!< Left arm IK client. */
@@ -68,6 +76,7 @@ private:
     tf::Transform _left_wrist_offset; /*!< Offset of left arm wrist_roll link from object. */
     tf::Transform _right_wrist_offset; /*!< Offset of right arm wrist_roll link from object. */
     geometry_msgs::PoseArray _obj_pose_traj; /*!< Pose trajectory of an object. */
+    ros::Publisher _scene_pub;
 
     void _get_right_goal();
     void _get_left_goal();
@@ -94,6 +103,9 @@ private:
                           std::vector<double> &seed_state);
     bool _gen_trarajectory(std::vector<double> &right_joint_traj,
                            std::vector<double> &left_joint_traj);
+    bool _is_state_valid(std::vector<double> &right_joints,
+                         std::vector<double> &left_joints);
+    bool _is_state_valid();
 };
 
 #endif // TUBEMANIPULATION_H

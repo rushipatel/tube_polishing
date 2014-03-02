@@ -23,6 +23,9 @@ TubeManipulation::TubeManipulation(ros::NodeHandlePtr rh)
     ros::service::waitForService("pr2_left_arm_kinematics/get_constraint_aware_ik");
     ros::service::waitForService("pr2_left_arm_kinematics/get_ik");
     ros::service::waitForService("trajectory_filter_unnormalizer/filter_trajectory");
+
+    _set_pln_scn_client = rh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
+    _get_pln_scn_client = rh->serviceClient<arm_navigation_msgs::GetPlanningScene>(SET_PLANNING_SCENE_DIFF_NAME);
     _ik_client_r = rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_right_arm_kinematics/get_constraint_aware_ik");
     _smpl_ik_client_r = rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_right_arm_kinematics/get_ik");
     _query_client_r = rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_right_arm_kinematics/get_ik_solver_info");
@@ -30,6 +33,13 @@ TubeManipulation::TubeManipulation(ros::NodeHandlePtr rh)
     _smpl_ik_client_l = rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_left_arm_kinematics/get_ik");
     _query_client_l = rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_left_arm_kinematics/get_ik_solver_info");
     _filter_trajectory_client = rh->serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
+
+    arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
+    arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
+    if(!_set_pln_scn_client.call(planning_scene_req, planning_scene_res))
+        ROS_ERROR("Can't set planning scene");
+
+    _scene_pub = rh->advertise<visualization_msgs::MarkerArray>("state_validity_marker", 128);
 }
 
 void TubeManipulation::setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array)
@@ -76,7 +86,7 @@ void TubeManipulation::_get_left_joints(std::vector<double> &joint_state)
       ("l_arm_controller/state");
     joint_state.clear();
     joint_state.resize(7);
-    //extract the joint angles from it
+    //extract the joint angles from message
     for(unsigned int i=0; i<7; i++)
       joint_state[i] = state_msg->actual.positions[i];
 }
@@ -84,24 +94,24 @@ void TubeManipulation::_get_left_joints(std::vector<double> &joint_state)
 void TubeManipulation::_get_default_right_joints(std::vector<double> &joint_state)
 {
     joint_state.resize(7);
-    joint_state[0] = -1.5;
+    joint_state[0] = 0;
     joint_state[1] = 0;
     joint_state[2] = 0;
     joint_state[3] = 0;
-    joint_state[4] = -0.15;
-    joint_state[5] = -0.1;
+    joint_state[4] = 0;
+    joint_state[5] = 0;
     joint_state[6] = 0;
 }
 
 void TubeManipulation::_get_default_left_joints(std::vector<double> &joint_state)
 {
     joint_state.resize(7);
-    joint_state[0] = 1.5;
+    joint_state[0] = 0;
     joint_state[1] = 0;
     joint_state[2] = 0;
     joint_state[3] = 0;
-    joint_state[4] = -0.15;
-    joint_state[5] = -0.1;
+    joint_state[4] = 0;
+    joint_state[5] = 0;
     joint_state[6] = 0;
 }
 
@@ -1076,4 +1086,83 @@ bool TubeManipulation::_get_simple_left_arm_ik(geometry_msgs::Pose pose,
       return false;
     }
     return true;
+}
+
+bool TubeManipulation::_is_state_valid(std::vector<double> &right_joints, std::vector<double> &left_joints)
+{
+    arm_navigation_msgs::GetPlanningScene::Request planning_scene_req;
+    arm_navigation_msgs::GetPlanningScene::Response planning_scene_res;
+    if(!_get_pln_scn_client.call(planning_scene_req, planning_scene_res))
+        ROS_ERROR("Can't get planning scene");
+    planning_environment::CollisionModels collision_models("robot_description");
+    planning_models::KinematicState* state = collision_models.setPlanningScene(planning_scene_res.planning_scene);
+
+    std::vector<std::string> right_joint_names = collision_models.getKinematicModel()->getModelGroup("right_arm")->getJointModelNames();
+    std::vector<std::string> left_joint_names = collision_models.getKinematicModel()->getModelGroup("right_arm")->getJointModelNames();
+
+    std::map<std::string, double> joint_values;
+
+    if(right_joints.size()==right_joint_names.size())
+    {
+        for(size_t i=0; i<right_joint_names.size(); i++)
+            joint_values[right_joint_names[i].c_str()] = right_joints[i];
+    }
+    else
+    {
+        ROS_ERROR("TubeManipulation - Not enough joint values");
+        return false;
+    }
+
+    if(left_joints.size()==left_joint_names.size())
+    {
+        for(size_t i=0; i<left_joint_names.size(); i++)
+            joint_values[left_joint_names[i].c_str()] = left_joints[i];
+    }
+    else
+    {
+        ROS_ERROR("TubeManipulation - Not enough joint values");
+        return false;
+    }
+
+    std::vector<std::string> joint_names = right_joint_names;
+    for(size_t i=0; i<left_joint_names.size(); i++)
+        joint_names.push_back(left_joint_names[i]);
+
+    //state->setKinematicState(joint_values);
+    /*if(!state->areJointsWithinBounds(joint_names))
+    {
+        ROS_ERROR("TubeManipulation - Joints are ot of bound");
+        return false;
+    }
+    if(!collision_models.isKinematicStateInCollision(*state))
+    {
+        ROS_ERROR("TubeManipulation - kinematic state is in collision");
+        return false;
+    }*/
+
+    std_msgs::ColorRGBA color;
+    color.a = 1;
+    color.g = 1;
+    visualization_msgs::MarkerArray arr;
+    collision_models.getAttachedCollisionObjectMarkers(*state, arr, "left_arms",color,ros::Duration(5));
+
+    _scene_pub.publish(arr);
+
+    return true;
+}
+
+bool TubeManipulation::isStateValid(arm_navigation_msgs::AttachedCollisionObject &attachedObj)
+{
+    arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
+    arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
+
+    planning_scene_req.planning_scene_diff.attached_collision_objects.push_back(attachedObj);
+
+    if(!_set_pln_scn_client.call(planning_scene_req, planning_scene_res))
+        ROS_ERROR("Can't set planning scene");
+
+    std::vector<double> right_joints, left_joints;
+    _get_right_joints(right_joints);
+    _get_left_joints(left_joints);
+    return _is_state_valid(right_joints, left_joints);
 }

@@ -6,6 +6,7 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
+#include <arm_navigation_msgs/AttachedCollisionObject.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <pcl/ros/conversions.h>
 #include <Eigen/Core>
@@ -52,25 +53,17 @@ namespace TubePerception
         float radius;
         bool isStrong;
 
-        //tf::Vector3 axisVector; //Global
         tf::Vector3 getAxisVector();
         float getAxisLength();
-        //std::vector<int> neighbourCylinders;
         pcl::ModelCoefficients coefficients; // global
         tf::Transform getLocalTransform(void); //tf to last (strong) cylinder in vector(array)
         geometry_msgs::Pose getLocalPose(void);
         tf::Vector3 getLocalAxisVector(void); // in a tube frame
-
-        //tf::Transform getGlobalTransform(void);
         void setLocalPose(geometry_msgs::Pose &pose);
         void setLocalPose(tf::Transform &t);
-        geometry_msgs::Pose getGlobalPose(void);
-        //void setGlobalPose(geometry_msgs::Pose &pose);
 
     private:
-
-        //geometry_msgs::Pose global_pose_; //in global frame that is point cloud frame (base_link)
-        geometry_msgs::Pose local_pose_;  //Local to first (strong) cylinder in vector(array)
+        geometry_msgs::Pose _local_pose;  //Local to first (strong) cylinder in vector(array)
     };
     
     /*class WorkTrajectory
@@ -90,6 +83,8 @@ namespace TubePerception
         std::vector<TubePerception::Cylinder> cylinders;
         geometry_msgs::Pose getPose(void);
         void setPose(geometry_msgs::Pose &pose);
+        void setPoseAsActualPose(); //copies pose in to actual pose
+        geometry_msgs::Pose getActualPose();
         tf::Transform getTransform();
         typedef boost::shared_ptr<TubePerception::Tube> Ptr;
         pcl::PointCloud<PointT>::Ptr tubeCloud;  //Do NOT use outside of Perception
@@ -102,9 +97,22 @@ namespace TubePerception
         geometry_msgs::Pose getCylinderGlobalPose(unsigned int cylIdx);
         void getCylinderMarker(visualization_msgs::MarkerArray &markerArray);
         void getCylinderPoses(geometry_msgs::PoseArray &pose_array);
+
+        arm_navigation_msgs::AttachedCollisionObject
+        getAttachedObjForRightGrasp(geometry_msgs::Pose &right_grasp_pose);
+
+        arm_navigation_msgs::AttachedCollisionObject
+        getAttachedObjForLeftGrasp(geometry_msgs::Pose &left_grasp_pose);
+
+        arm_navigation_msgs::AttachedCollisionObject
+        getAttachedObjForBothGrasps(geometry_msgs::Pose &right_grasp_pose);
+
     protected:
-        geometry_msgs::Pose pose_;  //in global(base_link) frame. actual pose
-        geometry_msgs::Pose virtual_pose_;  //not actual pose
+        geometry_msgs::Pose _pose;  //in global(base_link) frame.
+        geometry_msgs::Pose _actual_pose; //in global(base_link)
+        void _get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj, geometry_msgs::Pose &grasp_pose,
+                                            std::string link_name,
+                                            bool right_side, bool left_side);
     };
 
     class CloudProcessing
@@ -113,15 +121,15 @@ namespace TubePerception
 
         CloudProcessing(TubePerception::Tube::Ptr tube_ptr)
         {
-            tube_ = tube_ptr;
-            num_of_points_ = tube_->tubeCloud->points.size();
-            r_ = 0;
-            strong_line_thr_ = 0.2;
-            weak_line_thr_ = 0.1;
-            min_points_ = 0.05;
-            z_error_ = 0;
+            _tube = tube_ptr;
+            _num_of_points = _tube->tubeCloud->points.size();
+            _r = 0;
+            _strong_line_thr = 0.2;
+            _weak_line_thr = 0.1;
+            _min_points = 0.05;
+            _z_error = 0;
 
-            processCloud_();
+            _process_cloud();
         }
         //CloudProcessing(sensor_msgs::PointCloud2 &tubeCloud, geometry_msgs::Pose sensorPose);
         //~CloudProcessing();
@@ -137,33 +145,29 @@ namespace TubePerception
         void dispalyWorkTraj(void);
 
     private:
-        void processCloud_(void);
-        void estimate_normals_(void);
-        void get_radius_(void);
-        void collaps_normals_(void);
-        bool find_line_(pcl::PointIndices::Ptr inliers, Cylinder *cyl);
-        void remove_inliers_(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices);
-        void remove_inliers_(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices);
-        void get_line_points_(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2);
-        void segmentize_axis_(void);
-        void compensate_error_(void);
-        void cylinder_filter_(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers);
-        float is_in_cylinder_( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt );
-        void get_line_graph_(void);
-        void print_line_graph_(void);
-        void add_neighbour_(int cyl_ind, int neighbour_ind);
-        tf::Vector3 get_perp_vec3_(tf::Vector3 v3);
-        void define_pose_(void);
-        void define_pose2_(void);
-        void generate_work_vectors_();
-        float r_;
-        float strong_line_thr_;
-        float min_points_;
-        float weak_line_thr_;
-        pcl::PointCloud<PointT>::Ptr raw_axis_points_;
-        float z_error_;
-        int num_of_points_;
-        TubePerception::Tube::Ptr tube_;
+        void _process_cloud(void);
+        void _estimate_normals(void);
+        void _get_radius(void);
+        void _collaps_normals(void);
+        bool _find_line(pcl::PointIndices::Ptr inliers, Cylinder *cyl);
+        void _remove_inliers(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices);
+        void _remove_inliers(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices);
+        void _get_line_points(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2);
+        void _segmentize_axis(void);
+        void _compensate_error(void);
+        void _cylinder_filter(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers);
+        float _is_in_cylinder( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt );
+        tf::Vector3 _get_perp_vec3(tf::Vector3 v3);
+        void _define_pose(void);
+        void _generate_work_vectors();
+        float _r;
+        float _strong_line_thr; //not being used. please remove.
+        float _min_points;
+        float _weak_line_thr; //not being used. please remove.
+        pcl::PointCloud<PointT>::Ptr _raw_axis_points;
+        float _z_error;
+        int _num_of_points;
+        TubePerception::Tube::Ptr _tube;
     };
 
 }
