@@ -39,7 +39,7 @@ TubeManipulation::TubeManipulation(ros::NodeHandlePtr rh)
     if(!_set_pln_scn_client.call(planning_scene_req, planning_scene_res))
         ROS_ERROR("Can't set planning scene");
 
-    _scene_pub = rh->advertise<visualization_msgs::MarkerArray>("state_validity_marker", 128);
+    _scene_pub = rh->advertise<visualization_msgs::MarkerArray>("tube_polishing/state_validity_marker", 128);
 }
 
 void TubeManipulation::setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array)
@@ -1161,8 +1161,9 @@ bool TubeManipulation::isStateValid(arm_navigation_msgs::AttachedCollisionObject
     if(!_set_pln_scn_client.call(planning_scene_req, planning_scene_res))
         ROS_ERROR("Can't set planning scene");
 
-    std::vector<double> right_joints, left_joints;
+    return true;
+    /*&std::vector<double> right_joints, left_joints;
     _get_right_joints(right_joints);
     _get_left_joints(left_joints);
-    return _is_state_valid(right_joints, left_joints);
+    return _is_state_valid(right_joints, left_joints);*/
 }
