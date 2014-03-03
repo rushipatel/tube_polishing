@@ -211,7 +211,8 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
     {
         pose = cylinders[i].getLocalPose();
         tube2cyl = pose2tf(pose);
-        wrist2cyl = tube2cyl.inverseTimes(tube2wrist);
+        //wrist2cyl = tube2cyl.inverseTimes(tube2wrist);
+        wrist2cyl = tube2wrist.inverseTimes(tube2cyl);
         pose = tf2pose(wrist2cyl);
         cyl_shape.dimensions[0] = cylinders[i].radius;
         cyl_shape.dimensions[1] = cylinders[i].getAxisLength();

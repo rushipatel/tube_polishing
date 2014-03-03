@@ -164,7 +164,7 @@ int main(int argc, char **argv)
         posestamped.header.stamp = ros::Time::now();
         pose_pub.publish(posestamped);
         ROS_INFO_STREAM(" "<<cnt);
-        tube->setPose(posearray.poses[cnt]);
+        //tube->setPose(posearray.poses[cnt]);
         tube->getCylinderMarker(marker_array);
         tube_marker_pub.publish(marker_array);
     }

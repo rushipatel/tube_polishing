@@ -1155,6 +1155,30 @@ bool TubeManipulation::isStateValid(arm_navigation_msgs::AttachedCollisionObject
 {
     arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
+    
+    arm_navigation_msgs::AttachedCollisionObject obj;
+    obj.link_name = "r_wrist_roll_link";
+    obj.touch_links.push_back("r_end_effector");
+    obj.object.header.frame_id = "r_wrist_roll_link";
+    obj.object.header.stamp = ros::Time::now();
+    obj.object.id = "cylinder";
+    geometry_msgs::Pose pose;
+    pose.position.x = 0;
+    pose.position.y = 0;
+    pose.position.z = 0;
+    pose.orientation.x = 0;
+    pose.orientation.y = 0;
+    pose.orientation.z = 0;
+    pose.orientation.w = 1;
+    obj.object.poses.push_back(pose);
+    
+    arm_navigation_msgs::Shape shape;
+    shape.dimensions.resize(2);
+    shape.dimensions[0] = 0.01;
+    shape.dimensions[1] = 1;
+    shape.type = arm_navigation_msgs::Shape::CYLINDER;
+    
+    obj.object.shapes.push_back(shape);
 
     planning_scene_req.planning_scene_diff.attached_collision_objects.push_back(attachedObj);
 

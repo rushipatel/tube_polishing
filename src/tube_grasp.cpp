@@ -76,39 +76,25 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     r_grpr.open();
     l_grpr.open();
     TubeManipulation da(nodeHandle);
-    if(!da.simpleMoveLeftArm(aprh_pose))
-    {
-        da.simpleMoveRightArm(aprh_pose);
-        ros::Duration(5).sleep();
-        da.simpleMoveRightArm(pick_pose);
-        ros::Duration(3).sleep();
-        l_grpr.open();
-        l_grpr.setPosition(_tube->cylinders[0].radius*1.95,100);
-        ros::Duration(5).sleep();
+    
+    if(!da.simpleMoveRightArm(aprh_pose))
+        ROS_WARN("No IK");
+    ros::Duration(5).sleep();
+    if(!da.simpleMoveRightArm(pick_pose))
+        ROS_WARN("No IK");
+    ros::Duration(3).sleep();
+    l_grpr.open();
+    l_grpr.setPosition(_tube->cylinders[0].radius*1.95,100);
+    ros::Duration(5).sleep();
 
-        tf::Transform grasp, tube = _tube->getTransform();
-        grasp = tube.inverseTimes(p);
-        geometry_msgs::Pose pose__ = tf2pose(grasp);
-        arm_navigation_msgs::AttachedCollisionObject obj = _tube->getAttachedObjForRightGrasp(pose__);
-        da.isStateValid(obj);
-        da.simpleMoveRightArm(aprh_pose);
-    }
-    else
-    {
-        ros::Duration(5).sleep();
-        r_grpr.open();
-        ros::Duration(3).sleep();
-        da.simpleMoveLeftArm(pick_pose);
-        r_grpr.setPosition(_tube->cylinders[0].radius*1.95,100);
-        ros::Duration(5).sleep();
-
-        tf::Transform grasp, tube = _tube->getTransform();
-        grasp = tube.inverseTimes(p);
-        geometry_msgs::Pose pose__ = tf2pose(grasp);
-        arm_navigation_msgs::AttachedCollisionObject obj = _tube->getAttachedObjForLeftGrasp(pose__);
-        da.isStateValid(obj);
-        da.simpleMoveLeftArm(aprh_pose);
-    }
+    tf::Transform grasp, tube = _tube->getTransform();
+    grasp = tube.inverseTimes(p);
+    geometry_msgs::Pose pose__ = tf2pose(grasp);
+    arm_navigation_msgs::AttachedCollisionObject obj = _tube->getAttachedObjForRightGrasp(pose__);
+    da.isStateValid(obj);
+    da.simpleMoveRightArm(aprh_pose);
+    r_grpr.open();
+    l_grpr.open();
 }
 
 //returns global pick pose
