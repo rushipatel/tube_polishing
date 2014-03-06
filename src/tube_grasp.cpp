@@ -1,14 +1,10 @@
 #include "tubeGrasp.h"
 #include "math.h"
+#include "grasp.h"
 
 
 namespace TubeGrasp
 {
-
-Grasp::Grasp()
-{
-}
-
 GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh)
 {
     //_grasp_array = grasp_array;
@@ -56,8 +52,8 @@ void GraspAnalysis::analyze()
     _grasp_array->grasps.clear();
     _gen_grasps(_axis_step_size, _circular_steps, _grasp_array);
     _gen_test_pairs();
-    //_test_pairs_for_ik();
-    //_compute_metric();
+    _test_pairs_for_ik();
+    _compute_metric();
 }
 
 void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
@@ -75,28 +71,56 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     Gripper r_grpr("right_arm"), l_grpr("left_arm");
     r_grpr.open();
     l_grpr.open();
+    ros::Duration(5).sleep();
+
+
     TubeManipulation da(nodeHandle);
     
-    if(!da.simpleMoveRightArm(aprh_pose))
-        ROS_WARN("No IK");
-    ros::Duration(1).sleep();
-    if(!da.simpleMoveRightArm(pick_pose))
-        ROS_WARN("No IK");
-    ros::Duration(1).sleep();
-    //l_grpr.open();
-    //r_grpr.setPosition(_tube->cylinders[0].radius*1.95,100);
-    //ros::Duration(4).sleep();
+    if(da.simpleMoveRightArm(aprh_pose))
+    {
+        ros::Duration(2).sleep();
+        if(da.simpleMoveRightArm(pick_pose))
+        {
+            ros::Duration(1).sleep();
+            r_grpr.setPosition(_tube->cylinders[0].radius*1.95,100);
+            tf::Transform grasp, tube = _tube->getTransform();
+            grasp = tube.inverseTimes(p);
+            geometry_msgs::Pose pose__ = tf2pose(grasp);
+            arm_navigation_msgs::AttachedCollisionObject obj =
+                    _tube->getAttachedObjForRightGrasp(pose__);
 
-    tf::Transform grasp, tube = _tube->getTransform();
-    grasp = tube.inverseTimes(p);
-    geometry_msgs::Pose pose__ = tf2pose(grasp);
-    arm_navigation_msgs::AttachedCollisionObject obj = _tube->getAttachedObjForRightGrasp(pose__);
-    da.isStateValid(obj);
-    ros::Duration(2).sleep();
-    da.simpleMoveRightArm(aprh_pose);
-    da.isStateValid(obj);
-    //r_grpr.open();
-    //l_grpr.open();
+            //if(da.isStateValid(obj))
+               // ;
+            ROS_INFO("Object is attched. waiting for 5 secs");
+            ros::Duration(5).sleep();
+            da.simpleMoveRightArm(aprh_pose);
+            ROS_INFO("Moved back to approach position. check Object again in rviz");
+            //if(da.isStateValid(obj))
+              //  ROS_INFO("looks good");
+            geometry_msgs::Pose new_tube_pose;
+            da._get_regrasp_pose_right(pose__,aprh_pose,_valid_pairs->graspPairs[_best_pair_idx].rightGrasp.wristPose,_valid_pairs->graspPairs[_best_pair_idx].leftGrasp.wristPose, new_tube_pose);
+            pickPose = new_tube_pose;
+            tube = pose2tf(new_tube_pose);
+            _tube->setPose(new_tube_pose);
+            geometry_msgs::Pose new_wrist_pose = tube * pose2tf(pose__);
+            arm_navigation_msgs::AttachedCollisionObject obj =
+                    _tube->getAttachedObjForRightGrasp(pose__);
+            //da.isStateValid(obj);
+            da.moveRightArm(new_wrist_pose);
+            ros::Duration(3).sleep();
+            r_grpr.open();
+        }
+        else
+        {
+            ROS_INFO("IK issue 2");
+            return;
+        }
+    }
+    else
+    {
+        ROS_INFO("IK issue 1");
+        return;
+    }
 }
 
 //returns global pick pose
@@ -539,6 +563,7 @@ void GraspAnalysis::_compute_metric()
         }
     }
     ROS_WARN_STREAM("Best Grasp Pair index: "<<best_grasp);
+    _best_pair_idx = best_grasp;
     /*dualArms da(nodeHandle);
     da.objPoseTraj = _tube_traj;
     da.rightWristOffset = pose2tf(_valid_pairs->graspPairs[best_grasp].rightGrasp.wristPose);

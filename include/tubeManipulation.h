@@ -4,6 +4,7 @@
 #include <pr2_controllers_msgs/JointTrajectoryAction.h>
 #include <pr2_controllers_msgs/JointTrajectoryControllerState.h>
 #include <actionlib/client/simple_action_client.h>
+#include <kinematics_msgs/GetPositionFK.h>
 #include <kinematics_msgs/GetConstraintAwarePositionIK.h>
 #include <kinematics_msgs/GetPositionIK.h>
 #include <kinematics_msgs/GetKinematicSolverInfo.h>
@@ -14,12 +15,13 @@
 #include <arm_navigation_msgs/PlanningScene.h>
 #include <arm_navigation_msgs/SetPlanningSceneDiff.h>
 #include <arm_navigation_msgs/GetPlanningScene.h>
+#include <arm_navigation_msgs/RobotState.h> //don't need it.
 #include <planning_environment/models/collision_models.h>
 #include <vector>
 
 #include "utility.h"
 
-#define MAX_JOINT_VEL 0.5
+#define MAX_JOINT_VEL 0.2
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
 
 /*! \brief  Simple action server client definition for JointTrajectoryAction */
@@ -57,7 +59,12 @@ public:
     void setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array);
     void setWristOffset(tf::Transform &right_offset, tf::Transform &left_offset);
     void setWristOffset(geometry_msgs::Pose &right_offset, geometry_msgs::Pose &left_offset);
-    bool isStateValid(arm_navigation_msgs::AttachedCollisionObject &attachedObj);
+    bool isStateValid(arm_navigation_msgs::AttachedCollisionObject attachedObj);
+    bool _get_regrasp_pose_right(geometry_msgs::Pose crnt_grasp,
+                                 geometry_msgs::Pose wrist_pose,
+                                 geometry_msgs::Pose right_grasp,
+                                 geometry_msgs::Pose left_grasp,
+                                 geometry_msgs::Pose &obj_pose_out);
 
 private:
     TrajClient* _traj_client_r; /*!< Right arm trajectory action client. */
@@ -66,6 +73,8 @@ private:
     ros::ServiceClient _get_pln_scn_client; /*!< get planning scene diff */
     ros::ServiceClient _ik_client_r; /*!< Right arm IK client. */
     ros::ServiceClient _ik_client_l; /*!< Left arm IK client. */
+    ros::ServiceClient _fk_client_r;
+    ros::ServiceClient _fk_client_l;
     ros::ServiceClient _smpl_ik_client_r; /*!< Left arm IK client. */
     ros::ServiceClient _smpl_ik_client_l; /*!< Left arm IK client. */
     ros::ServiceClient _query_client_r; /*!< Right arm kinematic solver info query client. */
@@ -92,21 +101,29 @@ private:
     bool _get_right_arm_ik(geometry_msgs::Pose pose,
                           sensor_msgs::JointState &joint_state,
                           std::vector<double> &seed_state);
-    bool _get_simple_right_arm_ik(geometry_msgs::Pose pose,
+    bool _get_simple_right_arm_ik(geometry_msgs::Pose &pose,
                           sensor_msgs::JointState &joint_state,
                           std::vector<double> &seed_state);
+    bool _get_simple_right_arm_ik(geometry_msgs::Pose &pose,
+                                  std::vector<double> &joints,
+                                  std::vector<double> &seed_state);
     bool _get_left_arm_ik(geometry_msgs::Pose pose,
                           sensor_msgs::JointState &joint_state,
                           std::vector<double> &seed_state);
-    bool _get_simple_left_arm_ik(geometry_msgs::Pose pose,
+    bool _get_simple_left_arm_ik(geometry_msgs::Pose &pose,
                           sensor_msgs::JointState &joint_state,
                           std::vector<double> &seed_state);
+    bool _get_simple_left_arm_ik(geometry_msgs::Pose &pose,
+                                  std::vector<double> &joints,
+                                  std::vector<double> &seed_state);
     bool _gen_trarajectory(std::vector<double> &right_joint_traj,
                            std::vector<double> &left_joint_traj);
     bool _is_state_valid(std::vector<double> &right_joints,
                          std::vector<double> &left_joints, 
-                         arm_navigation_msgs::AttachedCollisionObject &attachedObj);
-    bool _is_state_valid();
+                         arm_navigation_msgs::GetPlanningScene::Request req);
+    geometry_msgs::Pose _get_right_fk(std::vector<double> &joints);
+    geometry_msgs::Pose _get_left_fk(std::vector<double> &joints);
+
 };
 
 #endif // TUBEMANIPULATION_H

@@ -125,6 +125,9 @@ int main(int argc, char **argv)
                     ps.header.stamp = ros::Time::now();
                     ps.pose = pick_pose;
                     pose_pub.publish(ps);
+                    tube->setPose(pick_pose);
+                    tube->getCylinderMarker(marker_array);
+                    tube_marker_pub.publish(marker_array);
                     //posearray = ga._tube_traj;
                     posearray = ga.grasp_pose_array;
                     //posearray.poses.push_back(tube->getPose());
