@@ -183,8 +183,8 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
                                      std::string link_name,
                                      bool right_side, bool left_side)
 {
-    obj.link_name = link_name;
-    obj.object.header.frame_id = link_name;
+    obj.link_name = "r_wrist_roll_link"; //link_name.c_str();
+    obj.object.header.frame_id = "r_wrist_roll_link"; //link_name.c_str();
 
     if(link_name.compare("r_wrist_roll_link"))
         right_side = true;

@@ -507,16 +507,26 @@ bool TubeManipulation::moveRightArm(geometry_msgs::Pose pose)
         traj_goal.trajectory.joint_names.push_back("r_wrist_roll_joint");
         goal.positions.resize(7);
         goal.velocities.resize(7);
-        for(int j=0; j<7; j++)
+        for(int i=0; i<7; i++)
         {
-            goal.positions[j] = joint_state.position[j];
-            goal.velocities[j] = 0.0;
+            goal.positions[i] = joint_state.position[i];
+            goal.velocities[i] = 0.0;
         }
         goal.time_from_start = ros::Duration(0.0);
         traj_goal.trajectory.points[0] = goal;
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
         _traj_client_r->sendGoalAndWait(traj_goal);
+        std::vector<double> joints(7);
+        double err = 1;
+        while(err>0.01)
+        {
+            _get_right_joints(joints);
+            err = 0;
+            for(int i=0; i<joints.size(); i++)
+                err += joints[i] - goal.positions[i];
+            ros::Duration(0.1).sleep();
+        }
     }
     else
         return 0;
@@ -549,16 +559,27 @@ bool TubeManipulation::moveLeftArm(geometry_msgs::Pose pose)
         traj_goal.trajectory.joint_names.push_back("l_wrist_roll_joint");
         goal.positions.resize(7);
         goal.velocities.resize(7);
-        for(int j=0; j<7; j++)
+        for(int i=0; i<7; i++)
         {
-            goal.positions[j] = joint_state.position[j];
-            goal.velocities[j] = 0.0;
+            goal.positions[i] = joint_state.position[i];
+            goal.velocities[i] = 0.0;
         }
         goal.time_from_start = ros::Duration(0.0);
         traj_goal.trajectory.points[0] = goal;
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
         _traj_client_l->sendGoalAndWait(traj_goal);
+        
+        std::vector<double> joints(7);
+        double err = 1;
+        while(err>0.01)
+        {
+            _get_left_joints(joints);
+            err = 0;
+            for(int i=0; i<joints.size(); i++)
+                err += joints[i] - goal.positions[i];
+            ros::Duration(0.1).sleep();
+        }
     }
     else
         return 0;
@@ -601,6 +622,18 @@ bool TubeManipulation::simpleMoveRightArm(geometry_msgs::Pose pose)
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
         _traj_client_r->sendGoalAndWait(traj_goal);
+        std::vector<double> joints(7);
+        double err = 1;
+        while(err>0.01)
+        {
+            _get_right_joints(joints);
+            err = 0;
+            for(int i=0; i<joints.size(); i++)
+            {  err += joints[i] - goal.positions[i]; std::cout<<err<<" ";}
+            ros::Duration(0.1).sleep();
+        }
+        ros::Duration(1).sleep();
+        ROS_INFO("set");
     }
     else
         return 0;
@@ -643,6 +676,17 @@ bool TubeManipulation::simpleMoveLeftArm(geometry_msgs::Pose pose)
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
         _traj_client_l->sendGoalAndWait(traj_goal);
+        std::vector<double> joints(7);
+        double err = 1;
+        while(err>0.01)
+        {
+            _get_left_joints(joints);
+            err = 0;
+            for(int i=0; i<joints.size(); i++)
+                err += joints[i] - goal.positions[i];
+            ros::Duration(0.1).sleep();
+        }
+        ros::Duration(1).sleep();
     }
     else
         return 0;
@@ -1088,17 +1132,20 @@ bool TubeManipulation::_get_simple_left_arm_ik(geometry_msgs::Pose pose,
     return true;
 }
 
-bool TubeManipulation::_is_state_valid(std::vector<double> &right_joints, std::vector<double> &left_joints)
+bool TubeManipulation::_is_state_valid(std::vector<double> &right_joints, std::vector<double> &left_joints, arm_navigation_msgs::AttachedCollisionObject &attachedObj)
 {
     arm_navigation_msgs::GetPlanningScene::Request planning_scene_req;
     arm_navigation_msgs::GetPlanningScene::Response planning_scene_res;
+    planning_scene_req.planning_scene_diff.attached_collision_objects.push_back(attachedObj);
     if(!_get_pln_scn_client.call(planning_scene_req, planning_scene_res))
         ROS_ERROR("Can't get planning scene");
     planning_environment::CollisionModels collision_models("robot_description");
     planning_models::KinematicState* state = collision_models.setPlanningScene(planning_scene_res.planning_scene);
 
-    std::vector<std::string> right_joint_names = collision_models.getKinematicModel()->getModelGroup("right_arm")->getJointModelNames();
-    std::vector<std::string> left_joint_names = collision_models.getKinematicModel()->getModelGroup("right_arm")->getJointModelNames();
+    std::vector<std::string> right_joint_names = 
+            collision_models.getKinematicModel()->getModelGroup("right_arm")->getJointModelNames();
+    std::vector<std::string> left_joint_names = 
+            collision_models.getKinematicModel()->getModelGroup("left_arm")->getJointModelNames();
 
     std::map<std::string, double> joint_values;
 
@@ -1128,17 +1175,17 @@ bool TubeManipulation::_is_state_valid(std::vector<double> &right_joints, std::v
     for(size_t i=0; i<left_joint_names.size(); i++)
         joint_names.push_back(left_joint_names[i]);
 
-    //state->setKinematicState(joint_values);
-    /*if(!state->areJointsWithinBounds(joint_names))
+    state->setKinematicState(joint_values);
+    if(!state->areJointsWithinBounds(joint_names))
     {
-        ROS_ERROR("TubeManipulation - Joints are ot of bound");
+        ROS_WARN("TubeManipulation - Joints are ot of bound");
         return false;
     }
     if(!collision_models.isKinematicStateInCollision(*state))
     {
-        ROS_ERROR("TubeManipulation - kinematic state is in collision");
+        ROS_WARN("TubeManipulation - kinematic state is in collision");
         return false;
-    }*/
+    }
 
     std_msgs::ColorRGBA color;
     color.a = 1;
@@ -1163,7 +1210,7 @@ bool TubeManipulation::isStateValid(arm_navigation_msgs::AttachedCollisionObject
     obj.object.header.stamp = ros::Time::now();
     obj.object.id = "cylinder";
     geometry_msgs::Pose pose;
-    pose.position.x = 0;
+    pose.position.x = 0.18;
     pose.position.y = 0;
     pose.position.z = 0;
     pose.orientation.x = 0;
@@ -1174,20 +1221,24 @@ bool TubeManipulation::isStateValid(arm_navigation_msgs::AttachedCollisionObject
     
     arm_navigation_msgs::Shape shape;
     shape.dimensions.resize(2);
-    shape.dimensions[0] = 0.01;
-    shape.dimensions[1] = 1;
+    shape.dimensions[0] = 0.03;
+    shape.dimensions[1] = 0.4;
     shape.type = arm_navigation_msgs::Shape::CYLINDER;
     
     obj.object.shapes.push_back(shape);
 
-    planning_scene_req.planning_scene_diff.attached_collision_objects.push_back(attachedObj);
+    //planning_scene_req.planning_scene_diff.attached_collision_objects.push_back(obj);
 
-    if(!_set_pln_scn_client.call(planning_scene_req, planning_scene_res))
-        ROS_ERROR("Can't set planning scene");
+    /*if(!_set_pln_scn_client.call(planning_scene_req, planning_scene_res))
+        ROS_ERROR("Can't set planning scene");*/
 
-    return true;
-    /*&std::vector<double> right_joints, left_joints;
+    //return true;
+    std::vector<double> right_joints, left_joints;
     _get_right_joints(right_joints);
     _get_left_joints(left_joints);
-    return _is_state_valid(right_joints, left_joints);*/
+    if(_is_state_valid(right_joints, left_joints, attachedObj))
+    {
+        ROS_INFO("State is valid");
+        return true;
+    }
 }

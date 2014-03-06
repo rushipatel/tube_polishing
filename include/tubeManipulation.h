@@ -104,7 +104,8 @@ private:
     bool _gen_trarajectory(std::vector<double> &right_joint_traj,
                            std::vector<double> &left_joint_traj);
     bool _is_state_valid(std::vector<double> &right_joints,
-                         std::vector<double> &left_joints);
+                         std::vector<double> &left_joints, 
+                         arm_navigation_msgs::AttachedCollisionObject &attachedObj);
     bool _is_state_valid();
 };
 

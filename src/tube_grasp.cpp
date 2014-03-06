@@ -67,7 +67,7 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     
     tf::Transform p, a;
     a.setIdentity();
-    a.setOrigin(tf::Vector3(-0.2, 0, 0));
+    a.setOrigin(tf::Vector3(-0.3, 0, 0));
     p = pose2tf(pick_pose);
     a = p*a;
     aprh_pose = tf2pose(a);
@@ -79,22 +79,24 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     
     if(!da.simpleMoveRightArm(aprh_pose))
         ROS_WARN("No IK");
-    ros::Duration(5).sleep();
+    ros::Duration(1).sleep();
     if(!da.simpleMoveRightArm(pick_pose))
         ROS_WARN("No IK");
-    ros::Duration(3).sleep();
-    l_grpr.open();
-    l_grpr.setPosition(_tube->cylinders[0].radius*1.95,100);
-    ros::Duration(5).sleep();
+    ros::Duration(1).sleep();
+    //l_grpr.open();
+    //r_grpr.setPosition(_tube->cylinders[0].radius*1.95,100);
+    //ros::Duration(4).sleep();
 
     tf::Transform grasp, tube = _tube->getTransform();
     grasp = tube.inverseTimes(p);
     geometry_msgs::Pose pose__ = tf2pose(grasp);
     arm_navigation_msgs::AttachedCollisionObject obj = _tube->getAttachedObjForRightGrasp(pose__);
     da.isStateValid(obj);
+    ros::Duration(2).sleep();
     da.simpleMoveRightArm(aprh_pose);
-    r_grpr.open();
-    l_grpr.open();
+    da.isStateValid(obj);
+    //r_grpr.open();
+    //l_grpr.open();
 }
 
 //returns global pick pose
