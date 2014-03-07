@@ -4,7 +4,7 @@
 /*! \brief Constructor. Subscribes to various services.
  *
  */
-TubeManipulation::TubeManipulation(ros::NodeHandlePtr rh)
+TubeManipulation::Arms::Arms(ros::NodeHandlePtr rh)
 {
     _traj_client_r  = new TrajClient("r_arm_controller/joint_trajectory_action", true);
     _traj_client_l  = new TrajClient("l_arm_controller/joint_trajectory_action", true);
@@ -25,7 +25,6 @@ TubeManipulation::TubeManipulation(ros::NodeHandlePtr rh)
     ros::service::waitForService("trajectory_filter_unnormalizer/filter_trajectory");
 
     _set_pln_scn_client = rh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
-    _get_pln_scn_client = rh->serviceClient<arm_navigation_msgs::GetPlanningScene>(SET_PLANNING_SCENE_DIFF_NAME);
     _fk_client_r = rh->serviceClient<kinematics_msgs::GetPositionFK>("pr2_right_arm_kinematics/get_fk");
     _fk_client_l = rh->serviceClient<kinematics_msgs::GetPositionFK>("pr2_left_arm_kinematics/get_fk");
     _ik_client_r = rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_right_arm_kinematics/get_constraint_aware_ik");
@@ -34,28 +33,28 @@ TubeManipulation::TubeManipulation(ros::NodeHandlePtr rh)
     _ik_client_l = rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_left_arm_kinematics/get_constraint_aware_ik");
     _smpl_ik_client_l = rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_left_arm_kinematics/get_ik");
     _query_client_l = rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_left_arm_kinematics/get_ik_solver_info");
-    _filter_trajectory_client = rh->serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
+    _filter_trajectory_client =
+            rh->serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
 
     arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
     if(!_set_pln_scn_client.call(planning_scene_req, planning_scene_res))
         ROS_ERROR("Can't set planning scene");
 
-    _scene_pub = rh->advertise<visualization_msgs::MarkerArray>("tube_polishing/state_validity_marker", 128);
 }
 
-void TubeManipulation::setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array)
+void TubeManipulation::Arms::setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array)
 {
     _obj_pose_traj = pose_array;
 }
 
-void TubeManipulation::setWristOffset(tf::Transform &right_offset, tf::Transform &left_offset)
+void TubeManipulation::Arms::setWristOffset(tf::Transform &right_offset, tf::Transform &left_offset)
 {
     _right_wrist_offset = right_offset;
     _left_wrist_offset = left_offset;
 }
 
-void TubeManipulation::setWristOffset(geometry_msgs::Pose &right_offset, geometry_msgs::Pose &left_offset)
+void TubeManipulation::Arms::setWristOffset(geometry_msgs::Pose &right_offset, geometry_msgs::Pose &left_offset)
 {
     _right_wrist_offset = pose2tf(right_offset);
     _left_wrist_offset = pose2tf(left_offset);
@@ -64,7 +63,7 @@ void TubeManipulation::setWristOffset(geometry_msgs::Pose &right_offset, geometr
 /*! \brief Gets current joint angles from pr2 controller topics for initial IK seeds.
  *
  */
-void TubeManipulation::_get_right_joints(std::vector<double> &joint_state)
+void TubeManipulation::Arms::_get_right_joints(std::vector<double> &joint_state)
 {
     //get a single message from the topic 'r_arm_controller/state'
     pr2_controllers_msgs::JointTrajectoryControllerStateConstPtr state_msg =
@@ -80,7 +79,7 @@ void TubeManipulation::_get_right_joints(std::vector<double> &joint_state)
 /*! \brief Gets current joint angles from pr2 controller topics for initial IK seeds.
  *
  */
-void TubeManipulation::_get_left_joints(std::vector<double> &joint_state)
+void TubeManipulation::Arms::_get_left_joints(std::vector<double> &joint_state)
 {
     //get a single message from the topic 'l_arm_controller/state'
     pr2_controllers_msgs::JointTrajectoryControllerStateConstPtr state_msg =
@@ -93,7 +92,7 @@ void TubeManipulation::_get_left_joints(std::vector<double> &joint_state)
       joint_state[i] = state_msg->actual.positions[i];
 }
 
-void TubeManipulation::_get_default_right_joints(std::vector<double> &joint_state)
+void TubeManipulation::Arms::_get_default_right_joints(std::vector<double> &joint_state)
 {
     joint_state.resize(7);
     joint_state[0] = 0;
@@ -105,7 +104,7 @@ void TubeManipulation::_get_default_right_joints(std::vector<double> &joint_stat
     joint_state[6] = 0;
 }
 
-void TubeManipulation::_get_default_left_joints(std::vector<double> &joint_state)
+void TubeManipulation::Arms::_get_default_left_joints(std::vector<double> &joint_state)
 {
     joint_state.resize(7);
     joint_state[0] = 0;
@@ -117,7 +116,7 @@ void TubeManipulation::_get_default_left_joints(std::vector<double> &joint_state
     joint_state[6] = 0;
 }
 
-geometry_msgs::Pose TubeManipulation::_get_right_fk(std::vector<double> &joints)
+geometry_msgs::Pose TubeManipulation::Arms::_get_right_fk(std::vector<double> &joints)
 {
     kinematics_msgs::GetPositionFK::Request req;
     kinematics_msgs::GetPositionFK::Response res;
@@ -150,7 +149,7 @@ geometry_msgs::Pose TubeManipulation::_get_right_fk(std::vector<double> &joints)
     return pose_stamped.pose;
 }
 
-geometry_msgs::Pose TubeManipulation::_get_left_fk(std::vector<double> &joints)
+geometry_msgs::Pose TubeManipulation::Arms::_get_left_fk(std::vector<double> &joints)
 {
     kinematics_msgs::GetPositionFK::Request req;
     kinematics_msgs::GetPositionFK::Response res;
@@ -183,7 +182,7 @@ geometry_msgs::Pose TubeManipulation::_get_left_fk(std::vector<double> &joints)
     return pose_stamped.pose;
 }
 
-bool TubeManipulation::_gen_trarajectory(std::vector<double> &right_joint_traj, std::vector<double> &left_joint_traj)
+bool TubeManipulation::Arms::_gen_trarajectory(std::vector<double> &right_joint_traj, std::vector<double> &left_joint_traj)
 {
     _right_joint_traj.clear();
     _left_joint_traj.clear();
@@ -239,7 +238,7 @@ bool TubeManipulation::_gen_trarajectory(std::vector<double> &right_joint_traj, 
  *
  *  Returns false if IK fails at any trajectory point. This function must be called before calling executeTrajectory() function.
  */
-bool TubeManipulation::genTrajectory()
+bool TubeManipulation::Arms::genTrajectory()
 {
     _right_joint_traj.clear();
     _left_joint_traj.clear();
@@ -252,7 +251,7 @@ bool TubeManipulation::genTrajectory()
  *
  *  Returns false if IK fails at any trajectory point. This function must be called before calling executeTrajectory() function.
  */
-bool TubeManipulation::genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &lefttJointTraj)
+bool TubeManipulation::Arms::genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &lefttJointTraj)
 {
     rightJointTraj.clear();
     lefttJointTraj.clear();
@@ -265,7 +264,7 @@ bool TubeManipulation::genTrajectory(std::vector<double> &rightJointTraj, std::v
  *
  *  
  */
-void TubeManipulation::_call_right_joints_unnormalizer(void)
+void TubeManipulation::Arms::_call_right_joints_unnormalizer(void)
 {
     arm_navigation_msgs::FilterJointTrajectory::Request req;
     arm_navigation_msgs::FilterJointTrajectory::Response res;
@@ -327,7 +326,7 @@ void TubeManipulation::_call_right_joints_unnormalizer(void)
  *
  *  
  */
-void TubeManipulation::_call_left_joints_unnormalizer()
+void TubeManipulation::Arms::_call_left_joints_unnormalizer()
 {
     arm_navigation_msgs::FilterJointTrajectory::Request req;
     arm_navigation_msgs::FilterJointTrajectory::Response res;
@@ -389,7 +388,7 @@ void TubeManipulation::_call_left_joints_unnormalizer()
  *
  *  
  */
-void TubeManipulation::_get_right_goal()
+void TubeManipulation::Arms::_get_right_goal()
 {
     trajectory_msgs::JointTrajectoryPoint traj_point;
 
@@ -429,7 +428,7 @@ void TubeManipulation::_get_right_goal()
  *
  *  
  */
-void TubeManipulation::_get_left_goal()
+void TubeManipulation::Arms::_get_left_goal()
 {
     trajectory_msgs::JointTrajectoryPoint traj_point;
 
@@ -469,7 +468,7 @@ void TubeManipulation::_get_left_goal()
  *
  *  Note: MAX_JOINT_VEL=0.5 is defined in dualArms.h file.
  */
-void TubeManipulation::_sync_start_times(void)
+void TubeManipulation::Arms::_sync_start_times(void)
 {
     double max_right_joint_move = 0, max_left_joint_move = 0, max_joint_move=0;
     double time_from_start = 0.25;
@@ -507,7 +506,7 @@ void TubeManipulation::_sync_start_times(void)
  *
  *  Note: genTrajectory() function must be called before calling this function.
  */
-bool TubeManipulation::executeJointTrajectory()
+bool TubeManipulation::Arms::executeJointTrajectory()
 {
     _get_right_goal();
     _get_left_goal();
@@ -530,7 +529,7 @@ bool TubeManipulation::executeJointTrajectory()
  *
  *  Note: genTrajectory() function must be called before calling this function.
  */
-bool TubeManipulation::executeJointTrajectory(std::vector<double> &qRight, std::vector<double> &qLeft)
+bool TubeManipulation::Arms::executeJointTrajectory(std::vector<double> &qRight, std::vector<double> &qLeft)
 {
     _right_joint_traj = qRight;
     _left_joint_traj = qLeft;
@@ -554,7 +553,7 @@ bool TubeManipulation::executeJointTrajectory(std::vector<double> &qRight, std::
  *
  *
  */
-bool TubeManipulation::moveRightArm(geometry_msgs::Pose pose)
+bool TubeManipulation::Arms::moveRightArm(geometry_msgs::Pose pose)
 {
     std::vector<double> crnt_joints(7);
     pr2_controllers_msgs::JointTrajectoryGoal traj_goal;
@@ -607,7 +606,7 @@ bool TubeManipulation::moveRightArm(geometry_msgs::Pose pose)
  *
  *
  */
-bool TubeManipulation::moveLeftArm(geometry_msgs::Pose pose)
+bool TubeManipulation::Arms::moveLeftArm(geometry_msgs::Pose pose)
 {
     std::vector<double> crnt_joints(7);
     pr2_controllers_msgs::JointTrajectoryGoal traj_goal;
@@ -661,7 +660,7 @@ bool TubeManipulation::moveLeftArm(geometry_msgs::Pose pose)
  *
  *
  */
-bool TubeManipulation::simpleMoveRightArm(geometry_msgs::Pose pose)
+bool TubeManipulation::Arms::simpleMoveRightArm(geometry_msgs::Pose pose)
 {
     std::vector<double> crnt_joints(7);
     pr2_controllers_msgs::JointTrajectoryGoal traj_goal;
@@ -699,7 +698,7 @@ bool TubeManipulation::simpleMoveRightArm(geometry_msgs::Pose pose)
             _get_right_joints(joints);
             err = 0;
             for(int i=0; i<joints.size(); i++)
-            {  err += joints[i] - goal.positions[i]; std::cout<<err<<" ";}
+            {  err += joints[i] - goal.positions[i];/* std::cout<<err<<" ";*/}
             ros::Duration(0.1).sleep();
         }
         ros::Duration(1).sleep();
@@ -714,7 +713,7 @@ bool TubeManipulation::simpleMoveRightArm(geometry_msgs::Pose pose)
  *
  *
  */
-bool TubeManipulation::simpleMoveLeftArm(geometry_msgs::Pose pose)
+bool TubeManipulation::Arms::simpleMoveLeftArm(geometry_msgs::Pose pose)
 {
     std::vector<double> crnt_joints(7);
     pr2_controllers_msgs::JointTrajectoryGoal traj_goal;
@@ -904,7 +903,7 @@ bool TubeManipulation::simpleMoveLeftArm(geometry_msgs::Pose pose)
 //    return 1;
 //}
 
-bool TubeManipulation::getRightArmIK(geometry_msgs::Pose pose,
+bool TubeManipulation::Arms::getRightArmIK(geometry_msgs::Pose pose,
                              sensor_msgs::JointState &jointState)
 {
     std::vector<double> joints(7);
@@ -912,7 +911,7 @@ bool TubeManipulation::getRightArmIK(geometry_msgs::Pose pose,
     return(_get_right_arm_ik(pose, jointState, joints));
 }
 
-bool TubeManipulation::getSimpleRightArmIK(geometry_msgs::Pose pose,
+bool TubeManipulation::Arms::getSimpleRightArmIK(geometry_msgs::Pose pose,
                              sensor_msgs::JointState &jointState)
 {
     std::vector<double> joints(7);
@@ -920,8 +919,16 @@ bool TubeManipulation::getSimpleRightArmIK(geometry_msgs::Pose pose,
     return(_get_simple_right_arm_ik(pose, jointState, joints));
 }
 
+bool TubeManipulation::Arms::getSimpleRightArmIK(geometry_msgs::Pose pose,
+                             std::vector<double> &jointState)
+{
+    std::vector<double> joints(7);
+    _get_right_joints(joints);
+    return(_get_simple_right_arm_ik(pose, jointState, joints));
+}
 
-bool TubeManipulation::getLeftArmIK(geometry_msgs::Pose pose,
+
+bool TubeManipulation::Arms::getLeftArmIK(geometry_msgs::Pose pose,
                              sensor_msgs::JointState &jointState)
 {
     std::vector<double> joints(7);
@@ -929,7 +936,7 @@ bool TubeManipulation::getLeftArmIK(geometry_msgs::Pose pose,
     return(_get_left_arm_ik(pose, jointState, joints));
 }
 
-bool TubeManipulation::getSimpleLeftArmIK(geometry_msgs::Pose pose,
+bool TubeManipulation::Arms::getSimpleLeftArmIK(geometry_msgs::Pose pose,
                              sensor_msgs::JointState &jointState)
 {
     std::vector<double> joints(7);
@@ -937,7 +944,7 @@ bool TubeManipulation::getSimpleLeftArmIK(geometry_msgs::Pose pose,
     return(_get_simple_left_arm_ik(pose, jointState, joints));
 }
 
-bool TubeManipulation::_get_right_arm_ik(geometry_msgs::Pose pose,
+bool TubeManipulation::Arms::_get_right_arm_ik(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &joint_state,
                                  std::vector<double> &seed_state)
 {
@@ -978,6 +985,7 @@ bool TubeManipulation::_get_right_arm_ik(geometry_msgs::Pose pose,
     else
     {
         ROS_ERROR("Seed state value is less than number of joints (7)");
+        return 0;
     }
 
     ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
@@ -991,7 +999,7 @@ bool TubeManipulation::_get_right_arm_ik(geometry_msgs::Pose pose,
       }
       else
       {
-        ROS_ERROR("Right arm Inverse kinematics failed for given pose.");
+        ROS_WARN("Right arm Inverse kinematics failed for given pose.");
         return 0;
       }
     }
@@ -1003,7 +1011,7 @@ bool TubeManipulation::_get_right_arm_ik(geometry_msgs::Pose pose,
     return 1;
 }
 
-bool TubeManipulation::_get_simple_right_arm_ik(geometry_msgs::Pose &pose,
+bool TubeManipulation::Arms::_get_simple_right_arm_ik(geometry_msgs::Pose &pose,
                                  sensor_msgs::JointState &joint_state,
                                  std::vector<double> &seed_state)
 {
@@ -1044,6 +1052,7 @@ bool TubeManipulation::_get_simple_right_arm_ik(geometry_msgs::Pose &pose,
     else
     {
         ROS_ERROR("Seed state value is less than number of joints (7)");
+        return 0;
     }
 
     ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
@@ -1057,7 +1066,7 @@ bool TubeManipulation::_get_simple_right_arm_ik(geometry_msgs::Pose &pose,
       }
       else
       {
-        ROS_ERROR("Right arm Inverse kinematics failed for given pose.");
+        ROS_WARN("Right arm Inverse kinematics failed for given pose.");
         return 0;
       }
     }
@@ -1069,7 +1078,7 @@ bool TubeManipulation::_get_simple_right_arm_ik(geometry_msgs::Pose &pose,
     return 1;
 }
 
-bool TubeManipulation::_get_left_arm_ik(geometry_msgs::Pose pose,
+bool TubeManipulation::Arms::_get_left_arm_ik(geometry_msgs::Pose pose,
                                 sensor_msgs::JointState &joint_state,
                                 std::vector<double> &seed_state)
 {
@@ -1110,6 +1119,7 @@ bool TubeManipulation::_get_left_arm_ik(geometry_msgs::Pose pose,
     else
     {
         ROS_ERROR("Seed state value is less than number of joints (7)");
+        return 0;
     }
 
     ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
@@ -1123,7 +1133,7 @@ bool TubeManipulation::_get_left_arm_ik(geometry_msgs::Pose pose,
       }
       else
       {
-        ROS_ERROR("Left arm Inverse kinematics failed for given pose.");
+        ROS_WARN("Left arm Inverse kinematics failed for given pose.");
         return false;
       }
     }
@@ -1135,7 +1145,7 @@ bool TubeManipulation::_get_left_arm_ik(geometry_msgs::Pose pose,
     return true;
 }
 
-bool TubeManipulation::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
+bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
                                 sensor_msgs::JointState &joint_state,
                                 std::vector<double> &seed_state)
 {
@@ -1176,6 +1186,7 @@ bool TubeManipulation::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
     else
     {
         ROS_ERROR("Seed state value is less than number of joints (7)");
+        return 0;
     }
 
     ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
@@ -1189,7 +1200,7 @@ bool TubeManipulation::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
       }
       else
       {
-        ROS_ERROR("Left arm Inverse kinematics failed for given pose.");
+        ROS_WARN("Left arm Inverse kinematics failed for given pose.");
         return false;
       }
     }
@@ -1201,7 +1212,7 @@ bool TubeManipulation::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
     return true;
 }
 
-bool TubeManipulation::_get_simple_right_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
+bool TubeManipulation::Arms::_get_simple_right_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
 {
     sensor_msgs::JointState joint_state;
     _get_simple_right_arm_ik(pose, joint_state, seed_state);
@@ -1210,7 +1221,7 @@ bool TubeManipulation::_get_simple_right_arm_ik(geometry_msgs::Pose &pose, std::
         joints[i] = joint_state.position[i];
 }
 
-bool TubeManipulation::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
+bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
 {
     sensor_msgs::JointState joint_state;
     _get_simple_left_arm_ik(pose, joint_state, seed_state);
@@ -1219,161 +1230,3 @@ bool TubeManipulation::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, std::v
         joints[i] = joint_state.position[i];
 }
 
-bool TubeManipulation::_is_state_valid(std::vector<double> &right_joints,
-                                       std::vector<double> &left_joints,
-                                       arm_navigation_msgs::GetPlanningScene::Request req)
-{
-    bool flag = true;
-    arm_navigation_msgs::GetPlanningScene::Response planning_scene_res;
-
-
-    if(!_get_pln_scn_client.call(req, planning_scene_res))
-        ROS_ERROR("Can't get planning scene");
-    planning_environment::CollisionModels collision_models("robot_description");
-    planning_models::KinematicState* state = collision_models.setPlanningScene(planning_scene_res.planning_scene);
-
-    std::vector<std::string> right_joint_names = 
-            collision_models.getKinematicModel()->getModelGroup("right_arm")->getJointModelNames();
-    std::vector<std::string> left_joint_names = 
-            collision_models.getKinematicModel()->getModelGroup("left_arm")->getJointModelNames();
-
-    std::map<std::string, double> joint_values;
-
-    if(right_joints.size()==right_joint_names.size())
-    {
-        for(size_t i=0; i<right_joint_names.size(); i++)
-            joint_values[right_joint_names[i].c_str()] = right_joints[i];
-    }
-    else
-    {
-        ROS_ERROR("TubeManipulation - Not enough joint values");
-        flag = false;
-    }
-
-    if(left_joints.size()==left_joint_names.size())
-    {
-        for(size_t i=0; i<left_joint_names.size(); i++)
-            joint_values[left_joint_names[i].c_str()] = left_joints[i];
-    }
-    else
-    {
-        ROS_ERROR("TubeManipulation - Not enough joint values");
-        flag = false;
-    }
-
-    std::vector<std::string> joint_names = right_joint_names;
-    for(size_t i=0; i<left_joint_names.size(); i++)
-        joint_names.push_back(left_joint_names[i]);
-    state->setKinematicState(joint_values);
-    if(!state->areJointsWithinBounds(joint_names))
-    {
-        ROS_WARN("TubeManipulation - Joints are ot of bound");
-        flag = false;
-    }
-    if(!collision_models.isKinematicStateInCollision(*state))
-    {
-        ROS_WARN("TubeManipulation - kinematic state is in collision");
-        flag = false;
-    }
-
-    std_msgs::ColorRGBA color;
-    color.a = 1;
-    color.g = 1;
-    visualization_msgs::MarkerArray arr;
-    collision_models.getAttachedCollisionObjectMarkers(*state, arr, "left_arms",color,ros::Duration(5));
-
-    //_scene_pub.publish(arr);
-    ROS_INFO("Leaving _is_state_valid()");
-    return flag;
-}
-
-bool TubeManipulation::isStateValid(arm_navigation_msgs::AttachedCollisionObject attachedObj)
-{
-    bool flag = true;
-
-    arm_navigation_msgs::GetPlanningScene::Request req;
-    req.planning_scene_diff.attached_collision_objects.push_back(attachedObj);
-
-    std::vector<double> right_joints, left_joints;
-    _get_right_joints(right_joints);
-    _get_left_joints(left_joints);
-    if(_is_state_valid(right_joints, left_joints, req))
-    {
-        ROS_INFO("call successfull");
-        flag = true;
-    }
-    ROS_INFO("Leaving isStateValid()");
-    return flag;
-//    {
-//        ROS_INFO("State is valid");
-//        return true;
-//    }
-//    else
-//    {
-//        ROS_INFO("Leaving isStateValid()");
-//        return false;
-//    }
-}
-
-bool TubeManipulation::_get_regrasp_pose_right(geometry_msgs::Pose crnt_grasp,
-                                               geometry_msgs::Pose wrist_pose,
-                                               geometry_msgs::Pose right_grasp,
-                                               geometry_msgs::Pose left_grasp,
-                                               geometry_msgs::Pose &obj_pose_out)
-{
-    tf::Transform obj_orig,obj,rand_tf,
-            wrist=pose2tf(wrist_pose),
-            grasp=pose2tf(crnt_grasp),
-            rg = pose2tf(right_grasp),
-            lg = pose2tf(left_grasp);
-
-    obj_orig = wrist * grasp.inverse();
-
-    tf::Quaternion q;
-    tf::Vector3 pos;
-    double y,p,r;
-    int cnt = 1000;
-    obj = obj_orig;
-    std::vector<double> right_joints(7), right_seeds(7),
-                        left_seeds(7), left_joints(7);
-    arm_navigation_msgs::GetPlanningScene::Request req;
-
-    _get_right_joints(right_seeds);
-    _get_left_joints(left_seeds);
-    tf::Transform right_wrist, right_wrist_crnt, left_wrist;
-    geometry_msgs::Pose right_wrist_crnt_pose, right_wrist_pose, left_wrist_pose;
-
-    do
-    {
-        right_wrist_crnt = obj * grasp;
-        right_wrist = obj * rg;
-        left_wrist = obj * lg;
-        right_wrist_pose = tf2pose(right_wrist);
-        right_wrist_crnt_pose = tf2pose(right_wrist_crnt);
-        left_wrist_pose = tf2pose(left_wrist);
-        if(_get_simple_right_arm_ik(right_wrist_crnt_pose, right_joints, right_seeds)
-           &&_get_simple_right_arm_ik(right_wrist_pose, right_joints, right_seeds)
-           &&_get_simple_left_arm_ik(left_wrist_pose, left_joints, left_seeds) )
-        {
-            //if(_is_state_valid(right_joints, left_joints, req))
-            //{
-                ROS_INFO("Valid pose found for regrasp");
-                cnt = 0;
-                obj_orig = obj;
-            //}
-        }
-
-        y = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
-        p = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
-        r = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
-        q.setRPY(r,p,y);
-        pos.setZero();
-        rand_tf.setRotation(q);
-        rand_tf.setOrigin(pos);
-        obj = obj_orig * rand_tf;
-        std::cout<<cnt<<" ";
-        cnt--;
-        }while(cnt>0);
-
-    obj_pose_out = tf2pose(obj_orig);
-}

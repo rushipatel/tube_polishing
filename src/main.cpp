@@ -16,13 +16,13 @@
 #include <stdio.h>
 #include <Eigen/Eigen>
 
-#include "tubeManipulation.h"
-#include "robotHead.h"
-#include "tubePerception.h"
-#include "tubeGrasp.h"
-#include "manipAnalysis.h"
 #include "utility.h"
-#include "gripper.h"
+#include "tubeManipulation.h"
+//#include "robotHead.h"
+//#include "tubePerception.h"
+//#include "tubeGrasp.h"
+//#include "manipAnalysis.h"
+//#include "gripper.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 
@@ -43,7 +43,10 @@ int main(int argc, char **argv)
     ros::Publisher grasp_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
     //ros::ServiceClient spawn_model_client = rh->serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_model");
 
-    TubeManipulation manip(rh);
+    TubeManipulation::CollisionCheck collision_check(rh);
+    collision_check.printState();
+
+    /*TubeManipulation manip(rh);
     geometry_msgs::Pose pose;
     pose.position.x = 0.1;
     pose.position.y = -0.6;
@@ -61,6 +64,8 @@ int main(int argc, char **argv)
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
     manip.moveLeftArm(pose);
+    std::vector<double> right_joints, left_joints;
+    manip.isStateValid(right_joints,left_joints);
 
     robotHead pr2_head;
     pr2_head.lookAt(0.75,0.0,0.5);
@@ -175,5 +180,5 @@ int main(int argc, char **argv)
     //ros::spin();
 
 
-  ros::shutdown();
+  ros::shutdown();*/
 }

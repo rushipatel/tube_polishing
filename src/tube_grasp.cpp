@@ -63,7 +63,7 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     
     tf::Transform p, a;
     a.setIdentity();
-    a.setOrigin(tf::Vector3(-0.3, 0, 0));
+    a.setOrigin(tf::Vector3(-0.25, 0, 0));
     p = pose2tf(pick_pose);
     a = p*a;
     aprh_pose = tf2pose(a);
@@ -74,39 +74,54 @@ void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
     ros::Duration(5).sleep();
 
 
-    TubeManipulation da(nodeHandle);
+    TubeManipulation manip(nodeHandle);
     
-    if(da.simpleMoveRightArm(aprh_pose))
+    if(manip.simpleMoveRightArm(aprh_pose))
     {
         ros::Duration(2).sleep();
-        if(da.simpleMoveRightArm(pick_pose))
+        if(manip.simpleMoveRightArm(pick_pose))
         {
             ros::Duration(1).sleep();
-            r_grpr.setPosition(_tube->cylinders[0].radius*1.95,100);
+            r_grpr.setPosition(_tube->cylinders[0].radius*1.95,-1);
+
+            ros::Duration(5).sleep();
             tf::Transform grasp, tube = _tube->getTransform();
             grasp = tube.inverseTimes(p);
             geometry_msgs::Pose pose__ = tf2pose(grasp);
             arm_navigation_msgs::AttachedCollisionObject obj =
                     _tube->getAttachedObjForRightGrasp(pose__);
 
-            //if(da.isStateValid(obj))
+            //if(manip.isStateValid(obj))
                // ;
-            ROS_INFO("Object is attched. waiting for 5 secs");
+            //ROS_INFO("Object is attched. waiting for 5 secs");
+
             ros::Duration(5).sleep();
-            da.simpleMoveRightArm(aprh_pose);
+            manip.simpleMoveRightArm(aprh_pose);
             ROS_INFO("Moved back to approach position. check Object again in rviz");
-            //if(da.isStateValid(obj))
-              //  ROS_INFO("looks good");
+            obj = _tube->getAttachedObjForRightGrasp(pose__);
+            /*if(manip.isStateValid(obj))
+                ROS_INFO("looks good");*/
+
+
             geometry_msgs::Pose new_tube_pose;
-            da._get_regrasp_pose_right(pose__,aprh_pose,_valid_pairs->graspPairs[_best_pair_idx].rightGrasp.wristPose,_valid_pairs->graspPairs[_best_pair_idx].leftGrasp.wristPose, new_tube_pose);
+            manip._get_regrasp_pose_right(pose__,aprh_pose,
+                                       _valid_pairs->graspPairs[_best_pair_idx].rightGrasp.wristPose,
+                                       _valid_pairs->graspPairs[_best_pair_idx].leftGrasp.wristPose,
+                                       new_tube_pose);
             pickPose = new_tube_pose;
             tube = pose2tf(new_tube_pose);
             _tube->setPose(new_tube_pose);
-            geometry_msgs::Pose new_wrist_pose = tube * pose2tf(pose__);
-            arm_navigation_msgs::AttachedCollisionObject obj =
-                    _tube->getAttachedObjForRightGrasp(pose__);
-            //da.isStateValid(obj);
-            da.moveRightArm(new_wrist_pose);
+            tf::Transform new_wrist_pose = tube * pose2tf(pose__);
+
+            /*obj = _tube->getAttachedObjForRightGrasp(pose__);
+            manip.isStateValid(obj);*/
+            std::vector<double> right_joints(7),left_joints;
+            if(manip.getSimpleRightArmIK(tf2pose(new_wrist_pose), right_joints))
+            {
+                if(manip.isStateValid(right_joints,left_joints))
+                    manip.moveRightArm(tf2pose(new_wrist_pose));
+            }
+
             ros::Duration(3).sleep();
             r_grpr.open();
         }

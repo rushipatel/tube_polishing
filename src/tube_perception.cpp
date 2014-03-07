@@ -158,7 +158,7 @@ arm_navigation_msgs::AttachedCollisionObject
 Tube::getAttachedObjForRightGrasp(geometry_msgs::Pose &right_grasp_pose)
 {
     arm_navigation_msgs::AttachedCollisionObject obj;
-    _get_attached_collision_object(obj, right_grasp_pose, "r_wrist_roll_link", true, false);
+    _get_attached_collision_object(obj, right_grasp_pose, "r_wrist_roll_link", true, true);
     return obj;
 }
 
@@ -166,7 +166,7 @@ arm_navigation_msgs::AttachedCollisionObject
 Tube::getAttachedObjForLeftGrasp(geometry_msgs::Pose &left_grasp_pose)
 {
     arm_navigation_msgs::AttachedCollisionObject obj;
-    _get_attached_collision_object(obj, left_grasp_pose, "l_wrist_roll_link", false, true);
+    _get_attached_collision_object(obj, left_grasp_pose, "l_wrist_roll_link", true, true);
     return obj;
 }
 
@@ -183,8 +183,8 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
                                      std::string link_name,
                                      bool right_side, bool left_side)
 {
-    obj.link_name = "r_wrist_roll_link"; //link_name.c_str();
-    obj.object.header.frame_id = "r_wrist_roll_link"; //link_name.c_str();
+    obj.link_name = link_name.c_str();
+    obj.object.header.frame_id = link_name.c_str();
 
     if(link_name.compare("r_wrist_roll_link"))
         right_side = true;
@@ -192,9 +192,35 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
         left_side = true;
 
     if(right_side)
-        obj.touch_links.push_back("r_end_effector");
+    {
+        //obj.touch_links.push_back("r_end_effector");
+        obj.touch_links.push_back("r_gripper_palm_link");
+        obj.touch_links.push_back("r_gripper_l_finger_link");
+        obj.touch_links.push_back("r_gripper_l_finger_tip_link");
+        obj.touch_links.push_back("r_gripper_motor_accelerometer_link");
+        obj.touch_links.push_back("r_gripper_led_frame");
+        obj.touch_links.push_back("r_gripper_motor_slider_link");
+        obj.touch_links.push_back("r_gripper_motor_screw_link");
+        obj.touch_links.push_back("r_gripper_r_finger_link");
+        obj.touch_links.push_back("r_gripper_r_finger_tip_link");
+        obj.touch_links.push_back("r_gripper_l_finger_tip_frame");
+        obj.touch_links.push_back("r_gripper_tool_frame");
+    }
     if(left_side)
-        obj.touch_links.push_back("l_end_effector");
+    {
+        //obj.touch_links.push_back("l_end_effector");
+        obj.touch_links.push_back("l_gripper_palm_link");
+        obj.touch_links.push_back("l_gripper_l_finger_link");
+        obj.touch_links.push_back("l_gripper_l_finger_tip_link");
+        obj.touch_links.push_back("l_gripper_motor_accelerometer_link");
+        obj.touch_links.push_back("l_gripper_led_frame");
+        obj.touch_links.push_back("l_gripper_motor_slider_link");
+        obj.touch_links.push_back("l_gripper_motor_screw_link");
+        obj.touch_links.push_back("l_gripper_r_finger_link");
+        obj.touch_links.push_back("l_gripper_r_finger_tip_link");
+        obj.touch_links.push_back("l_gripper_l_finger_tip_frame");
+        obj.touch_links.push_back("l_gripper_tool_frame");
+    }
 
     obj.object.id = "tube";
     obj.object.header.stamp = ros::Time::now();

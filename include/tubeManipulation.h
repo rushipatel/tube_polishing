@@ -27,16 +27,19 @@
 /*! \brief  Simple action server client definition for JointTrajectoryAction */
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryAction> TrajClient;
 
+namespace TubeManipulation
+{
+
 /*! \brief Class to move both hands in sync for graspped object by both hands. 
  *
  *  This class takes in offset in transforms for both hands and _obj_pose_traj as pose array.
  *  It generates joint trajectory for both hands using GetconstraintAwarePositionIK service 
  *  and executes both trajectory in synchronized fashion.
  */
-class TubeManipulation
+class Arms
 {
 public:
-    TubeManipulation(ros::NodeHandlePtr rh);
+    Arms(ros::NodeHandlePtr rh);
     bool genTrajectory();
     bool genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &lefttJointTraj);
     bool genLeftTrajectory(std::vector<double> &jointTrajectory);  //Prerequisites: leftWristOffset and objPoseTraj
@@ -54,12 +57,13 @@ public:
                       sensor_msgs::JointState &jointState);
     bool getSimpleRightArmIK(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &jointState);
+    bool getSimpleRightArmIK(geometry_msgs::Pose pose,
+                                 std::vector<double> &jointState);
     bool getSimpleLeftArmIK(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &jointState);
     void setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array);
     void setWristOffset(tf::Transform &right_offset, tf::Transform &left_offset);
     void setWristOffset(geometry_msgs::Pose &right_offset, geometry_msgs::Pose &left_offset);
-    bool isStateValid(arm_navigation_msgs::AttachedCollisionObject attachedObj);
     bool _get_regrasp_pose_right(geometry_msgs::Pose crnt_grasp,
                                  geometry_msgs::Pose wrist_pose,
                                  geometry_msgs::Pose right_grasp,
@@ -85,7 +89,6 @@ private:
     tf::Transform _left_wrist_offset; /*!< Offset of left arm wrist_roll link from object. */
     tf::Transform _right_wrist_offset; /*!< Offset of right arm wrist_roll link from object. */
     geometry_msgs::PoseArray _obj_pose_traj; /*!< Pose trajectory of an object. */
-    ros::Publisher _scene_pub;
 
     void _get_right_goal();
     void _get_left_goal();
@@ -118,12 +121,53 @@ private:
                                   std::vector<double> &seed_state);
     bool _gen_trarajectory(std::vector<double> &right_joint_traj,
                            std::vector<double> &left_joint_traj);
-    bool _is_state_valid(std::vector<double> &right_joints,
-                         std::vector<double> &left_joints, 
-                         arm_navigation_msgs::GetPlanningScene::Request req);
+
     geometry_msgs::Pose _get_right_fk(std::vector<double> &joints);
     geometry_msgs::Pose _get_left_fk(std::vector<double> &joints);
 
 };
+
+class CollisionCheck
+{
+public:
+    CollisionCheck(ros::NodeHandlePtr nh);
+    ~CollisionCheck();
+    void resetState(void);
+    void addAttachedObj(arm_navigation_msgs::AttachedCollisionObject &attachedObj);
+    void clearAttachedObj(void);
+    void printState(void);
+    bool isStateValid(arm_navigation_msgs::AttachedCollisionObject attachedObj,
+                      std::vector<double> &right_joints,
+                      std::vector<double> &left_joints);
+    bool isStateValid(arm_navigation_msgs::AttachedCollisionObject attachedObj);
+    bool isStateValid(std::vector<double> &right_joints,
+                      std::vector<double> &left_joints);
+private:
+    ros::NodeHandlePtr _nh;
+    ros::ServiceClient _get_scn_client; /*!< get planning scene diff */
+    arm_navigation_msgs::PlanningScene _scn;
+    planning_environment::CollisionModels *_collision_models;
+    arm_navigation_msgs::AttachedCollisionObject _att_obj;
+    arm_navigation_msgs::GetPlanningScene::Request _scn_req;
+    arm_navigation_msgs::GetPlanningScene::Response _scn_res;
+    std::map<std::string, double> _jnt_values;
+    std::vector<double> _r_jnts;
+    std::vector<double> _l_jnts;
+    std::vector<std::string> _r_jnt_nms;
+    std::vector<std::string> _r_lnk_nms;
+    std::vector<std::string> _l_jnt_nms;
+    std::vector<std::string> _l_lnk_nms;
+    std::vector<double> _actual_r_jnts;
+    std::vector<double> _actual_l_jnts;
+    ros::Publisher _mrkr_pub;
+    visualization_msgs::MarkerArray _mrkr_arr;
+    planning_models::KinematicState* _state;
+
+    bool _is_state_valid(std::vector<double> &right_joints,
+                         std::vector<double> &left_joints,
+                         arm_navigation_msgs::GetPlanningScene::Request req);
+};
+
+}//TubeManipulation
 
 #endif // TUBEMANIPULATION_H

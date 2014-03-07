@@ -1,7 +1,6 @@
 #ifndef UTILITY_CPP
 #define UTILITY_CPP
 
-#include <ros/ros.h>
 #include <geometry_msgs/Pose.h>
 #include <tf/tf.h>
 
