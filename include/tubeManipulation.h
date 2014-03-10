@@ -68,9 +68,11 @@ public:
                                  geometry_msgs::Pose wrist_pose,
                                  geometry_msgs::Pose right_grasp,
                                  geometry_msgs::Pose left_grasp,
+                                 arm_navigation_msgs::AttachedCollisionObject att_obj,
                                  geometry_msgs::Pose &obj_pose_out);
 
 private:
+    ros::NodeHandlePtr _rh;
     TrajClient* _traj_client_r; /*!< Right arm trajectory action client. */
     TrajClient* _traj_client_l; /*!< Left arm trajectory action client. */
     ros::ServiceClient _set_pln_scn_client; /*!< set planning scene diff */
@@ -132,16 +134,14 @@ class CollisionCheck
 public:
     CollisionCheck(ros::NodeHandlePtr nh);
     ~CollisionCheck();
-    void resetState(void);
-    void addAttachedObj(arm_navigation_msgs::AttachedCollisionObject &attachedObj);
+    void refreshState(void);
+    void setAttachedObj(arm_navigation_msgs::AttachedCollisionObject &attachedObj);
     void clearAttachedObj(void);
     void printState(void);
-    bool isStateValid(arm_navigation_msgs::AttachedCollisionObject attachedObj,
-                      std::vector<double> &right_joints,
-                      std::vector<double> &left_joints);
-    bool isStateValid(arm_navigation_msgs::AttachedCollisionObject attachedObj);
     bool isStateValid(std::vector<double> &right_joints,
                       std::vector<double> &left_joints);
+    void enableVisualization();
+    void disableVisualization();
 private:
     ros::NodeHandlePtr _nh;
     ros::ServiceClient _get_scn_client; /*!< get planning scene diff */
@@ -162,10 +162,15 @@ private:
     ros::Publisher _mrkr_pub;
     visualization_msgs::MarkerArray _mrkr_arr;
     planning_models::KinematicState* _state;
+    bool _visualize;
 
-    bool _is_state_valid(std::vector<double> &right_joints,
-                         std::vector<double> &left_joints,
-                         arm_navigation_msgs::GetPlanningScene::Request req);
+    std_msgs::ColorRGBA _good_color;
+    std_msgs::ColorRGBA _collision_color;
+    std_msgs::ColorRGBA _joint_limits_color;
+    std_msgs::ColorRGBA _point_markers;
+
+    bool _is_state_valid();
+    void _reset_state();
 };
 
 }//TubeManipulation

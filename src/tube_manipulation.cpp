@@ -6,6 +6,7 @@
  */
 TubeManipulation::Arms::Arms(ros::NodeHandlePtr rh)
 {
+    _rh = rh;
     _traj_client_r  = new TrajClient("r_arm_controller/joint_trajectory_action", true);
     _traj_client_l  = new TrajClient("l_arm_controller/joint_trajectory_action", true);
     while(!_traj_client_r->waitForServer(ros::Duration(5.0)))
@@ -24,17 +25,17 @@ TubeManipulation::Arms::Arms(ros::NodeHandlePtr rh)
     ros::service::waitForService("pr2_left_arm_kinematics/get_ik");
     ros::service::waitForService("trajectory_filter_unnormalizer/filter_trajectory");
 
-    _set_pln_scn_client = rh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
-    _fk_client_r = rh->serviceClient<kinematics_msgs::GetPositionFK>("pr2_right_arm_kinematics/get_fk");
-    _fk_client_l = rh->serviceClient<kinematics_msgs::GetPositionFK>("pr2_left_arm_kinematics/get_fk");
-    _ik_client_r = rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_right_arm_kinematics/get_constraint_aware_ik");
-    _smpl_ik_client_r = rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_right_arm_kinematics/get_ik");
-    _query_client_r = rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_right_arm_kinematics/get_ik_solver_info");
-    _ik_client_l = rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_left_arm_kinematics/get_constraint_aware_ik");
-    _smpl_ik_client_l = rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_left_arm_kinematics/get_ik");
-    _query_client_l = rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_left_arm_kinematics/get_ik_solver_info");
+    _set_pln_scn_client = _rh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
+    _fk_client_r = _rh->serviceClient<kinematics_msgs::GetPositionFK>("pr2_right_arm_kinematics/get_fk");
+    _fk_client_l = _rh->serviceClient<kinematics_msgs::GetPositionFK>("pr2_left_arm_kinematics/get_fk");
+    _ik_client_r = _rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_right_arm_kinematics/get_constraint_aware_ik");
+    _smpl_ik_client_r = _rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_right_arm_kinematics/get_ik");
+    _query_client_r = _rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_right_arm_kinematics/get_ik_solver_info");
+    _ik_client_l = _rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_left_arm_kinematics/get_constraint_aware_ik");
+    _smpl_ik_client_l = _rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_left_arm_kinematics/get_ik");
+    _query_client_l = _rh->serviceClient<kinematics_msgs::GetKinematicSolverInfo>("pr2_left_arm_kinematics/get_ik_solver_info");
     _filter_trajectory_client =
-            rh->serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
+            _rh->serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
 
     arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
@@ -56,8 +57,8 @@ void TubeManipulation::Arms::setWristOffset(tf::Transform &right_offset, tf::Tra
 
 void TubeManipulation::Arms::setWristOffset(geometry_msgs::Pose &right_offset, geometry_msgs::Pose &left_offset)
 {
-    _right_wrist_offset = pose2tf(right_offset);
-    _left_wrist_offset = pose2tf(left_offset);
+    _right_wrist_offset = poseToTf(right_offset);
+    _left_wrist_offset = poseToTf(left_offset);
 }
 
 /*! \brief Gets current joint angles from pr2 controller topics for initial IK seeds.
@@ -202,13 +203,13 @@ bool TubeManipulation::Arms::_gen_trarajectory(std::vector<double> &right_joint_
 
     for(unsigned int i=0; i<_obj_pose_traj.poses.size(); i++)
     {
-        tf_obj = pose2tf(_obj_pose_traj.poses[i]);
+        tf_obj = poseToTf(_obj_pose_traj.poses[i]);
 
         tf_right_wrist = tf_obj*_right_wrist_offset;
-        right_pose = tf2pose(tf_right_wrist);
+        right_pose = tfToPose(tf_right_wrist);
 
         tf_left_wrist = tf_obj*_left_wrist_offset;
-        left_pose = tf2pose(tf_left_wrist);
+        left_pose = tfToPose(tf_left_wrist);
 
         if( _get_right_arm_ik(right_pose, right_joint_state, right_joints) &&
                  _get_left_arm_ik(left_pose, left_joint_state, left_joints) )
@@ -799,9 +800,9 @@ bool TubeManipulation::Arms::simpleMoveLeftArm(geometry_msgs::Pose pose)
 
 //    for(unsigned int i=0; i<_obj_pose_traj.poses.size(); i++)
 //    {
-//        tf_base_obj = pose2tf(_obj_pose_traj.poses[i]);
+//        tf_base_obj = poseToTf(_obj_pose_traj.poses[i]);
 //        tf_base_wrist = tf_base_obj*_right_wrist_offset;
-//        pose = tf2pose(tf_base_wrist);
+//        pose = tfToPose(tf_base_wrist);
 //        for(int k=0; k<7; k++)
 //            gpik_req.ik_request.ik_seed_state.joint_state.position[k] = last_joints[k];
 //        gpik_req.ik_request.pose_stamped.pose = pose;
@@ -870,9 +871,9 @@ bool TubeManipulation::Arms::simpleMoveLeftArm(geometry_msgs::Pose pose)
 
 //    for(unsigned int i=0; i<_obj_pose_traj.poses.size(); i++)
 //    {
-//        tf_base_obj = pose2tf(_obj_pose_traj.poses[i]);
+//        tf_base_obj = poseToTf(_obj_pose_traj.poses[i]);
 //        tf_base_wrist = tf_base_obj*_left_wrist_offset;
-//        pose = tf2pose(tf_base_wrist);
+//        pose = tfToPose(tf_base_wrist);
 //        for(int k=0; k<7; k++)
 //            gpik_req.ik_request.ik_seed_state.joint_state.position[k] = last_joints[k];
 //        gpik_req.ik_request.pose_stamped.pose = pose;
@@ -1215,18 +1216,87 @@ bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
 bool TubeManipulation::Arms::_get_simple_right_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
 {
     sensor_msgs::JointState joint_state;
-    _get_simple_right_arm_ik(pose, joint_state, seed_state);
+    bool flag = _get_simple_right_arm_ik(pose, joint_state, seed_state);
     joints.resize(joint_state.position.size());
     for(int i=0; i<joint_state.position.size(); i++)
         joints[i] = joint_state.position[i];
+    return flag;
 }
 
 bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
 {
     sensor_msgs::JointState joint_state;
-    _get_simple_left_arm_ik(pose, joint_state, seed_state);
+    bool flag = _get_simple_left_arm_ik(pose, joint_state, seed_state);
     joints.resize(joint_state.position.size());
     for(int i=0; i<joint_state.position.size(); i++)
         joints[i] = joint_state.position[i];
+    return flag;
 }
 
+bool TubeManipulation::Arms::_get_regrasp_pose_right(geometry_msgs::Pose crnt_grasp,
+                                                     geometry_msgs::Pose wrist_pose,
+                                                     geometry_msgs::Pose right_grasp,
+                                                     geometry_msgs::Pose left_grasp,
+                                                     arm_navigation_msgs::AttachedCollisionObject att_obj,
+                                                     geometry_msgs::Pose &obj_pose_out)
+{
+    bool pose_found = false;
+    TubeManipulation::CollisionCheck collision_check(_rh);
+    collision_check.setAttachedObj(att_obj);
+    tf::Transform obj_orig,obj,rand_tf,
+            wrist=poseToTf(wrist_pose),
+            grasp=poseToTf(crnt_grasp),
+            rg = poseToTf(right_grasp),
+            lg = poseToTf(left_grasp);
+
+    obj_orig = wrist * grasp.inverse();
+
+    tf::Quaternion q;
+    tf::Vector3 pos;
+    double y,p,r;
+    int cnt = 1000;
+    obj = obj_orig;
+    std::vector<double> right_joints(7), right_seeds(7),
+                        left_seeds(7), left_joints(7);
+
+    _get_right_joints(right_seeds);
+    _get_left_joints(left_seeds);
+    tf::Transform right_wrist, right_wrist_crnt, left_wrist;
+    geometry_msgs::Pose right_wrist_crnt_pose, right_wrist_pose, left_wrist_pose;
+
+    do
+    {
+        right_wrist_crnt = obj * grasp;
+        right_wrist = obj * rg;
+        left_wrist = obj * lg;
+        right_wrist_pose = tfToPose(right_wrist);
+        right_wrist_crnt_pose = tfToPose(right_wrist_crnt);
+        left_wrist_pose = tfToPose(left_wrist);
+        if(_get_simple_right_arm_ik(right_wrist_pose, right_joints, right_seeds)
+           &&_get_simple_right_arm_ik(right_wrist_crnt_pose, right_joints, right_seeds)
+           &&_get_simple_left_arm_ik(left_wrist_pose, left_joints, left_seeds) )
+        {
+            if(collision_check.isStateValid(right_joints, left_joints))
+            {
+                ROS_INFO("Valid pose found for regrasp");
+                cnt = 0;
+                obj_orig = obj;
+                pose_found = true;
+            }
+        }
+
+        y = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        p = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        r = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        q.setRPY(r,p,y);
+        pos.setZero();
+        rand_tf.setRotation(q);
+        rand_tf.setOrigin(pos);
+        obj = obj_orig * rand_tf;
+        std::cout<<cnt<<" ";
+        cnt--;
+        }while(cnt>0);
+
+    obj_pose_out = tfToPose(obj_orig);
+    return pose_found;
+}

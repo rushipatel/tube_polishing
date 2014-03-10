@@ -16,13 +16,13 @@
 #include <stdio.h>
 #include <Eigen/Eigen>
 
-#include "utility.h"
 #include "tubeManipulation.h"
-//#include "robotHead.h"
-//#include "tubePerception.h"
-//#include "tubeGrasp.h"
-//#include "manipAnalysis.h"
-//#include "gripper.h"
+#include "robotHead.h"
+#include "tubePerception.h"
+#include "tubeGrasp.h"
+#include "manipAnalysis.h"
+#include "gripper.h"
+#include "utility.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 
@@ -41,10 +41,59 @@ int main(int argc, char **argv)
     ros::Publisher marker_pub = rh->advertise<visualization_msgs::Marker>("/tube_polishing/marker", 2);
     ros::Publisher tube_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
     ros::Publisher grasp_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
-    //ros::ServiceClient spawn_model_client = rh->serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_model");
 
     TubeManipulation::CollisionCheck collision_check(rh);
-    collision_check.printState();
+    collision_check.enableVisualization();
+    std::vector<double> right_joints(7), left_joints(7);
+    for(int i=0; i<right_joints.size(); i++)
+    {
+        right_joints[i] = 0;
+        left_joints[i] = 0;
+    }
+    right_joints[0] = 0.0;
+    right_joints[1] = 0.2;
+    right_joints[3] = -0.15;
+    right_joints[5] = -0.1;
+    right_joints[6] = (M_PI/4)-0.1;
+
+    left_joints[3] = -0.15;
+    left_joints[5] = -0.1;
+
+    arm_navigation_msgs::AttachedCollisionObject att_object;
+      att_object.link_name = "r_gripper_r_finger_tip_link";
+
+      att_object.object.id = "attached_pole";
+      att_object.object.operation.operation = arm_navigation_msgs::CollisionObjectOperation::ADD;
+
+      att_object.object.header.frame_id = "r_gripper_r_finger_tip_link";
+      att_object.object.header.stamp = ros::Time::now();
+      arm_navigation_msgs::Shape object;
+      object.type = arm_navigation_msgs::Shape::CYLINDER;
+      object.dimensions.resize(2);
+      object.dimensions[0] = .015;
+      object.dimensions[1] = 0.5;
+      geometry_msgs::Pose pose;
+      pose.position.x = 0.0;
+      pose.position.y = 0.0;
+      pose.position.z = 0.0;
+      pose.orientation.x = 0;
+      pose.orientation.y = 0;
+      pose.orientation.z = 0;
+      pose.orientation.w = 1;
+      att_object.object.shapes.push_back(object);
+      att_object.object.poses.push_back(pose);
+      att_object.touch_links.push_back("r_end_effector");
+    collision_check.setAttachedObj(att_object);
+    collision_check.isStateValid(right_joints, left_joints);
+    collision_check.clearAttachedObj();
+    while(getchar()!='q')
+    {
+        if(collision_check.isStateValid(right_joints, left_joints))
+        {
+            ROS_WARN("Looks good");
+        }
+    }
+    //collision_check.printState();
 
     /*TubeManipulation manip(rh);
     geometry_msgs::Pose pose;
@@ -64,8 +113,6 @@ int main(int argc, char **argv)
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
     manip.moveLeftArm(pose);
-    std::vector<double> right_joints, left_joints;
-    manip.isStateValid(right_joints,left_joints);
 
     robotHead pr2_head;
     pr2_head.lookAt(0.75,0.0,0.5);

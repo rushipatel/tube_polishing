@@ -11,10 +11,54 @@
 #include "tubeManipulation.h"
 #include "gripper.h"
 #include "robotHead.h"
-#include "grasp.h"
 
 namespace TubeGrasp
 {
+
+    class Grasp
+    {
+    public:
+        Grasp(){}
+        geometry_msgs::Pose wristPose;
+        unsigned int group; //circular group. it helps reduce pairs to test
+        unsigned int cylinderIdx;
+    };
+
+    class GraspPair
+    {
+    public:
+        GraspPair()
+        {
+            isValid = false;
+            rank = 0;
+        }
+        TubeGrasp::Grasp rightGrasp;
+        TubeGrasp::Grasp leftGrasp;
+        bool isValid;
+        std::vector<double> qRight; //to store ik results (joint traj) for valid_pairs
+        std::vector<double> qLeft;
+        //Stores minimum of two, right and left, metric
+        std::vector<double> forceMetric; //Memory inefficient. Store accumulative rank only after dev/debug
+        std::vector<double> rotMetric;
+        double rank;
+        double minForce;
+        double minRot;
+    };
+
+    class GraspArray
+    {
+    public:
+        std::vector<TubeGrasp::Grasp> grasps;
+        typedef boost::shared_ptr<TubeGrasp::GraspArray> Ptr;
+    };
+
+    class GraspPairArray
+    {
+    public:
+        std::vector<TubeGrasp::GraspPair> graspPairs;
+        typedef boost::shared_ptr<TubeGrasp::GraspPairArray> Ptr;
+    };
+
     class GraspAnalysis
     {
     public:
@@ -28,8 +72,9 @@ namespace TubeGrasp
         void analyze(); //temp. dev purpose
         void getGraspMarker(visualization_msgs::MarkerArray &markerArray);
         //returns grasp somewhere closer to center of object. very rough approximation.
-        geometry_msgs::Pose getPickUpPose();
         void pickUpTube(geometry_msgs::Pose &pickPose);
+        bool getComputedGraspPair(GraspPair &graspPair);
+        geometry_msgs::Pose getPickUpPose();
         geometry_msgs::PoseArray _work_traj; //put this back in private after dbg/dev
         geometry_msgs::PoseArray _tube_traj;
         visualization_msgs::Marker vismsg_workNormalsX;
@@ -52,7 +97,7 @@ namespace TubeGrasp
         unsigned long MAX_TEST_GRASPS; //Maximum valid grasps to store
         //Maximum iteration for randomly selecting grasp to test
         unsigned long MAX_ITERATION;  //Check the repetations in selecting random index in test_for_ik_
-        void _gen_grasps(double axis_step_size, int circular_steps,  GraspArray::Ptr grasp_array);
+        void _gen_grasps(double axis_step_size, int circular_steps,  GraspArray::Ptr grasp_array, double offset);
         bool _gen_work_trajectory();
         void _gen_test_pairs();
         void _normalize_worktrajectory();
