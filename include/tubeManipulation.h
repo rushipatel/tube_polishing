@@ -15,7 +15,9 @@
 #include <arm_navigation_msgs/PlanningScene.h>
 #include <arm_navigation_msgs/SetPlanningSceneDiff.h>
 #include <arm_navigation_msgs/GetPlanningScene.h>
-#include <arm_navigation_msgs/RobotState.h> //don't need it.
+#include <arm_navigation_msgs/MoveArmAction.h>
+#include <arm_navigation_msgs/utils.h>
+//#include <arm_navigation_msgs/RobotState.h> //don't need it.
 #include <planning_environment/models/collision_models.h>
 #include <vector>
 
@@ -26,6 +28,7 @@
 
 /*! \brief  Simple action server client definition for JointTrajectoryAction */
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryAction> TrajClient;
+typedef actionlib::SimpleActionClient<arm_navigation_msgs::MoveArmAction> MoveArmClient;
 
 namespace TubeManipulation
 {
@@ -70,11 +73,17 @@ public:
                                  geometry_msgs::Pose left_grasp,
                                  arm_navigation_msgs::AttachedCollisionObject att_obj,
                                  geometry_msgs::Pose &obj_pose_out);
+    bool moveRightArmWithMPlanning(geometry_msgs::Pose pose);
+    bool moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, 
+                                   geometry_msgs::Pose pose);
+    bool moveLeftArmWithMPlanning();
 
 private:
     ros::NodeHandlePtr _rh;
     TrajClient* _traj_client_r; /*!< Right arm trajectory action client. */
     TrajClient* _traj_client_l; /*!< Left arm trajectory action client. */
+    MoveArmClient* _mv_arm_client_r;
+    MoveArmClient* _mv_arm_client_l;
     ros::ServiceClient _set_pln_scn_client; /*!< set planning scene diff */
     ros::ServiceClient _get_pln_scn_client; /*!< get planning scene diff */
     ros::ServiceClient _ik_client_r; /*!< Right arm IK client. */
@@ -86,6 +95,7 @@ private:
     ros::ServiceClient _query_client_r; /*!< Right arm kinematic solver info query client. */
     ros::ServiceClient _query_client_l; /*!< Left arm kinematic solver info query client. */
     ros::ServiceClient _filter_trajectory_client; /*!< Joint trajectory unnormalizer filter client. */
+    ros::Publisher _att_obj_pub;
     pr2_controllers_msgs::JointTrajectoryGoal _right_goal, _left_goal; /*!< Joint trajectory goal to execute joint trajectory. */
     std::vector<double> _right_joint_traj,_left_joint_traj; /*!< Double linear array to store joint trajectory. */
     tf::Transform _left_wrist_offset; /*!< Offset of left arm wrist_roll link from object. */

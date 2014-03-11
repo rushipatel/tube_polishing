@@ -179,9 +179,10 @@ Tube::getAttachedObjForBothGrasps(geometry_msgs::Pose &right_grasp_pose)
 }
 
 //from grasp to tube
-void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj, geometry_msgs::Pose &grasp_pose,
-                                     std::string link_name,
-                                     bool right_side, bool left_side)
+void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj, 
+                                          geometry_msgs::Pose &grasp_pose,
+                                          std::string link_name,
+                                          bool right_side, bool left_side)
 {
     obj.link_name = link_name.c_str();
     obj.object.header.frame_id = link_name.c_str();

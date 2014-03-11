@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     ros::Publisher tube_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
     ros::Publisher grasp_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
 
-    TubeManipulation::CollisionCheck collision_check(rh);
+    /*TubeManipulation::CollisionCheck collision_check(rh);
     collision_check.enableVisualization();
     std::vector<double> right_joints(7), left_joints(7);
     for(int i=0; i<right_joints.size(); i++)
@@ -92,10 +92,9 @@ int main(int argc, char **argv)
         {
             ROS_WARN("Looks good");
         }
-    }
-    //collision_check.printState();
+    }*/
 
-    /*TubeManipulation manip(rh);
+    TubeManipulation::Arms manip(rh);
     geometry_msgs::Pose pose;
     pose.position.x = 0.1;
     pose.position.y = -0.6;
@@ -104,7 +103,8 @@ int main(int argc, char **argv)
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
-    manip.moveRightArm(pose);
+    //manip.moveRightArm(pose);
+    manip.moveRightArmWithMPlanning(pose);
     pose.position.x = 0.1;
     pose.position.y = 0.6;
     pose.position.z = 0.8;
@@ -117,7 +117,7 @@ int main(int argc, char **argv)
     robotHead pr2_head;
     pr2_head.lookAt(0.75,0.0,0.5);
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
+    /*pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     //write_kinect_output(rh);
     tabletop_object_detector::TabletopSegmentation seg_srv;
