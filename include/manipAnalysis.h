@@ -46,9 +46,9 @@ private:
 ManipAnalysis::ManipAnalysis(std::string whichArm, const ros::NodeHandlePtr nh)
 {
     bool right_arm;
-    if(whichArm.compare("right_arm"))
+    if(whichArm.compare("right_arm")==0)
         right_arm = true;
-    else if(whichArm.compare("left_arm"))
+    else if(whichArm.compare("left_arm")==0)
         right_arm = false;
     else
     {

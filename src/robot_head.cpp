@@ -11,7 +11,7 @@ robotHead::robotHead()
 }
 
 //! Points the high-def camera frame at a point in a given frame
-void robotHead::lookAt(double x, double y, double z)
+bool robotHead::lookAt(double x, double y, double z)
 {
     //the goal message we will be sending
     pr2_controllers_msgs::PointHeadGoal goal;
@@ -36,5 +36,12 @@ void robotHead::lookAt(double x, double y, double z)
     point_head_client_->sendGoal(goal);
 
     //wait for it to get there (abort after 2 secs to prevent getting stuck)
-    point_head_client_->waitForResult(ros::Duration(2));
+    point_head_client_->waitForResult(ros::Duration(5));
+    actionlib::SimpleClientGoalState state = point_head_client_->getState();
+    if(!state.isDone())
+    {
+        ROS_WARN("RobotHead - Couldn't set head to given point");
+        return false;
+    }
+    return true;
 }

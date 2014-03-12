@@ -6,6 +6,7 @@ namespace TubeGrasp
 {
 GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh)
 {
+    _nh = nh;
     //_grasp_array = grasp_array;
     _tube = tube;
     _grasp_array.reset(new (TubeGrasp::GraspArray));
@@ -14,7 +15,7 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr 
     _axis_step_size = 0.05;
     _circular_steps = 8;
     _wrist_axis_offset = 0.072; //72 mm from axis of cylinder to wrist origin
-    nodeHandle = nh;
+    _grasp_pair_found = false;
     MAX_TEST_GRASPS = 30;
     MAX_ITERATION = 200;
 }
@@ -52,20 +53,19 @@ void GraspAnalysis::analyze()
     _gen_grasps(_axis_step_size, _circular_steps, _grasp_array, _wrist_axis_offset);
     _gen_test_pairs();
     _test_pairs_for_ik();
-    _best_pair_idx = std::numeric_limits<unsigned long int>::max();
     _compute_metric();
 }
 
 bool GraspAnalysis::getComputedGraspPair(GraspPair &graspPair)
 {
-    if(_best_pair_idx != std::numeric_limits<unsigned long int>::max())
+    if(_grasp_pair_found)
     {
-        graspPair = _valid_pairs->graspPairs.at(_best_pair_idx);
+        graspPair = _computed_pair;
         return true;
     }
     else
     {
-        ROS_ERROR("GraspAnalysis - There is no valid pair or grasps hasn't been computed yet.");
+        ROS_ERROR("GraspAnalysis - There is no valid grasp pair or grasps hasn't been computed yet. did you call analyze()?");
         return false;
     }
 }
@@ -463,14 +463,14 @@ void GraspAnalysis::_gen_test_pairs()
 
 void GraspAnalysis::_test_pairs_for_ik()
 {
-    TubeManipulation::Arms da(nodeHandle);
+    TubeManipulation::Arms manip(_nh);
 
     int idx;
     unsigned long test_grasps=1;
 
     ROS_INFO_STREAM("Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
     GraspPair gp;
-    da.setObjPoseTrajectory(_tube_traj);
+    manip.setObjPoseTrajectory(_tube_traj);
 
     unsigned long it=MAX_ITERATION;
     _valid_pairs->graspPairs.reserve(MAX_TEST_GRASPS);
@@ -480,9 +480,9 @@ void GraspAnalysis::_test_pairs_for_ik()
         it--;
         idx = rand()%(_test_pairs->graspPairs.size()+1);
         gp = _test_pairs->graspPairs[idx];
-        da.setWristOffset(gp.rightGrasp.wristPose, gp.leftGrasp.wristPose);
+        manip.setWristOffset(gp.rightGrasp.wristPose, gp.leftGrasp.wristPose);
         //genTrajectory clears vectors(qRight, qLeft) in arguement
-        if(da.genTrajectory(gp.qRight, gp.qLeft))
+        if(manip.genTrajectory(gp.qRight, gp.qLeft))
         {
             gp.isValid = true;
             _valid_pairs->graspPairs.push_back(gp);
@@ -512,8 +512,8 @@ void GraspAnalysis::_test_pairs_for_ik()
 //for each trajectory point and ultimatlly accumulative rank
 void GraspAnalysis::_compute_metric()
 {
-    ManipAnalysis ma_right("right_arm",nodeHandle);
-    ManipAnalysis ma_left("left_arm",nodeHandle);
+    ManipAnalysis ma_right("right_arm",_nh);
+    ManipAnalysis ma_left("left_arm",_nh);
     tf::Vector3 f_vec,axis,vec;
     tf::Transform t, work = pose2tf(_work_pose);
     t.setIdentity();
@@ -583,7 +583,7 @@ void GraspAnalysis::_compute_metric()
         ROS_INFO_STREAM("Pair "<<i<<" (F,R): "<<f_min<<" "<<r_min);
     }
     double r = 0;
-    unsigned long int best_grasp = std::numeric_limits<unsigned long int>::max();
+    unsigned long int best_grasp;
     for(size_t i=0; i<_valid_pairs->graspPairs.size(); i++)
     {
         if(_valid_pairs->graspPairs[i].rank>r)
@@ -592,8 +592,16 @@ void GraspAnalysis::_compute_metric()
             r = _valid_pairs->graspPairs[i].rank;
         }
     }
-    ROS_WARN_STREAM("Best Grasp Pair index: "<<best_grasp);
-    _best_pair_idx = best_grasp;
+    if(!_valid_pairs->graspPairs.empty())
+    {
+        ROS_WARN_STREAM("Best Grasp Pair index: "<<best_grasp);
+        _computed_pair = _valid_pairs->graspPairs[best_grasp];
+        _grasp_pair_found = true;
+    }
+    else
+        ROS_ERROR("TubeGrasp - No computed valid grasp found");
+
+
     /*dualArms da(nodeHandle);
     da.objPoseTraj = _tube_traj;
     da.rightWristOffset = pose2tf(_valid_pairs->graspPairs[best_grasp].rightGrasp.wristPose);

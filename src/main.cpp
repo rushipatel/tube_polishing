@@ -5,7 +5,6 @@
 #include <visualization_msgs/Marker.h>
 #include <pr2_controllers_msgs/JointTrajectoryAction.h>
 #include <pr2_controllers_msgs/JointTrajectoryActionGoal.h>
-#include <tabletop_object_detector/TabletopSegmentation.h>
 #include <tabletop_object_detector/Table.h>
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/point_cloud_conversion.h>
@@ -16,6 +15,7 @@
 #include <stdio.h>
 #include <Eigen/Eigen>
 
+#include "controlSequence.h"
 #include "tubeManipulation.h"
 #include "robotHead.h"
 #include "tubePerception.h"
@@ -34,13 +34,18 @@ int main(int argc, char **argv)
     ros::AsyncSpinner spinner(1);
     spinner.start();
 
-    ros::ServiceClient seg_srv_client = rh->serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
+    /*ros::ServiceClient seg_srv_client = rh->serviceClient<tabletop_object_detector::TabletopSegmentation>(SEGMENTATION_SRV);
     //ros::Publisher cloud_pub = rh->advertise<sensor_msgs::PointCloud2>("tube_cloud",2);
     //ros::Publisher marker_pub = rh->advertise<visualization_msgs::Marker>("tube_cylinder_markers", 10);
     ros::Publisher pose_pub = rh->advertise<geometry_msgs::PoseStamped>("/tube_polishing/work_traj_pose",10);
     ros::Publisher marker_pub = rh->advertise<visualization_msgs::Marker>("/tube_polishing/marker", 2);
     ros::Publisher tube_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
-    ros::Publisher grasp_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
+    ros::Publisher grasp_marker_pub = rh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);*/
+
+    ControlSequence control_seq(rh);
+    control_seq.initialize();
+    control_seq.start();
+    ros::shutdown();
 
     /*TubeManipulation::CollisionCheck collision_check(rh);
     collision_check.enableVisualization();
@@ -94,28 +99,6 @@ int main(int argc, char **argv)
         }
     }*/
 
-    TubeManipulation::Arms manip(rh);
-    geometry_msgs::Pose pose;
-    pose.position.x = 0.1;
-    pose.position.y = -0.6;
-    pose.position.z = 0.8;
-    pose.orientation.x = 0.0;
-    pose.orientation.y = 0.0;
-    pose.orientation.z = 0.0;
-    pose.orientation.w = 1.0;
-    //manip.moveRightArm(pose);
-    manip.moveRightArmWithMPlanning(pose);
-    pose.position.x = 0.1;
-    pose.position.y = 0.6;
-    pose.position.z = 0.8;
-    pose.orientation.x = 0.0;
-    pose.orientation.y = 0.0;
-    pose.orientation.z = 0.0;
-    pose.orientation.w = 1.0;
-    manip.moveLeftArm(pose);
-
-    robotHead pr2_head;
-    pr2_head.lookAt(0.75,0.0,0.5);
 
     /*pcl::PointCloud<pcl::PointXYZ>::Ptr tube_cloud_ptr;
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
@@ -130,7 +113,6 @@ int main(int argc, char **argv)
         {
             if(seg_srv.response.result==seg_srv.response.SUCCESS)
             {
-                ROS_INFO("....OK....");
                 for(unsigned int i=0; i<seg_srv.response.clusters.size(); i++)
                 {
                     sensor_msgs::PointCloud pc;

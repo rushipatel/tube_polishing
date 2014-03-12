@@ -62,7 +62,6 @@ namespace TubeGrasp
     class GraspAnalysis
     {
     public:
-        ros::NodeHandlePtr nodeHandle;
         GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh);
         void setWorkPose(geometry_msgs::Pose &p);
         int getWorkPose(geometry_msgs::Pose &p);
@@ -81,13 +80,16 @@ namespace TubeGrasp
         visualization_msgs::Marker vismsg_workNormalsY;
         visualization_msgs::Marker vismsg_workNormalsZ;
         geometry_msgs::PoseArray grasp_pose_array;
+        typedef boost::shared_ptr<TubeGrasp::GraspAnalysis> Ptr;
 
     private:
+        ros::NodeHandlePtr _nh;
         TubePerception::Tube::Ptr _tube;
         TubeGrasp::GraspArray::Ptr _grasp_array;
         TubeGrasp::GraspPairArray::Ptr _test_pairs;
         TubeGrasp::GraspPairArray::Ptr _valid_pairs;
-        unsigned long _best_pair_idx;
+        TubeGrasp::GraspPair _computed_pair;
+        bool _grasp_pair_found;
 
         geometry_msgs::Pose _work_pose;
         int _traj_idx;

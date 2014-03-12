@@ -19,7 +19,7 @@ public:
   {
       delete point_head_client_;
   };
-  void lookAt(double x, double y, double z);
+  bool lookAt(double x, double y, double z);
 };
 
 #endif

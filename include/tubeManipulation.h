@@ -67,16 +67,22 @@ public:
     void setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array);
     void setWristOffset(tf::Transform &right_offset, tf::Transform &left_offset);
     void setWristOffset(geometry_msgs::Pose &right_offset, geometry_msgs::Pose &left_offset);
-    bool _get_regrasp_pose_right(geometry_msgs::Pose crnt_grasp,
+    bool getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
                                  geometry_msgs::Pose wrist_pose,
-                                 geometry_msgs::Pose right_grasp,
-                                 geometry_msgs::Pose left_grasp,
+                                 geometry_msgs::Pose other_hand_grasp,
+                                 arm_navigation_msgs::AttachedCollisionObject att_obj,
+                                 geometry_msgs::Pose &obj_pose_out);
+    bool getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
+                                 geometry_msgs::Pose wrist_pose,
+                                 geometry_msgs::Pose other_hand_grasp,
                                  arm_navigation_msgs::AttachedCollisionObject att_obj,
                                  geometry_msgs::Pose &obj_pose_out);
     bool moveRightArmWithMPlanning(geometry_msgs::Pose pose);
     bool moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, 
                                    geometry_msgs::Pose pose);
-    bool moveLeftArmWithMPlanning();
+    bool moveLeftArmWithMPlanning(geometry_msgs::Pose pose);
+    bool moveLeftArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
+    typedef boost::shared_ptr<TubeManipulation::Arms> Ptr;
 
 private:
     ros::NodeHandlePtr _rh;
@@ -101,6 +107,8 @@ private:
     tf::Transform _left_wrist_offset; /*!< Offset of left arm wrist_roll link from object. */
     tf::Transform _right_wrist_offset; /*!< Offset of right arm wrist_roll link from object. */
     geometry_msgs::PoseArray _obj_pose_traj; /*!< Pose trajectory of an object. */
+    std::vector<std::string> _r_jnt_nms;
+    std::vector<std::string> _l_jnt_nms;
 
     void _get_right_goal();
     void _get_left_goal();
@@ -133,6 +141,8 @@ private:
                                   std::vector<double> &seed_state);
     bool _gen_trarajectory(std::vector<double> &right_joint_traj,
                            std::vector<double> &left_joint_traj);
+    bool _move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
+    bool _move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
 
     geometry_msgs::Pose _get_right_fk(std::vector<double> &joints);
     geometry_msgs::Pose _get_left_fk(std::vector<double> &joints);
@@ -152,6 +162,8 @@ public:
                       std::vector<double> &left_joints);
     void enableVisualization();
     void disableVisualization();
+    typedef boost::shared_ptr<TubeManipulation::CollisionCheck> Ptr;
+
 private:
     ros::NodeHandlePtr _nh;
     ros::ServiceClient _get_scn_client; /*!< get planning scene diff */

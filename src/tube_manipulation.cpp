@@ -45,6 +45,22 @@ TubeManipulation::Arms::Arms(ros::NodeHandlePtr rh)
     if(!_set_pln_scn_client.call(planning_scene_req, planning_scene_res))
         ROS_ERROR("Can't set planning scene");
 
+    _r_jnt_nms.push_back("r_shoulder_pan_joint");
+    _r_jnt_nms.push_back("r_shoulder_lift_joint");
+    _r_jnt_nms.push_back("r_upper_arm_roll_joint");
+    _r_jnt_nms.push_back("r_elbow_flex_joint");
+    _r_jnt_nms.push_back("r_forearm_roll_joint");
+    _r_jnt_nms.push_back("r_wrist_flex_joint");
+    _r_jnt_nms.push_back("r_wrist_roll_joint");
+
+    _l_jnt_nms.push_back("l_shoulder_pan_joint");
+    _l_jnt_nms.push_back("l_shoulder_lift_joint");
+    _l_jnt_nms.push_back("l_upper_arm_roll_joint");
+    _l_jnt_nms.push_back("l_elbow_flex_joint");
+    _l_jnt_nms.push_back("l_forearm_roll_joint");
+    _l_jnt_nms.push_back("l_wrist_flex_joint");
+    _l_jnt_nms.push_back("l_wrist_roll_joint");
+
 }
 
 void TubeManipulation::Arms::setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array)
@@ -133,14 +149,7 @@ geometry_msgs::Pose TubeManipulation::Arms::_get_right_fk(std::vector<double> &j
     req.robot_state.joint_state.header.stamp = ros::Time::now();
 
     req.robot_state.joint_state.name.resize(joints.size());
-    req.robot_state.joint_state.name.push_back("r_shoulder_pan_joint");
-    req.robot_state.joint_state.name.push_back("r_shoulder_lift_joint");
-    req.robot_state.joint_state.name.push_back("r_upper_arm_roll_joint");
-    req.robot_state.joint_state.name.push_back("r_elbow_flex_joint");
-    req.robot_state.joint_state.name.push_back("r_forearm_roll_joint");
-    req.robot_state.joint_state.name.push_back("r_wrist_flex_joint");
-    req.robot_state.joint_state.name.push_back("r_wrist_roll_joint");
-
+    req.robot_state.joint_state.name = _r_jnt_nms;
     req.robot_state.joint_state.position.resize(joints.size());
     for(int i=0; i<joints.size(); i++)
         req.robot_state.joint_state.position[i] = joints[i];
@@ -166,14 +175,7 @@ geometry_msgs::Pose TubeManipulation::Arms::_get_left_fk(std::vector<double> &jo
     req.robot_state.joint_state.header.stamp = ros::Time::now();
 
     req.robot_state.joint_state.name.resize(joints.size());
-    req.robot_state.joint_state.name.push_back("l_shoulder_pan_joint");
-    req.robot_state.joint_state.name.push_back("l_shoulder_lift_joint");
-    req.robot_state.joint_state.name.push_back("l_upper_arm_roll_joint");
-    req.robot_state.joint_state.name.push_back("l_elbow_flex_joint");
-    req.robot_state.joint_state.name.push_back("l_forearm_roll_joint");
-    req.robot_state.joint_state.name.push_back("l_wrist_flex_joint");
-    req.robot_state.joint_state.name.push_back("l_wrist_roll_joint");
-
+    req.robot_state.joint_state.name = _l_jnt_nms;
     req.robot_state.joint_state.position.resize(joints.size());
     for(int i=0; i<joints.size(); i++)
         req.robot_state.joint_state.position[i] = joints[i];
@@ -274,26 +276,14 @@ void TubeManipulation::Arms::_call_right_joints_unnormalizer(void)
     arm_navigation_msgs::FilterJointTrajectory::Response res;
     req.allowed_time = ros::Duration(60);
 
-    req.start_state.joint_state.name.push_back("r_shoulder_pan_joint");
-    req.start_state.joint_state.name.push_back("r_shoulder_lift_joint");
-    req.start_state.joint_state.name.push_back("r_upper_arm_roll_joint");
-    req.start_state.joint_state.name.push_back("r_elbow_flex_joint");
-    req.start_state.joint_state.name.push_back("r_forearm_roll_joint");
-    req.start_state.joint_state.name.push_back("r_wrist_flex_joint");
-    req.start_state.joint_state.name.push_back("r_wrist_roll_joint");
-    req.start_state.joint_state.position.resize(7);
+    req.start_state.joint_state.name = _r_jnt_nms;
+    req.start_state.joint_state.position.resize(_r_jnt_nms.size());
 
-    for(unsigned int i=0; i<7; i++)
+    for(unsigned int i=0; i<_r_jnt_nms.size(); i++)
         req.start_state.joint_state.position[i] = _right_goal.trajectory.points[1].positions[i];
 
 
-    req.trajectory.joint_names.push_back("r_shoulder_pan_joint");
-    req.trajectory.joint_names.push_back("r_shoulder_lift_joint");
-    req.trajectory.joint_names.push_back("r_upper_arm_roll_joint");
-    req.trajectory.joint_names.push_back("r_elbow_flex_joint");
-    req.trajectory.joint_names.push_back("r_forearm_roll_joint");
-    req.trajectory.joint_names.push_back("r_wrist_flex_joint");
-    req.trajectory.joint_names.push_back("r_wrist_roll_joint");
+    req.trajectory.joint_names = _r_jnt_nms;
     req.trajectory.points.resize(_right_goal.trajectory.points.size());
 
     for(unsigned int i=0; i<_right_goal.trajectory.points.size(); i++)
@@ -301,7 +291,7 @@ void TubeManipulation::Arms::_call_right_joints_unnormalizer(void)
 
     for(unsigned int i=0; i<_right_goal.trajectory.points.size(); i++)
     {
-        for(int j=0; j<7; j++)
+        for(int j=0; j<_r_jnt_nms.size(); j++)
             req.trajectory.points[i].positions[j] = _right_goal.trajectory.points[i].positions[j];
     }
 
@@ -314,15 +304,13 @@ void TubeManipulation::Arms::_call_right_joints_unnormalizer(void)
         else
         {
             ROS_ERROR("Requested right trajectory was not filtered. Error code: %d",res.error_code.val);
-            ros::shutdown();
-            exit(-1);
+            return;
         }
     }
     else
     {
         ROS_ERROR("Service call to right filter trajectory failed %s",_filter_trajectory_client.getService().c_str());
-        ros::shutdown();
-        exit(-1);
+        return;
     }
 }
 
@@ -336,26 +324,14 @@ void TubeManipulation::Arms::_call_left_joints_unnormalizer()
     arm_navigation_msgs::FilterJointTrajectory::Response res;
     req.allowed_time = ros::Duration(1);
 
-    req.start_state.joint_state.name.push_back("l_shoulder_pan_joint");
-    req.start_state.joint_state.name.push_back("l_shoulder_lift_joint");
-    req.start_state.joint_state.name.push_back("l_upper_arm_roll_joint");
-    req.start_state.joint_state.name.push_back("l_elbow_flex_joint");
-    req.start_state.joint_state.name.push_back("l_forearm_roll_joint");
-    req.start_state.joint_state.name.push_back("l_wrist_flex_joint");
-    req.start_state.joint_state.name.push_back("l_wrist_roll_joint");
-    req.start_state.joint_state.position.resize(7);
+    req.start_state.joint_state.name = _l_jnt_nms;
+    req.start_state.joint_state.position.resize(_l_jnt_nms.size());
 
     for(unsigned int i=0; i<7; i++)
         req.start_state.joint_state.position[i] = _left_goal.trajectory.points[1].positions[i];
 
 
-    req.trajectory.joint_names.push_back("l_shoulder_pan_joint");
-    req.trajectory.joint_names.push_back("l_shoulder_lift_joint");
-    req.trajectory.joint_names.push_back("l_upper_arm_roll_joint");
-    req.trajectory.joint_names.push_back("l_elbow_flex_joint");
-    req.trajectory.joint_names.push_back("l_forearm_roll_joint");
-    req.trajectory.joint_names.push_back("l_wrist_flex_joint");
-    req.trajectory.joint_names.push_back("l_wrist_roll_joint");
+    req.trajectory.joint_names = _l_jnt_nms;
     req.trajectory.points.resize(_left_goal.trajectory.points.size());
 
     for(unsigned int i=0; i<_left_goal.trajectory.points.size(); i++)
@@ -399,14 +375,7 @@ void TubeManipulation::Arms::_get_right_goal()
     traj_point.positions.resize(7);
     traj_point.velocities.resize(7);
 
-    _right_goal.trajectory.joint_names.push_back("r_shoulder_pan_joint");
-    _right_goal.trajectory.joint_names.push_back("r_shoulder_lift_joint");
-    _right_goal.trajectory.joint_names.push_back("r_upper_arm_roll_joint");
-    _right_goal.trajectory.joint_names.push_back("r_elbow_flex_joint");
-    _right_goal.trajectory.joint_names.push_back("r_forearm_roll_joint");
-    _right_goal.trajectory.joint_names.push_back("r_wrist_flex_joint");
-    _right_goal.trajectory.joint_names.push_back("r_wrist_roll_joint");
-
+    _right_goal.trajectory.joint_names = _r_jnt_nms;
     _right_goal.trajectory.points.resize(_obj_pose_traj.poses.size());
 
     for(int j=0; j<7; j++)
@@ -439,14 +408,7 @@ void TubeManipulation::Arms::_get_left_goal()
     traj_point.positions.resize(7);
     traj_point.velocities.resize(7);
 
-    _left_goal.trajectory.joint_names.push_back("l_shoulder_pan_joint");
-    _left_goal.trajectory.joint_names.push_back("l_shoulder_lift_joint");
-    _left_goal.trajectory.joint_names.push_back("l_upper_arm_roll_joint");
-    _left_goal.trajectory.joint_names.push_back("l_elbow_flex_joint");
-    _left_goal.trajectory.joint_names.push_back("l_forearm_roll_joint");
-    _left_goal.trajectory.joint_names.push_back("l_wrist_flex_joint");
-    _left_goal.trajectory.joint_names.push_back("l_wrist_roll_joint");
-
+    _left_goal.trajectory.joint_names = _l_jnt_nms;
     _left_goal.trajectory.points.resize(_obj_pose_traj.poses.size());
 
     for(int j=0; j<7; j++)
@@ -569,16 +531,10 @@ bool TubeManipulation::Arms::moveRightArm(geometry_msgs::Pose pose)
     if(_get_right_arm_ik(pose, joint_state, crnt_joints))
     {
         traj_goal.trajectory.points.resize(1);
-        traj_goal.trajectory.joint_names.push_back("r_shoulder_pan_joint");
-        traj_goal.trajectory.joint_names.push_back("r_shoulder_lift_joint");
-        traj_goal.trajectory.joint_names.push_back("r_upper_arm_roll_joint");
-        traj_goal.trajectory.joint_names.push_back("r_elbow_flex_joint");
-        traj_goal.trajectory.joint_names.push_back("r_forearm_roll_joint");
-        traj_goal.trajectory.joint_names.push_back("r_wrist_flex_joint");
-        traj_goal.trajectory.joint_names.push_back("r_wrist_roll_joint");
-        goal.positions.resize(7);
-        goal.velocities.resize(7);
-        for(int i=0; i<7; i++)
+        traj_goal.trajectory.joint_names = _r_jnt_nms;
+        goal.positions.resize(_r_jnt_nms.size());
+        goal.velocities.resize(_r_jnt_nms.size());
+        for(int i=0; i<_r_jnt_nms.size(); i++)
         {
             goal.positions[i] = joint_state.position[i];
             goal.velocities[i] = 0.0;
@@ -588,7 +544,7 @@ bool TubeManipulation::Arms::moveRightArm(geometry_msgs::Pose pose)
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
         _traj_client_r->sendGoalAndWait(traj_goal);
-        std::vector<double> joints(7);
+        std::vector<double> joints(_r_jnt_nms.size());
         double err = 1;
         while(err>0.01)
         {
@@ -608,112 +564,138 @@ bool TubeManipulation::Arms::moveRightArm(geometry_msgs::Pose pose)
 
 bool TubeManipulation::Arms::moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
 {
-    arm_navigation_msgs::MoveArmGoal goalA;
-    
-      goalA.motion_plan_request.group_name = "right_arm";
-      goalA.motion_plan_request.num_planning_attempts = 1;
-      goalA.motion_plan_request.planner_id = std::string("");
-      goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
-      goalA.motion_plan_request.allowed_planning_time = ros::Duration(5.0);
-      goalA.planning_scene_diff.attached_collision_objects.push_back(attObj);
-      
-      arm_navigation_msgs::SimplePoseConstraint desired_pose;
-      desired_pose.header.frame_id = "base_link";
-      desired_pose.link_name = "r_wrist_roll_link";
-      desired_pose.pose = pose;
-          
-      desired_pose.absolute_position_tolerance.x = 0.02;
-      desired_pose.absolute_position_tolerance.y = 0.02;
-      desired_pose.absolute_position_tolerance.z = 0.02;
-    
-      desired_pose.absolute_roll_tolerance = 0.04;
-      desired_pose.absolute_pitch_tolerance = 0.04;
-      desired_pose.absolute_yaw_tolerance = 0.04;
-      
-      arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);
-    
-      if (_rh->ok())
-      {
-        bool finished_within_time = false;
-        _mv_arm_client_r->sendGoal(goalA);
-        finished_within_time = _mv_arm_client_r->waitForResult(ros::Duration(60.0));
-        if (!finished_within_time)
-        {
-          _mv_arm_client_r->cancelGoal();
-          ROS_INFO("TubeManipulation - Timed out achieving goal");
-          return false;
-        }
-        else
-        {
-          actionlib::SimpleClientGoalState state = _mv_arm_client_r->getState();
-          bool success = (state == actionlib::SimpleClientGoalState::SUCCEEDED);
-          if(success)
-            ROS_INFO("TubeManipulation - Action finished: %s",state.toString().c_str());
-          else
-          {
-            ROS_INFO("TubeManipulation - Action failed: %s",state.toString().c_str());
-            return false;
-          }
-        }
-      }
-return true;
+    return _move_right_arm_with_mplning(attObj, pose);
 }
 
 bool TubeManipulation::Arms::moveRightArmWithMPlanning(geometry_msgs::Pose pose)
 {
+    arm_navigation_msgs::AttachedCollisionObject attObj;
+    return _move_right_arm_with_mplning(attObj, pose);
+}
+bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
+{
     arm_navigation_msgs::MoveArmGoal goalA;
-    
-      goalA.motion_plan_request.group_name = "right_arm";
-      goalA.motion_plan_request.num_planning_attempts = 1;
-      goalA.motion_plan_request.planner_id = std::string("");
-      goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
-      goalA.motion_plan_request.allowed_planning_time = ros::Duration(5.0);
-      
-      arm_navigation_msgs::SimplePoseConstraint desired_pose;
-      desired_pose.header.frame_id = "base_link";
-      desired_pose.link_name = "r_wrist_roll_link";
-      desired_pose.pose = pose;
-          
-      desired_pose.absolute_position_tolerance.x = 0.02;
-      desired_pose.absolute_position_tolerance.y = 0.02;
-      desired_pose.absolute_position_tolerance.z = 0.02;
-    
-      desired_pose.absolute_roll_tolerance = 0.04;
-      desired_pose.absolute_pitch_tolerance = 0.04;
-      desired_pose.absolute_yaw_tolerance = 0.04;
-      
-      arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);
-    
-      if (_rh->ok())
-      {
+
+    goalA.motion_plan_request.group_name = "right_arm";
+    goalA.motion_plan_request.num_planning_attempts = 3;
+    goalA.motion_plan_request.planner_id = std::string("");
+    goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
+    goalA.motion_plan_request.allowed_planning_time = ros::Duration(60.0);
+
+    if(!attObj.object.shapes.empty())
+        goalA.planning_scene_diff.attached_collision_objects.push_back(attObj);
+
+    arm_navigation_msgs::SimplePoseConstraint desired_pose;
+    desired_pose.header.frame_id = "base_link";
+    desired_pose.link_name = "r_wrist_roll_link";
+    desired_pose.pose = pose;
+
+    desired_pose.absolute_position_tolerance.x = 0.02;
+    desired_pose.absolute_position_tolerance.y = 0.02;
+    desired_pose.absolute_position_tolerance.z = 0.02;
+
+    desired_pose.absolute_roll_tolerance = 0.04;
+    desired_pose.absolute_pitch_tolerance = 0.04;
+    desired_pose.absolute_yaw_tolerance = 0.04;
+
+    arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);
+
+    if (_rh->ok())
+    {
         bool finished_within_time = false;
         _mv_arm_client_r->sendGoal(goalA);
         finished_within_time = _mv_arm_client_r->waitForResult(ros::Duration(60.0));
         if (!finished_within_time)
         {
-          _mv_arm_client_r->cancelGoal();
-          ROS_INFO("TubeManipulation - Timed out achieving goal");
-          return false;
+            _mv_arm_client_r->cancelGoal();
+            ROS_INFO("TubeManipulation - Timed out achieving goal");
+            return false;
         }
         else
         {
-          actionlib::SimpleClientGoalState state = _mv_arm_client_r->getState();
-          bool success = (state == actionlib::SimpleClientGoalState::SUCCEEDED);
-          if(success)
+            actionlib::SimpleClientGoalState state = _mv_arm_client_r->getState();
+            bool success = (state == actionlib::SimpleClientGoalState::SUCCEEDED);
+            if(success)
             ROS_INFO("TubeManipulation - Action finished: %s",state.toString().c_str());
-          else
-          {
-            ROS_INFO("TubeManipulation - Action failed: %s",state.toString().c_str());
-            return false;
-          }
+            else
+            {
+                ROS_INFO("TubeManipulation - Action failed: %s",state.toString().c_str());
+                return false;
+            }
         }
-      }
+    }
     return true;
 }
 
-bool TubeManipulation::Arms::moveLeftArmWithMPlanning()
+bool TubeManipulation::Arms::moveLeftArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
 {
-    ;
+    return _move_left_arm_with_mplning(attObj, pose);
+}
+
+bool TubeManipulation::Arms::moveLeftArmWithMPlanning(geometry_msgs::Pose pose)
+{
+    arm_navigation_msgs::AttachedCollisionObject attObj;
+    return _move_left_arm_with_mplning(attObj, pose);
+}
+
+bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
+{
+    arm_navigation_msgs::MoveArmGoal goalA;
+
+    goalA.motion_plan_request.group_name = "left_arm";
+    goalA.motion_plan_request.num_planning_attempts = 3;
+    goalA.motion_plan_request.planner_id = std::string("");
+    goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
+    std::vector<double> joints;
+    _get_left_joints(joints);
+
+    goalA.motion_plan_request.start_state.joint_state.name = _l_jnt_nms;
+    goalA.motion_plan_request.start_state.joint_state.position = joints;
+    goalA.motion_plan_request.allowed_planning_time = ros::Duration(60.0);
+
+    if(!attObj.object.shapes.empty())
+        goalA.planning_scene_diff.attached_collision_objects.push_back(attObj);
+
+    arm_navigation_msgs::SimplePoseConstraint desired_pose;
+    desired_pose.header.frame_id = "base_link";
+    desired_pose.link_name = "l_wrist_roll_link";
+    desired_pose.pose = pose;
+
+    desired_pose.absolute_position_tolerance.x = 0.02;
+    desired_pose.absolute_position_tolerance.y = 0.02;
+    desired_pose.absolute_position_tolerance.z = 0.02;
+
+    desired_pose.absolute_roll_tolerance = 0.04;
+    desired_pose.absolute_pitch_tolerance = 0.04;
+    desired_pose.absolute_yaw_tolerance = 0.04;
+
+    arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);
+
+    if (_rh->ok())
+    {
+        bool finished_within_time = false;
+        _mv_arm_client_l->sendGoal(goalA);
+        finished_within_time = _mv_arm_client_l->waitForResult(ros::Duration(60.0));
+        if (!finished_within_time)
+        {
+            _mv_arm_client_l->cancelGoal();
+            ROS_INFO("TubeManipulation - Timed out achieving goal");
+            return false;
+        }
+        else
+        {
+            actionlib::SimpleClientGoalState state = _mv_arm_client_l->getState();
+            bool success = (state == actionlib::SimpleClientGoalState::SUCCEEDED);
+            if(success)
+            ROS_INFO("TubeManipulation - Action finished: %s",state.toString().c_str());
+            else
+            {
+                ROS_INFO("TubeManipulation - Action failed: %s",state.toString().c_str());
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 /*! \brief Simple move arm function to move individual arm for given pose.
@@ -732,16 +714,10 @@ bool TubeManipulation::Arms::moveLeftArm(geometry_msgs::Pose pose)
     if(_get_left_arm_ik(pose, joint_state, crnt_joints))
     {
         traj_goal.trajectory.points.resize(1);
-        traj_goal.trajectory.joint_names.push_back("l_shoulder_pan_joint");
-        traj_goal.trajectory.joint_names.push_back("l_shoulder_lift_joint");
-        traj_goal.trajectory.joint_names.push_back("l_upper_arm_roll_joint");
-        traj_goal.trajectory.joint_names.push_back("l_elbow_flex_joint");
-        traj_goal.trajectory.joint_names.push_back("l_forearm_roll_joint");
-        traj_goal.trajectory.joint_names.push_back("l_wrist_flex_joint");
-        traj_goal.trajectory.joint_names.push_back("l_wrist_roll_joint");
-        goal.positions.resize(7);
-        goal.velocities.resize(7);
-        for(int i=0; i<7; i++)
+        traj_goal.trajectory.joint_names = _l_jnt_nms;
+        goal.positions.resize(_l_jnt_nms.size());
+        goal.velocities.resize(_l_jnt_nms.size());
+        for(int i=0; i<_l_jnt_nms.size(); i++)
         {
             goal.positions[i] = joint_state.position[i];
             goal.velocities[i] = 0.0;
@@ -752,7 +728,7 @@ bool TubeManipulation::Arms::moveLeftArm(geometry_msgs::Pose pose)
         traj_goal.trajectory.header.stamp = time_to_start;
         _traj_client_l->sendGoalAndWait(traj_goal);
         
-        std::vector<double> joints(7);
+        std::vector<double> joints(_l_jnt_nms.size());
         double err = 1;
         while(err>0.01)
         {
@@ -786,16 +762,10 @@ bool TubeManipulation::Arms::simpleMoveRightArm(geometry_msgs::Pose pose)
     if(_get_simple_right_arm_ik(pose, joint_state, crnt_joints))
     {
         traj_goal.trajectory.points.resize(1);
-        traj_goal.trajectory.joint_names.push_back("r_shoulder_pan_joint");
-        traj_goal.trajectory.joint_names.push_back("r_shoulder_lift_joint");
-        traj_goal.trajectory.joint_names.push_back("r_upper_arm_roll_joint");
-        traj_goal.trajectory.joint_names.push_back("r_elbow_flex_joint");
-        traj_goal.trajectory.joint_names.push_back("r_forearm_roll_joint");
-        traj_goal.trajectory.joint_names.push_back("r_wrist_flex_joint");
-        traj_goal.trajectory.joint_names.push_back("r_wrist_roll_joint");
-        goal.positions.resize(7);
-        goal.velocities.resize(7);
-        for(int j=0; j<7; j++)
+        traj_goal.trajectory.joint_names = _r_jnt_nms;
+        goal.positions.resize(_r_jnt_nms.size());
+        goal.velocities.resize(_r_jnt_nms.size());
+        for(int j=0; j<_r_jnt_nms.size(); j++)
         {
             goal.positions[j] = joint_state.position[j];
             goal.velocities[j] = 0.0;
@@ -805,7 +775,7 @@ bool TubeManipulation::Arms::simpleMoveRightArm(geometry_msgs::Pose pose)
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
         _traj_client_r->sendGoalAndWait(traj_goal);
-        std::vector<double> joints(7);
+        std::vector<double> joints(_r_jnt_nms.size());
         double err = 1;
         while(err>0.01)
         {
@@ -839,16 +809,10 @@ bool TubeManipulation::Arms::simpleMoveLeftArm(geometry_msgs::Pose pose)
     if(_get_simple_left_arm_ik(pose, joint_state, crnt_joints))
     {
         traj_goal.trajectory.points.resize(1);
-        traj_goal.trajectory.joint_names.push_back("l_shoulder_pan_joint");
-        traj_goal.trajectory.joint_names.push_back("l_shoulder_lift_joint");
-        traj_goal.trajectory.joint_names.push_back("l_upper_arm_roll_joint");
-        traj_goal.trajectory.joint_names.push_back("l_elbow_flex_joint");
-        traj_goal.trajectory.joint_names.push_back("l_forearm_roll_joint");
-        traj_goal.trajectory.joint_names.push_back("l_wrist_flex_joint");
-        traj_goal.trajectory.joint_names.push_back("l_wrist_roll_joint");
-        goal.positions.resize(7);
-        goal.velocities.resize(7);
-        for(int j=0; j<7; j++)
+        traj_goal.trajectory.joint_names = _l_jnt_nms;
+        goal.positions.resize(_l_jnt_nms.size());
+        goal.velocities.resize(_l_jnt_nms.size());
+        for(int j=0; j<_l_jnt_nms.size(); j++)
         {
             goal.positions[j] = joint_state.position[j];
             goal.velocities[j] = 0.0;
@@ -858,7 +822,7 @@ bool TubeManipulation::Arms::simpleMoveLeftArm(geometry_msgs::Pose pose)
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
         _traj_client_l->sendGoalAndWait(traj_goal);
-        std::vector<double> joints(7);
+        std::vector<double> joints(_l_jnt_nms.size());
         double err = 1;
         while(err>0.01)
         {
@@ -875,147 +839,6 @@ bool TubeManipulation::Arms::simpleMoveLeftArm(geometry_msgs::Pose pose)
 
     return 1;
 }
-
-///*! \brief Calls IK service.
-// *
-// */
-//bool _call_right_arm_gpik(std::vector<double> &right_joint_trajectory)
-//{
-//    kinematics_msgs::GetKinematicSolverInfo::Request request;
-//    kinematics_msgs::GetKinematicSolverInfo::Response response;
-//    std::vector<double> last_joints;
-//    geometry_msgs::Pose pose;
-//    tf::Transform tf_base_wrist, tf_base_obj;
-
-//    if(_query_client_r.call(request,response))
-//    {
-//      for(unsigned int i=0; i< response.kinematic_solver_info.joint_names.size(); i++)
-//      {
-//        ROS_DEBUG("right arm Joint: %d %s",i,response.kinematic_solver_info.joint_names[i].c_str());
-//      }
-//    }
-//    else
-//    {
-//      ROS_ERROR("Could not call right arm query service");
-//      ros::shutdown();
-//      exit(-1);
-//    }
-
-//    kinematics_msgs::GetConstraintAwarePositionIK::Request  gpik_req;
-//    kinematics_msgs::GetConstraintAwarePositionIK::Response gpik_res;
-//    gpik_req.timeout = ros::Duration(5.0);
-//    gpik_req.ik_request.ik_link_name = "r_wrist_roll_link";
-
-//    gpik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
-//    gpik_req.ik_request.ik_seed_state.joint_state.position.resize(response.kinematic_solver_info.joint_names.size());
-//    gpik_req.ik_request.ik_seed_state.joint_state.name = response.kinematic_solver_info.joint_names;
-//    _get_right_joints(last_joints);
-
-//    for(unsigned int i=0; i<_obj_pose_traj.poses.size(); i++)
-//    {
-//        tf_base_obj = pose2tf(_obj_pose_traj.poses[i]);
-//        tf_base_wrist = tf_base_obj*_right_wrist_offset;
-//        pose = tf2pose(tf_base_wrist);
-//        for(int k=0; k<7; k++)
-//            gpik_req.ik_request.ik_seed_state.joint_state.position[k] = last_joints[k];
-//        gpik_req.ik_request.pose_stamped.pose = pose;
-//        if(_ik_client_r.call(gpik_req, gpik_res))
-//        {
-//          if(gpik_res.error_code.val == gpik_res.error_code.SUCCESS)
-//          {
-//            for(unsigned int j=0; j<gpik_res.solution.joint_state.name.size(); j++)
-//            {
-//              //ROS_INFO("Joint: %s %f",gpik_res.solution.joint_state.name[i].c_str(),gpik_res.solution.joint_state.position[i]);
-//              right_joint_trajectory.push_back(gpik_res.solution.joint_state.position[j]);
-//            }
-//            for( int l=0; l<7; l++)
-//                last_joints[l] = gpik_res.solution.joint_state.position[l];
-//          }
-//          else
-//          {
-//            ROS_DEBUG("right arm Inverse kinematics failed at pose no. %d",i);
-//            return 0;
-//          }
-//        }
-//        else
-//        {
-//          ROS_ERROR("right arm Inverse kinematics service call failed at pose no. %d",i);
-//          return 0;
-//        }
-//    }
-//    return 1;
-//}
-
-///*! \brief Calls IK service.
-// *
-// */
-//bool _call_left_arm_gpik(std::vector<double> &left_joint_trajectory)
-//{
-//    kinematics_msgs::GetKinematicSolverInfo::Request request;
-//    kinematics_msgs::GetKinematicSolverInfo::Response response;
-//    std::vector<double> last_joints(7);
-//    geometry_msgs::Pose pose;
-//    tf::Transform tf_base_wrist, tf_base_obj;
-
-//    if(_query_client_l.call(request,response))
-//    {
-//      for(unsigned int i=0; i< response.kinematic_solver_info.joint_names.size(); i++)
-//      {
-//        ROS_DEBUG("left_arm Joint: %d %s",i,response.kinematic_solver_info.joint_names[i].c_str());
-//      }
-//    }
-//    else
-//    {
-//      ROS_ERROR("Could not call left_arm query service");
-//      ros::shutdown();
-//      exit(-1);
-//    }
-
-//    kinematics_msgs::GetConstraintAwarePositionIK::Request  gpik_req;
-//    kinematics_msgs::GetConstraintAwarePositionIK::Response gpik_res;
-//    gpik_req.timeout = ros::Duration(5.0);
-//    gpik_req.ik_request.ik_link_name = "l_wrist_roll_link";
-
-//    gpik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
-//    gpik_req.ik_request.ik_seed_state.joint_state.position.resize(response.kinematic_solver_info.joint_names.size());
-//    gpik_req.ik_request.ik_seed_state.joint_state.name = response.kinematic_solver_info.joint_names;
-
-//    _get_left_joints(last_joints);
-
-//    for(unsigned int i=0; i<_obj_pose_traj.poses.size(); i++)
-//    {
-//        tf_base_obj = pose2tf(_obj_pose_traj.poses[i]);
-//        tf_base_wrist = tf_base_obj*_left_wrist_offset;
-//        pose = tf2pose(tf_base_wrist);
-//        for(int k=0; k<7; k++)
-//            gpik_req.ik_request.ik_seed_state.joint_state.position[k] = last_joints[k];
-//        gpik_req.ik_request.pose_stamped.pose = pose;
-//        if(ik_client_l_.call(gpik_req, gpik_res))
-//        {
-//          if(gpik_res.error_code.val == gpik_res.error_code.SUCCESS)
-//          {
-//            for(unsigned int j=0; j<gpik_res.solution.joint_state.name.size(); j++)
-//            {
-//              //ROS_INFO("Joint: %s %f",gpik_res.solution.joint_state.name[i].c_str(),gpik_res.solution.joint_state.position[i]);
-//              left_joint_trajectory.push_back(gpik_res.solution.joint_state.position[j]);
-//            }
-//            for( int l=0; l<7; l++)
-//                last_joints[l] = gpik_res.solution.joint_state.position[l];
-//          }
-//          else
-//          {
-//            ROS_DEBUG("left_arm Inverse kinematics failed at pose no. %d",i);
-//            return 0;
-//          }
-//        }
-//        else
-//        {
-//          ROS_ERROR("left_arm Inverse kinematics service call failed at pose no. %d",i);
-//          return 0;
-//        }
-//    }
-//    return 1;
-//}
 
 bool TubeManipulation::Arms::getRightArmIK(geometry_msgs::Pose pose,
                              sensor_msgs::JointState &jointState)
@@ -1065,40 +888,18 @@ bool TubeManipulation::Arms::_get_right_arm_ik(geometry_msgs::Pose pose,
     kinematics_msgs::GetConstraintAwarePositionIK::Request  ik_req;
     kinematics_msgs::GetConstraintAwarePositionIK::Response ik_res;
 
-    kinematics_msgs::GetKinematicSolverInfo::Request request;
-    kinematics_msgs::GetKinematicSolverInfo::Response response;
-    if(_query_client_r.call(request,response))
-    {
-      for(unsigned int i=0; i< response.kinematic_solver_info.joint_names.size(); i++)
-      {
-        ROS_DEBUG("right_arm Joint: %d %s",i,response.kinematic_solver_info.joint_names[i].c_str());
-      }
-    }
-    else
-    {
-      ROS_ERROR("Could not call right_arm query service");
-      return false;
-    }
-
     ik_req.timeout = ros::Duration(5.0);
     ik_req.ik_request.ik_link_name = "r_wrist_roll_link";
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_shoulder_pan_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_shoulder_lift_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_upper_arm_roll_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_elbow_flex_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_forearm_roll_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_wrist_flex_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_wrist_roll_joint");
-
-    ik_req.ik_request.ik_seed_state.joint_state.position.resize(7);
-    if(seed_state.size()==7)
+    ik_req.ik_request.ik_seed_state.joint_state.name = _r_jnt_nms;
+    ik_req.ik_request.ik_seed_state.joint_state.position.resize(_r_jnt_nms.size());
+    if(seed_state.size()==_r_jnt_nms.size())
     {
-        for(unsigned int i=0; i<7; i++)
+        for(unsigned int i=0; i<_r_jnt_nms.size(); i++)
             ik_req.ik_request.ik_seed_state.joint_state.position[i] = seed_state[i];
     }
     else
     {
-        ROS_ERROR("Seed state value is less than number of joints (7)");
+        ROS_ERROR("Seed state value is less than number of joints (%d)",_r_jnt_nms.size());
         return 0;
     }
 
@@ -1131,41 +932,19 @@ bool TubeManipulation::Arms::_get_simple_right_arm_ik(geometry_msgs::Pose &pose,
 {
     kinematics_msgs::GetPositionIK::Request  ik_req;
     kinematics_msgs::GetPositionIK::Response ik_res;
-    kinematics_msgs::GetKinematicSolverInfo::Request request;
-    kinematics_msgs::GetKinematicSolverInfo::Response response;
-
-    if(_query_client_r.call(request,response))
-    {
-      for(unsigned int i=0; i< response.kinematic_solver_info.joint_names.size(); i++)
-      {
-        ROS_DEBUG("right_arm Joint: %d %s",i,response.kinematic_solver_info.joint_names[i].c_str());
-      }
-    }
-    else
-    {
-      ROS_ERROR("Could not call right_arm query service");
-      return false;
-    }
 
     ik_req.timeout = ros::Duration(5.0);
     ik_req.ik_request.ik_link_name = "r_wrist_roll_link";
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_shoulder_pan_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_shoulder_lift_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_upper_arm_roll_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_elbow_flex_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_forearm_roll_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_wrist_flex_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("r_wrist_roll_joint");
-
-    ik_req.ik_request.ik_seed_state.joint_state.position.resize(7);
-    if(seed_state.size()==7)
+    ik_req.ik_request.ik_seed_state.joint_state.name = _r_jnt_nms;
+    ik_req.ik_request.ik_seed_state.joint_state.position.resize(_r_jnt_nms.size());
+    if(seed_state.size()==_r_jnt_nms.size())
     {
-        for(unsigned int i=0; i<7; i++)
+        for(unsigned int i=0; i<_r_jnt_nms.size(); i++)
             ik_req.ik_request.ik_seed_state.joint_state.position[i] = seed_state[i];
     }
     else
     {
-        ROS_ERROR("Seed state value is less than number of joints (7)");
+        ROS_ERROR("Seed state value is less than number of joints (%d)", _r_jnt_nms.size());
         return 0;
     }
 
@@ -1199,35 +978,14 @@ bool TubeManipulation::Arms::_get_left_arm_ik(geometry_msgs::Pose pose,
     kinematics_msgs::GetConstraintAwarePositionIK::Request  ik_req;
     kinematics_msgs::GetConstraintAwarePositionIK::Response ik_res;
 
-    kinematics_msgs::GetKinematicSolverInfo::Request request;
-    kinematics_msgs::GetKinematicSolverInfo::Response response;
-    if(_query_client_l.call(request,response))
-    {
-      for(unsigned int i=0; i< response.kinematic_solver_info.joint_names.size(); i++)
-      {
-        ROS_DEBUG("left_arm Joint: %d %s",i,response.kinematic_solver_info.joint_names[i].c_str());
-      }
-    }
-    else
-    {
-      ROS_ERROR("Could not call left_arm query service");
-      return false;
-    }
-
     ik_req.timeout = ros::Duration(5.0);
     ik_req.ik_request.ik_link_name = "l_wrist_roll_link";
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_shoulder_pan_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_shoulder_lift_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_upper_arm_roll_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_elbow_flex_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_forearm_roll_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_wrist_flex_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_wrist_roll_joint");
+    ik_req.ik_request.ik_seed_state.joint_state.name = _l_jnt_nms;
+    ik_req.ik_request.ik_seed_state.joint_state.position.resize(_l_jnt_nms.size());
 
-    ik_req.ik_request.ik_seed_state.joint_state.position.resize(7);
-    if(seed_state.size()==7)
+    if(seed_state.size()==_l_jnt_nms.size())
     {
-        for(unsigned int i=0; i<7; i++)
+        for(unsigned int i=0; i<_l_jnt_nms.size(); i++)
             ik_req.ik_request.ik_seed_state.joint_state.position[i] = seed_state[i];
     }
     else
@@ -1239,7 +997,7 @@ bool TubeManipulation::Arms::_get_left_arm_ik(geometry_msgs::Pose pose,
     ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
     ik_req.ik_request.pose_stamped.pose = pose;
 
-    if(_ik_client_l .call(ik_req, ik_res))
+    if(_ik_client_l.call(ik_req, ik_res))
     {
       if(ik_res.error_code.val == ik_res.error_code.SUCCESS)
       {
@@ -1266,47 +1024,25 @@ bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
     kinematics_msgs::GetPositionIK::Request  ik_req;
     kinematics_msgs::GetPositionIK::Response ik_res;
 
-    kinematics_msgs::GetKinematicSolverInfo::Request request;
-    kinematics_msgs::GetKinematicSolverInfo::Response response;
-    if(_query_client_l.call(request,response))
-    {
-      for(unsigned int i=0; i< response.kinematic_solver_info.joint_names.size(); i++)
-      {
-        ROS_DEBUG("left_arm Joint: %d %s",i,response.kinematic_solver_info.joint_names[i].c_str());
-      }
-    }
-    else
-    {
-      ROS_ERROR("Could not call left_arm query service");
-      return false;
-    }
-
     ik_req.timeout = ros::Duration(5.0);
     ik_req.ik_request.ik_link_name = "l_wrist_roll_link";
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_shoulder_pan_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_shoulder_lift_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_upper_arm_roll_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_elbow_flex_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_forearm_roll_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_wrist_flex_joint");
-    ik_req.ik_request.ik_seed_state.joint_state.name.push_back("l_wrist_roll_joint");
-
-    ik_req.ik_request.ik_seed_state.joint_state.position.resize(7);
-    if(seed_state.size()==7)
+    ik_req.ik_request.ik_seed_state.joint_state.name = _l_jnt_nms;
+    ik_req.ik_request.ik_seed_state.joint_state.position.resize(_l_jnt_nms.size());
+    if(seed_state.size()==_l_jnt_nms.size())
     {
-        for(unsigned int i=0; i<7; i++)
+        for(unsigned int i=0; i<_l_jnt_nms.size(); i++)
             ik_req.ik_request.ik_seed_state.joint_state.position[i] = seed_state[i];
     }
     else
     {
-        ROS_ERROR("Seed state value is less than number of joints (7)");
+        ROS_ERROR("Seed state value is less than number of joints (%d)", _l_jnt_nms.size());
         return 0;
     }
 
     ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
     ik_req.ik_request.pose_stamped.pose = pose;
 
-    if(_smpl_ik_client_l .call(ik_req, ik_res))
+    if(_smpl_ik_client_l.call(ik_req, ik_res))
     {
       if(ik_res.error_code.val == ik_res.error_code.SUCCESS)
       {
@@ -1346,52 +1082,49 @@ bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, 
     return flag;
 }
 
-bool TubeManipulation::Arms::_get_regrasp_pose_right(geometry_msgs::Pose crnt_grasp,
+//for object picked up by right arm
+bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
                                                      geometry_msgs::Pose wrist_pose,
-                                                     geometry_msgs::Pose right_grasp,
-                                                     geometry_msgs::Pose left_grasp,
+                                                     geometry_msgs::Pose other_hand_grasp,
                                                      arm_navigation_msgs::AttachedCollisionObject att_obj,
                                                      geometry_msgs::Pose &obj_pose_out)
 {
     bool pose_found = false;
     TubeManipulation::CollisionCheck collision_check(_rh);
     collision_check.setAttachedObj(att_obj);
-    tf::Transform obj_orig,obj,rand_tf,
+    tf::Transform obj_orig, obj, rand_tf,
             wrist=pose2tf(wrist_pose),
             grasp=pose2tf(crnt_grasp),
-            rg = pose2tf(right_grasp),
-            lg = pose2tf(left_grasp);
+            og = pose2tf(other_hand_grasp);
 
     obj_orig = wrist * grasp.inverse();
 
     tf::Quaternion q;
     tf::Vector3 pos;
     double y,p,r;
-    int cnt = 1000;
+    int MAX_CNT = 1000;
+    int cnt = MAX_CNT;
     obj = obj_orig;
     std::vector<double> right_joints(7), right_seeds(7),
                         left_seeds(7), left_joints(7);
 
     _get_right_joints(right_seeds);
     _get_left_joints(left_seeds);
-    tf::Transform right_wrist, right_wrist_crnt, left_wrist;
-    geometry_msgs::Pose right_wrist_crnt_pose, right_wrist_pose, left_wrist_pose;
+    tf::Transform wrist_crnt, other_wrist;
+    geometry_msgs::Pose wrist_crnt_pose, other_wrist_pose;
 
     do
     {
-        right_wrist_crnt = obj * grasp;
-        right_wrist = obj * rg;
-        left_wrist = obj * lg;
-        right_wrist_pose = tf2pose(right_wrist);
-        right_wrist_crnt_pose = tf2pose(right_wrist_crnt);
-        left_wrist_pose = tf2pose(left_wrist);
-        if(_get_simple_right_arm_ik(right_wrist_pose, right_joints, right_seeds)
-           &&_get_simple_right_arm_ik(right_wrist_crnt_pose, right_joints, right_seeds)
-           &&_get_simple_left_arm_ik(left_wrist_pose, left_joints, left_seeds) )
+        wrist_crnt = obj * grasp;
+        other_wrist = obj * og;
+        wrist_crnt_pose = tf2pose(wrist_crnt);
+        other_wrist_pose = tf2pose(other_wrist);
+        if(_get_simple_right_arm_ik(wrist_crnt_pose, right_joints, right_seeds)
+           &&_get_simple_left_arm_ik(other_wrist_pose, left_joints, left_seeds) )
         {
             if(collision_check.isStateValid(right_joints, left_joints))
             {
-                ROS_INFO("Valid pose found for regrasp");
+                ROS_INFO("TubeManipulation - Valid object pose found in %d iteration", (MAX_CNT-cnt));
                 cnt = 0;
                 obj_orig = obj;
                 pose_found = true;
@@ -1406,11 +1139,82 @@ bool TubeManipulation::Arms::_get_regrasp_pose_right(geometry_msgs::Pose crnt_gr
         rand_tf.setRotation(q);
         rand_tf.setOrigin(pos);
         obj = obj_orig * rand_tf;
-        std::cout<<cnt<<" ";
         cnt--;
         }while(cnt>0);
 
     obj_pose_out = tf2pose(obj_orig);
+
+    if(!pose_found)
+        ROS_WARN("TubeManipulation - Couldn't find valid object pose for regrasping");
+
+    return pose_found;
+}
+
+//for object picked up by left hand
+bool TubeManipulation::Arms::getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
+                                                     geometry_msgs::Pose wrist_pose,
+                                                     geometry_msgs::Pose other_hand_grasp,
+                                                     arm_navigation_msgs::AttachedCollisionObject att_obj,
+                                                     geometry_msgs::Pose &obj_pose_out)
+{
+    bool pose_found = false;
+    TubeManipulation::CollisionCheck collision_check(_rh);
+    collision_check.setAttachedObj(att_obj);
+    tf::Transform obj_orig, obj, rand_tf,
+            wrist=pose2tf(wrist_pose),
+            grasp=pose2tf(crnt_grasp),
+            og = pose2tf(other_hand_grasp);
+
+    obj_orig = wrist * grasp.inverse();
+
+    tf::Quaternion q;
+    tf::Vector3 pos;
+    double y,p,r;
+    int MAX_CNT = 1000;
+    int cnt = MAX_CNT;
+    obj = obj_orig;
+    std::vector<double> right_joints(7), right_seeds(7),
+                        left_seeds(7), left_joints(7);
+
+    _get_right_joints(right_seeds);
+    _get_left_joints(left_seeds);
+    tf::Transform wrist_crnt, other_wrist;
+    geometry_msgs::Pose wrist_crnt_pose, other_wrist_pose;
+
+    do
+    {
+        wrist_crnt = obj * grasp;
+        other_wrist = obj * og;
+        wrist_crnt_pose = tf2pose(wrist_crnt);
+        other_wrist_pose = tf2pose(other_wrist);
+        if(_get_simple_left_arm_ik(wrist_crnt_pose, left_joints, left_seeds)
+           &&_get_simple_right_arm_ik(other_wrist_pose, right_joints, right_seeds) )
+        {
+            if(collision_check.isStateValid(right_joints, left_joints))
+            {
+                ROS_INFO("TubeManipulation - Valid object pose found in %d iteration", (MAX_CNT-cnt));
+                cnt = 0;
+                obj_orig = obj;
+                pose_found = true;
+            }
+        }
+
+        y = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        p = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        r = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        q.setRPY(r,p,y);
+        pos.setZero();
+        rand_tf.setRotation(q);
+        rand_tf.setOrigin(pos);
+        obj = obj_orig * rand_tf;
+        cnt--;
+        }while(cnt>0);
+
+    obj_pose_out = tf2pose(obj_orig);
+
+    if(!pose_found)
+        ROS_WARN("TubeManipulation - Couldn't find valid object pose for regrasping");
+
     return pose_found;
 }
 
@@ -1432,50 +1236,10 @@ TubeManipulation::CollisionCheck::CollisionCheck(ros::NodeHandlePtr nh)
     _point_markers.r = 1.0;
     _point_markers.g = .8;
 
-    _r_jnts.resize(7);
+    /*_r_jnts.resize(7);
     _l_jnts.resize(7);
     _r_jnt_nms.resize(7);
-    _l_jnt_nms.resize(7);
-
-    /*_jnt_values["r_shoulder_pan_joint"] = 0;
-    _jnt_values["r_shoulder_lift_joint"] = 0;
-    _jnt_values["r_upper_arm_roll_joint"] = 0;
-    _jnt_values["r_elbow_flex_joint"] = 0;
-    _jnt_values["r_forearm_roll_joint"] = 0;
-    _jnt_values["r_wrist_flex_joint"] = 0;
-    _jnt_values["r_wrist_roll_joint"] = 0;*/
-
-    /*_r_jnt_nms.push_back("r_shoulder_pan_joint");
-    _r_jnt_nms.push_back("r_shoulder_lift_joint");
-    _r_jnt_nms.push_back("r_upper_arm_roll_joint");
-    _r_jnt_nms.push_back("r_elbow_flex_joint");
-    _r_jnt_nms.push_back("r_forearm_roll_joint");
-    _r_jnt_nms.push_back("r_wrist_flex_joint");
-    _r_jnt_nms.push_back("r_wrist_roll_joint");
-
-    _l_jnt_nms.push_back("l_shoulder_pan_joint");
-    _l_jnt_nms.push_back("l_shoulder_lift_joint");
-    _l_jnt_nms.push_back("l_upper_arm_roll_joint");
-    _l_jnt_nms.push_back("l_elbow_flex_joint");
-    _l_jnt_nms.push_back("l_forearm_roll_joint");
-    _l_jnt_nms.push_back("l_wrist_flex_joint");
-    _l_jnt_nms.push_back("l_wrist_roll_joint");
-
-    _r_lnk_nms.push_back("r_shoulder_pan_link");
-    _r_lnk_nms.push_back("r_shoulder_lift_link");
-    _r_lnk_nms.push_back("r_upper_arm_roll_link");
-    _r_lnk_nms.push_back("r_elbow_flex_joint");
-    _r_lnk_nms.push_back("r_forearm_roll_joint");
-    _r_lnk_nms.push_back("r_wrist_flex_joint");
-    _r_lnk_nms.push_back("r_wrist_roll_joint");
-
-    _l_lnk_nms.push_back("l_shoulder_pan_joint");
-    _l_lnk_nms.push_back("l_shoulder_lift_joint");
-    _l_lnk_nms.push_back("l_upper_arm_roll_joint");
-    _l_lnk_nms.push_back("l_elbow_flex_joint");
-    _l_lnk_nms.push_back("l_forearm_roll_joint");
-    _l_lnk_nms.push_back("l_wrist_flex_joint");
-    _l_lnk_nms.push_back("l_wrist_roll_joint");*/
+    _l_jnt_nms.resize(7);*/
 
     _reset_state();
 }

@@ -79,7 +79,7 @@ namespace TubePerception
     class Tube
     {
     public:
-        Tube(sensor_msgs::PointCloud2 &rosTubeCloud);
+        Tube();
         //~Tube();
         std::vector<TubePerception::Cylinder> cylinders;
         geometry_msgs::Pose getPose(void);
@@ -87,12 +87,13 @@ namespace TubePerception
         void setPoseAsActualPose(); //copies pose in to actual pose
         geometry_msgs::Pose getActualPose();
         tf::Transform getTransform();
+        void reset(void);
         typedef boost::shared_ptr<TubePerception::Tube> Ptr;
-        pcl::PointCloud<PointT>::Ptr tubeCloud;  //Do NOT use outside of Perception
-        pcl::PointCloud<PointT>::Ptr axisPoints; //Do NOT use outside of Perception
+
         //in global frame, for current state of tube. Not actual pose of tube
         //std::vector<TubePerception::WorkTrajectory> workTrajectories;
         //work trajectories by NormalArray
+
         std::vector<pcl::PointCloud<PointT>::Ptr> workPointsCluster;
         unsigned int whichCylinder(PointT point);
         geometry_msgs::Pose getCylinderGlobalPose(unsigned int cylIdx);
@@ -120,19 +121,7 @@ namespace TubePerception
     {
     public:
 
-        CloudProcessing(TubePerception::Tube::Ptr tube_ptr)
-        {
-            _tube = tube_ptr;
-            _num_of_points = _tube->tubeCloud->points.size();
-            _r = 0;
-            _strong_line_thr = 0.2;
-            _weak_line_thr = 0.1;
-            _min_points = 0.05;
-            _z_error = 0;
-
-            _process_cloud();
-        }
-        //CloudProcessing(sensor_msgs::PointCloud2 &tubeCloud, geometry_msgs::Pose sensorPose);
+        CloudProcessing(sensor_msgs::PointCloud2 &rosTubeCloud, TubePerception::Tube::Ptr tube_ptr);
         //~CloudProcessing();
 
         void displayCloud(void);
@@ -144,9 +133,11 @@ namespace TubePerception
         void setZerror(float error);
         bool writeAxisPointsOnFile(std::string fileName);
         void dispalyWorkTraj(void);
+        void processCloud(void);
+        typedef boost::shared_ptr<TubePerception::CloudProcessing> Ptr;
 
     private:
-        void _process_cloud(void);
+        void _segmentize_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
         void _estimate_normals(void);
         void _get_radius(void);
         void _collaps_normals(void);
@@ -168,6 +159,8 @@ namespace TubePerception
         pcl::PointCloud<PointT>::Ptr _raw_axis_points;
         float _z_error;
         int _num_of_points;
+        pcl::PointCloud<PointT>::Ptr _tube_cloud;
+        pcl::PointCloud<PointT>::Ptr _axis_points;
         TubePerception::Tube::Ptr _tube;
     };
 
