@@ -56,12 +56,16 @@ public:
     bool simpleMoveLeftArm(geometry_msgs::Pose pose);
     bool getRightArmIK(geometry_msgs::Pose pose,
                        sensor_msgs::JointState &jointState);
+    bool getRightArmIK(geometry_msgs::Pose pose,
+                       std::vector<double> &jointsOut);
     bool getLeftArmIK(geometry_msgs::Pose pose,
                       sensor_msgs::JointState &jointState);
+    bool getLeftArmIK(geometry_msgs::Pose pose,
+                       std::vector<double> &jointsOut);
     bool getSimpleRightArmIK(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &jointState);
     bool getSimpleRightArmIK(geometry_msgs::Pose pose,
-                                 std::vector<double> &jointState);
+                                 std::vector<double> &jointsOut);
     bool getSimpleLeftArmIK(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &jointState);
     void setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array);
@@ -129,6 +133,9 @@ private:
     bool _get_right_arm_ik(geometry_msgs::Pose pose,
                           sensor_msgs::JointState &joint_state,
                           std::vector<double> &seed_state);
+    bool _get_right_arm_ik(geometry_msgs::Pose &pose,
+                          std::vector<double> &joints,
+                          std::vector<double> &seed_state);
     bool _get_simple_right_arm_ik(geometry_msgs::Pose &pose,
                           sensor_msgs::JointState &joint_state,
                           std::vector<double> &seed_state);
@@ -137,6 +144,9 @@ private:
                                   std::vector<double> &seed_state);
     bool _get_left_arm_ik(geometry_msgs::Pose pose,
                           sensor_msgs::JointState &joint_state,
+                          std::vector<double> &seed_state);
+    bool _get_left_arm_ik(geometry_msgs::Pose &pose,
+                          std::vector<double> &joints,
                           std::vector<double> &seed_state);
     bool _get_simple_left_arm_ik(geometry_msgs::Pose &pose,
                           sensor_msgs::JointState &joint_state,

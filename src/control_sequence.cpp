@@ -8,6 +8,7 @@ ControlSequence::ControlSequence(ros::NodeHandlePtr nh)
     _arms.reset(new TubeManipulation::Arms(_nh));
     _tube.reset(new TubePerception::Tube);
     _tube_mrkr_pub = _nh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
+    _collosion_obj_pub = _nh->advertise<arm_navigation_msgs::CollisionObject>("collision_object",10);
 
     _attached_to_right_arm = false;
     _attached_to_left_arm = false;
@@ -22,23 +23,19 @@ ControlSequence::~ControlSequence()
 
 bool ControlSequence::initialize()
 {
-    bool good = true;
-
     if(!_set_cloud_capture_posture())
     {
         ROS_ERROR("ControlSequence - Unable to intitialize capture posture");
-        good = false;
-        return good;
+        return false;
     }
 
     _clusters.clear();
     if(!_get_segmented_cloud()) //fills the clusters found by segmentation service
     {
         ROS_ERROR("ControlSequence - Segmentation error");
-        good = false;
-        return good;
+        return false;
     }
-    return good;
+    return true;
 }
 
 void ControlSequence::start()
@@ -58,7 +55,7 @@ void ControlSequence::start()
             return;
         }
 
-        if(_pick_up_tube("right_arm"))
+        if(false/*_pick_up_tube("right_arm")*/)
         {
             _get_attached_object();
             if(!_repos_tube_and_regrasp())
@@ -117,7 +114,7 @@ bool ControlSequence::_set_cloud_capture_posture()
     Gripper gripper;
     gripper.openRightGripper();
     gripper.openLeftGripper();
-    ros::Duration(5).sleep();
+    //ros::Duration(5).sleep();
 
     geometry_msgs::Pose pose;
     pose.position.x = 0.1;
@@ -128,7 +125,8 @@ bool ControlSequence::_set_cloud_capture_posture()
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
 
-    if(!_arms->moveRightArm(pose))
+
+    if(!_arms->moveRightArmWithMPlanning(pose))
     {
         is_set = false;
         ROS_ERROR("ControlSequence - Unable to move right arm.");
@@ -142,7 +140,7 @@ bool ControlSequence::_set_cloud_capture_posture()
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
 
-    if(!_arms->moveLeftArm(pose))
+    if(!_arms->moveLeftArmWithMPlanning(pose))
     {
         is_set = false;
         ROS_ERROR("ControlSequence - Unable to move left arm.");
@@ -183,6 +181,9 @@ bool ControlSequence::_get_segmented_cloud()
                         sensor_msgs::convertPointCloudToPointCloud2(seg_srv.response.clusters[i], pc2);
                         _clusters.push_back(pc2);
                     }
+                    _get_table_as_object(seg_srv);
+                    _collosion_obj_pub.publish(_table);
+
                 }
                 else
                 {
@@ -199,6 +200,38 @@ bool ControlSequence::_get_segmented_cloud()
     }
     ROS_INFO("ControlSequence - In total, %d clusters found by segmentation service",_clusters.size());
     return true;
+}
+
+void ControlSequence::_get_table_as_object(tabletop_object_detector::TabletopSegmentation &seg_srv)
+{
+    double x_min = seg_srv.response.table.x_min,
+           x_max = seg_srv.response.table.x_max,
+           y_min = seg_srv.response.table.y_min,
+           y_max = seg_srv.response.table.y_max;
+
+    y_max = std::max(std::abs(y_min), std::abs(y_max));
+    y_min = y_max * (-1);
+
+    _table.header.frame_id = "base_link";
+    _table.header.stamp = ros::Time::now();
+    _table.id = "Table";
+    _table.operation.operation = _table.operation.ADD;
+
+    geometry_msgs::Pose pose;
+    pose.orientation = seg_srv.response.table.pose.pose.orientation;
+    pose.position.x = (x_min + x_max)/2;
+    pose.position.y = (y_min + y_max)/2;
+    pose.position.z = seg_srv.response.table.pose.pose.position.z;
+    _table.poses.push_back(pose);
+
+    arm_navigation_msgs::Shape box;
+    box.type = box.BOX;
+    box.dimensions.resize(3);
+    box.dimensions[0] = (x_max - x_min);
+    box.dimensions[1] = (y_max - y_min);
+    box.dimensions[2] = 0.025;
+
+    _table.shapes.push_back(box);
 }
 
 bool ControlSequence::_generate_tube_model(unsigned int cluster_idx)
@@ -372,12 +405,12 @@ bool ControlSequence::_repos_tube_and_regrasp()
         geometry_msgs::Pose aprch_pose = move_in_X(_grasp_pair.leftGrasp.wristPose, -0.1);
         _tube->resetActualPose(_current_grasp.rightGrasp.wristPose,new_wrist_pose);
         _get_attached_object();
-        if(!_arms->moveLeftArmWithMPlanning(_att_obj, aprch_pose))
+        /*if(!_arms->moveLeftArmWithMPlanning(_att_obj, aprch_pose))
         {
             ROS_ERROR("ControlSequence - Failed to move left arm to approach position for regrasping");
             return false;
-        }
-        if(!_arms->simpleMoveLeftArm(_grasp_pair.leftGrasp.wristPose))
+        }*/
+        if(!_arms->moveLeftArmWithMPlanning(_grasp_pair.leftGrasp.wristPose))
         {
             ROS_ERROR("ControlSequence - Failed to move left arm to grasp position regrasping");
             return false;

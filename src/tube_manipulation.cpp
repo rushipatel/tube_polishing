@@ -596,30 +596,107 @@ bool TubeManipulation::Arms::moveRightArmWithMPlanning(geometry_msgs::Pose pose)
     arm_navigation_msgs::AttachedCollisionObject attObj;
     return _move_right_arm_with_mplning(attObj, pose);
 }
+//bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
+//{
+//    arm_navigation_msgs::MoveArmGoal goalA;
+//    arm_navigation_msgs::GetPlanningScene::Request req;
+//    arm_navigation_msgs::GetPlanningScene::Response res;
+//    if(!attObj.object.shapes.empty())
+//        req.planning_scene_diff.attached_collision_objects.push_back(attObj);
+//    if(!_set_pln_scn_client.call(req,res))
+//        ROS_ERROR("TubeManipulation - Move right arm with MPlanning - Can't set planning scene");
+
+//    goalA.motion_plan_request.group_name = "right_arm";
+//    goalA.motion_plan_request.num_planning_attempts = 10;
+//    goalA.motion_plan_request.planner_id = std::string("");
+//    goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
+//    goalA.motion_plan_request.allowed_planning_time = ros::Duration(60.0);
+//    std::vector<double> joints;
+//    _get_right_joints(joints);
+
+//    goalA.motion_plan_request.start_state.joint_state.name = _r_jnt_nms;
+//    goalA.motion_plan_request.start_state.joint_state.position = joints;
+//    /*if(!attObj.object.shapes.empty())
+//        goalA.planning_scene_diff.attached_collision_objects.push_back(attObj);*/
+
+//    arm_navigation_msgs::SimplePoseConstraint desired_pose;
+//    desired_pose.header.frame_id = "base_link";
+//    desired_pose.link_name = "r_wrist_roll_link";
+//    desired_pose.pose = pose;
+
+//    desired_pose.absolute_position_tolerance.x = 0.02;
+//    desired_pose.absolute_position_tolerance.y = 0.02;
+//    desired_pose.absolute_position_tolerance.z = 0.02;
+
+//    desired_pose.absolute_roll_tolerance = 0.04;
+//    desired_pose.absolute_pitch_tolerance = 0.04;
+//    desired_pose.absolute_yaw_tolerance = 0.04;
+
+//    arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);
+
+//    if (_rh->ok())
+//    {
+//        bool finished_within_time = false;
+//        _mv_arm_client_r->sendGoal(goalA);
+//        finished_within_time = _mv_arm_client_r->waitForResult(ros::Duration(60.0));
+//        if (!finished_within_time)
+//        {
+//            _mv_arm_client_r->cancelGoal();
+//            ROS_INFO("TubeManipulation - Timed out achieving goal");
+//            return false;
+//        }
+//        else
+//        {
+//            actionlib::SimpleClientGoalState state = _mv_arm_client_r->getState();
+//            bool success = (state == actionlib::SimpleClientGoalState::SUCCEEDED);
+//            if(success)
+//                ROS_INFO("TubeManipulation - Action finished: %s",state.toString().c_str());
+//            /*else if(state==_mv_)
+//            {
+//                _move_right_arm_with_mplning(attObj, pose);
+//            }*/
+//            else
+//            {
+//                ROS_INFO("TubeManipulation - Action failed: %s",state.toString().c_str());
+//                return false;
+//            }
+//        }
+//    }
+//    return true;
+//}
+
 bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
 {
     arm_navigation_msgs::MoveArmGoal goalA;
-    arm_navigation_msgs::GetPlanningScene::Request req;
-    arm_navigation_msgs::GetPlanningScene::Response res;
+    arm_navigation_msgs::SetPlanningSceneDiff::Request req;
+    arm_navigation_msgs::SetPlanningSceneDiff::Response res;
     if(!attObj.object.shapes.empty())
         req.planning_scene_diff.attached_collision_objects.push_back(attObj);
     if(!_set_pln_scn_client.call(req,res))
         ROS_ERROR("TubeManipulation - Move right arm with MPlanning - Can't set planning scene");
+
+    std::vector<double> ik_joints(7), joints;
+    _get_right_joints(joints);
+    _get_right_arm_ik(pose,ik_joints,joints);
 
     goalA.motion_plan_request.group_name = "right_arm";
     goalA.motion_plan_request.num_planning_attempts = 10;
     goalA.motion_plan_request.planner_id = std::string("");
     goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
     goalA.motion_plan_request.allowed_planning_time = ros::Duration(60.0);
-    std::vector<double> joints;
-    _get_right_joints(joints);
-
     goalA.motion_plan_request.start_state.joint_state.name = _r_jnt_nms;
     goalA.motion_plan_request.start_state.joint_state.position = joints;
-    /*if(!attObj.object.shapes.empty())
-        goalA.planning_scene_diff.attached_collision_objects.push_back(attObj);*/
+    goalA.motion_plan_request.goal_constraints.joint_constraints.resize(_r_jnt_nms.size());
 
-    arm_navigation_msgs::SimplePoseConstraint desired_pose;
+    for (unsigned int i = 0 ; i < goalA.motion_plan_request.goal_constraints.joint_constraints.size(); i++)
+    {
+      goalA.motion_plan_request.goal_constraints.joint_constraints[i].joint_name = _r_jnt_nms[i];
+      goalA.motion_plan_request.goal_constraints.joint_constraints[i].position = ik_joints[i];
+      goalA.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_below = 0.05;
+      goalA.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_above = 0.05;
+    }
+
+    /*arm_navigation_msgs::SimplePoseConstraint desired_pose;
     desired_pose.header.frame_id = "base_link";
     desired_pose.link_name = "r_wrist_roll_link";
     desired_pose.pose = pose;
@@ -632,7 +709,7 @@ bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::A
     desired_pose.absolute_pitch_tolerance = 0.04;
     desired_pose.absolute_yaw_tolerance = 0.04;
 
-    arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);
+    arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);*/
 
     if (_rh->ok())
     {
@@ -679,25 +756,37 @@ bool TubeManipulation::Arms::moveLeftArmWithMPlanning(geometry_msgs::Pose pose)
 bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
 {
     arm_navigation_msgs::MoveArmGoal goalA;
-    arm_navigation_msgs::GetPlanningScene::Request req;
-    arm_navigation_msgs::GetPlanningScene::Response res;
+    arm_navigation_msgs::SetPlanningSceneDiff::Request req;
+    arm_navigation_msgs::SetPlanningSceneDiff::Response res;
     if(!attObj.object.shapes.empty())
         req.planning_scene_diff.attached_collision_objects.push_back(attObj);
     if(!_set_pln_scn_client.call(req,res))
         ROS_ERROR("TubeManipulation - Move right arm with MPlanning - Can't set planning scene");
 
+    std::vector<double> ik_joints(7), joints;
+    _get_left_joints(joints);
+    _get_left_arm_ik(pose,ik_joints,joints);
+
     goalA.motion_plan_request.group_name = "left_arm";
     goalA.motion_plan_request.num_planning_attempts = 10;
     goalA.motion_plan_request.planner_id = std::string("");
     goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
-    std::vector<double> joints;
-    _get_left_joints(joints);
-
     goalA.motion_plan_request.start_state.joint_state.name = _l_jnt_nms;
     goalA.motion_plan_request.start_state.joint_state.position = joints;
-    goalA.motion_plan_request.allowed_planning_time = ros::Duration(60.0);
+    goalA.motion_plan_request.allowed_planning_time = ros::Duration(30.0);
+    goalA.motion_plan_request.start_state.joint_state.name = _l_jnt_nms;
+    goalA.motion_plan_request.start_state.joint_state.position = joints;
+    goalA.motion_plan_request.goal_constraints.joint_constraints.resize(_l_jnt_nms.size());
 
-    arm_navigation_msgs::SimplePoseConstraint desired_pose;
+    for (unsigned int i = 0 ; i < goalA.motion_plan_request.goal_constraints.joint_constraints.size(); i++)
+    {
+      goalA.motion_plan_request.goal_constraints.joint_constraints[i].joint_name = _l_jnt_nms[i];
+      goalA.motion_plan_request.goal_constraints.joint_constraints[i].position = ik_joints[i];
+      goalA.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_below = 0.05;
+      goalA.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_above = 0.05;
+    }
+
+    /*arm_navigation_msgs::SimplePoseConstraint desired_pose;
     desired_pose.header.frame_id = "base_link";
     desired_pose.link_name = "l_wrist_roll_link";
     desired_pose.pose = pose;
@@ -710,7 +799,7 @@ bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::At
     desired_pose.absolute_pitch_tolerance = 0.04;
     desired_pose.absolute_yaw_tolerance = 0.04;
 
-    arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);
+    arm_navigation_msgs::addGoalConstraintToMoveArmGoal(desired_pose,goalA);*/
 
     if (_rh->ok())
     {
@@ -889,6 +978,14 @@ bool TubeManipulation::Arms::getRightArmIK(geometry_msgs::Pose pose,
     return(_get_right_arm_ik(pose, jointState, joints));
 }
 
+bool TubeManipulation::Arms::getRightArmIK(geometry_msgs::Pose pose,
+                             std::vector<double> &jointsOut)
+{
+    std::vector<double> joints(7);
+    _get_right_joints(joints);
+    return(_get_right_arm_ik(pose, jointsOut, joints));
+}
+
 bool TubeManipulation::Arms::getSimpleRightArmIK(geometry_msgs::Pose pose,
                              sensor_msgs::JointState &jointState)
 {
@@ -898,11 +995,11 @@ bool TubeManipulation::Arms::getSimpleRightArmIK(geometry_msgs::Pose pose,
 }
 
 bool TubeManipulation::Arms::getSimpleRightArmIK(geometry_msgs::Pose pose,
-                             std::vector<double> &jointState)
+                             std::vector<double> &jointsOut)
 {
     std::vector<double> joints(7);
     _get_right_joints(joints);
-    return(_get_simple_right_arm_ik(pose, jointState, joints));
+    return(_get_simple_right_arm_ik(pose, jointsOut, joints));
 }
 
 
@@ -914,12 +1011,60 @@ bool TubeManipulation::Arms::getLeftArmIK(geometry_msgs::Pose pose,
     return(_get_left_arm_ik(pose, jointState, joints));
 }
 
+bool TubeManipulation::Arms::getLeftArmIK(geometry_msgs::Pose pose,
+                             std::vector<double> &jointsOut)
+{
+    std::vector<double> joints(7);
+    _get_left_joints(joints);
+    return(_get_left_arm_ik(pose, jointsOut, joints));
+}
+
 bool TubeManipulation::Arms::getSimpleLeftArmIK(geometry_msgs::Pose pose,
                              sensor_msgs::JointState &jointState)
 {
     std::vector<double> joints(7);
     _get_left_joints(joints);
     return(_get_simple_left_arm_ik(pose, jointState, joints));
+}
+
+bool TubeManipulation::Arms::_get_right_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
+{
+    sensor_msgs::JointState joint_state;
+    bool flag = _get_right_arm_ik(pose, joint_state, seed_state);
+    joints.resize(joint_state.position.size());
+    for(int i=0; i<joint_state.position.size(); i++)
+        joints[i] = joint_state.position[i];
+    return flag;
+}
+
+bool TubeManipulation::Arms::_get_simple_right_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
+{
+    sensor_msgs::JointState joint_state;
+    bool flag = _get_simple_right_arm_ik(pose, joint_state, seed_state);
+    joints.resize(joint_state.position.size());
+    for(int i=0; i<joint_state.position.size(); i++)
+        joints[i] = joint_state.position[i];
+    return flag;
+}
+
+bool TubeManipulation::Arms::_get_left_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
+{
+    sensor_msgs::JointState joint_state;
+    bool flag = _get_left_arm_ik(pose, joint_state, seed_state);
+    joints.resize(joint_state.position.size());
+    for(int i=0; i<joint_state.position.size(); i++)
+        joints[i] = joint_state.position[i];
+    return flag;
+}
+
+bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
+{
+    sensor_msgs::JointState joint_state;
+    bool flag = _get_simple_left_arm_ik(pose, joint_state, seed_state);
+    joints.resize(joint_state.position.size());
+    for(int i=0; i<joint_state.position.size(); i++)
+        joints[i] = joint_state.position[i];
+    return flag;
 }
 
 bool TubeManipulation::Arms::_get_right_arm_ik(geometry_msgs::Pose pose,
@@ -1103,26 +1248,6 @@ bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
     return true;
 }
 
-bool TubeManipulation::Arms::_get_simple_right_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
-{
-    sensor_msgs::JointState joint_state;
-    bool flag = _get_simple_right_arm_ik(pose, joint_state, seed_state);
-    joints.resize(joint_state.position.size());
-    for(int i=0; i<joint_state.position.size(); i++)
-        joints[i] = joint_state.position[i];
-    return flag;
-}
-
-bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, std::vector<double> &joints, std::vector<double> &seed_state)
-{
-    sensor_msgs::JointState joint_state;
-    bool flag = _get_simple_left_arm_ik(pose, joint_state, seed_state);
-    joints.resize(joint_state.position.size());
-    for(int i=0; i<joint_state.position.size(); i++)
-        joints[i] = joint_state.position[i];
-    return flag;
-}
-
 //for object held up by right arm
 bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
                                                      geometry_msgs::Pose wrist_pose,
@@ -1268,6 +1393,12 @@ bool TubeManipulation::Arms::getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
                 pose_found = true;
             }
         }
+
+
+        y = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        p = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        r = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
+        q.setRPY(r,p,y);
 
         // bounding box to move around is 0.5x0.5x0.5
         double x_min = -0.25,

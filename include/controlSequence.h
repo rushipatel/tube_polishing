@@ -29,10 +29,12 @@ private:
     ros::ServiceClient _seg_srv_client;
     std::vector<sensor_msgs::PointCloud2> _clusters;
     ros::Publisher _tube_mrkr_pub;
+    ros::Publisher _collosion_obj_pub;
     TubeGrasp::GraspPair _grasp_pair;
     geometry_msgs::Pose _pick_pose;
     TubeGrasp::GraspPair _current_grasp;
     arm_navigation_msgs::AttachedCollisionObject _att_obj;
+    arm_navigation_msgs::CollisionObject _table;
 
     bool _attached_to_right_arm;
     bool _attached_to_left_arm;
@@ -46,6 +48,7 @@ private:
     void _get_attached_object();
     void _get_trajectory();
     bool _move_to_staging_point();
+    void _get_table_as_object(tabletop_object_detector::TabletopSegmentation &seg_srv);
 };
 
 

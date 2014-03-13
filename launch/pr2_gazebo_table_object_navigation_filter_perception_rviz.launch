@@ -17,7 +17,7 @@
   <include file="$(find tube_polishing)/launch/tabletop_segmentation.launch"/>
   
   <!-- pr2_interactive_manipulation for rviz -->
-  <!-- include file="$(find pr2_interactive_manipulation)/launch/pr2_interactive_manipulation_desktop.launch" /-->
+  <!--include file="$(find pr2_interactive_manipulation)/launch/pr2_interactive_manipulation_desktop.launch"/-->
 
 </launch>
 
