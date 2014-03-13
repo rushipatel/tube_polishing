@@ -82,6 +82,11 @@ public:
                                    geometry_msgs::Pose pose);
     bool moveLeftArmWithMPlanning(geometry_msgs::Pose pose);
     bool moveLeftArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
+    geometry_msgs::Pose getRightArmFK();
+    geometry_msgs::Pose getRightArmFK(std::vector<double> &left_joints);
+    geometry_msgs::Pose getLeftArmFK();
+    geometry_msgs::Pose getLeftArmFK(std::vector<double> &left_joints);
+
     typedef boost::shared_ptr<TubeManipulation::Arms> Ptr;
 
 private:
@@ -162,6 +167,7 @@ public:
                       std::vector<double> &left_joints);
     void enableVisualization();
     void disableVisualization();
+    void setMarkerLifeTime(double time);
     typedef boost::shared_ptr<TubeManipulation::CollisionCheck> Ptr;
 
 private:
@@ -183,6 +189,7 @@ private:
     std::vector<double> _actual_l_jnts;
     ros::Publisher _mrkr_pub;
     visualization_msgs::MarkerArray _mrkr_arr;
+    double _mrk_life_time;
     planning_models::KinematicState* _state;
     bool _visualize;
 

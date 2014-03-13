@@ -14,8 +14,9 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr 
     _valid_pairs.reset(new (TubeGrasp::GraspPairArray));
     _axis_step_size = 0.05;
     _circular_steps = 8;
-    _wrist_axis_offset = 0.072; //72 mm from axis of cylinder to wrist origin
+    _wrist_axis_offset = 0.17; //72 mm from axis of cylinder to wrist origin
     _grasp_pair_found = false;
+    _traj_idx = 0;
     MAX_TEST_GRASPS = 30;
     MAX_ITERATION = 200;
 }
@@ -39,6 +40,11 @@ int GraspAnalysis::getWorkPose(geometry_msgs::Pose &p)
         return 1;
     }
     return 0;
+}
+
+void GraspAnalysis::getTubeWorkTrajectory(geometry_msgs::PoseArray &tube_traj)
+{
+    tube_traj = _tube_traj;
 }
 
 void GraspAnalysis::setWorkTrajIdx(int trajIdx)
@@ -70,88 +76,6 @@ bool GraspAnalysis::getComputedGraspPair(GraspPair &graspPair)
     }
 }
 
-//void GraspAnalysis::pickUpTube(geometry_msgs::Pose &pickPose)
-//{
-//    geometry_msgs::Pose pick_pose, aprh_pose;
-//    pick_pose = getPickUpPose();
-    
-//    tf::Transform p, a;
-//    a.setIdentity();
-//    a.setOrigin(tf::Vector3(-0.25, 0, 0));
-//    p = pose2tf(pick_pose);
-//    a = p*a;
-//    aprh_pose = tf2pose(a);
-    
-//    Gripper r_grpr("right_arm"), l_grpr("left_arm");
-//    r_grpr.open();
-//    l_grpr.open();
-//    ros::Duration(5).sleep();
-
-
-//    TubeManipulation::Arms manip(nodeHandle);
-    
-//    if(manip.simpleMoveRightArm(aprh_pose))
-//    {
-//        ros::Duration(2).sleep();
-//        if(manip.simpleMoveRightArm(pick_pose))
-//        {
-//            ros::Duration(1).sleep();
-//            r_grpr.setPosition(_tube->cylinders[0].radius*1.95,-1);
-
-//            ros::Duration(5).sleep();
-//            tf::Transform grasp, tube = _tube->getTransform();
-//            grasp = tube.inverseTimes(p);
-//            geometry_msgs::Pose pose__ = tf2pose(grasp);
-//            arm_navigation_msgs::AttachedCollisionObject obj =
-//                    _tube->getAttachedObjForRightGrasp(pose__);
-
-//            //if(manip.isStateValid(obj))
-//               // ;
-//            //ROS_INFO("Object is attched. waiting for 5 secs");
-
-//            ros::Duration(5).sleep();
-//            manip.simpleMoveRightArm(aprh_pose);
-//            ROS_INFO("Moved back to approach position. check Object again in rviz");
-//            obj = _tube->getAttachedObjForRightGrasp(pose__);
-//            /*if(manip.isStateValid(obj))
-//                ROS_INFO("looks good");*/
-
-
-//            geometry_msgs::Pose new_tube_pose;
-//            manip._get_regrasp_pose_right(pose__,aprh_pose,
-//                                       _valid_pairs->graspPairs[_best_pair_idx].rightGrasp.wristPose,
-//                                       _valid_pairs->graspPairs[_best_pair_idx].leftGrasp.wristPose,
-//                                       new_tube_pose);
-//            pickPose = new_tube_pose;
-//            tube = pose2tf(new_tube_pose);
-//            _tube->setPose(new_tube_pose);
-//            tf::Transform new_wrist_pose = tube * pose2tf(pose__);
-
-//            /*obj = _tube->getAttachedObjForRightGrasp(pose__);
-//            manip.isStateValid(obj);*/
-//            std::vector<double> right_joints(7),left_joints;
-//            if(manip.getSimpleRightArmIK(tf2pose(new_wrist_pose), right_joints))
-//            {
-//                if(manip.isStateValid(right_joints,left_joints))
-//                    manip.moveRightArm(tf2pose(new_wrist_pose));
-//            }
-
-//            ros::Duration(3).sleep();
-//            r_grpr.open();
-//        }
-//        else
-//        {
-//            ROS_INFO("IK issue 2");
-//            return;
-//        }
-//    }
-//    else
-//    {
-//        ROS_INFO("IK issue 1");
-//        return;
-//    }
-//}
-
 //returns global pick pose
 geometry_msgs::Pose GraspAnalysis::getPickUpPose()
 {
@@ -159,7 +83,7 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
     GraspArray::Ptr grasp_array;
     grasp_array.reset(new (GraspArray));
     //offset is 0.18 for picking so that fingers don't hit table.
-    _gen_grasps(_axis_step_size, 180, grasp_array, 0.18);
+    _gen_grasps(_axis_step_size, 180, grasp_array, 0.185);
 
     tf::Transform g,t = _tube->getTransform();
 

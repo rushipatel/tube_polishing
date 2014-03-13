@@ -50,6 +50,15 @@ geometry_msgs::Pose Tube::getActualPose()
     return _actual_pose;
 }
 
+// graspPose is in local to tube frame, wristPose is in global. pose of arm holding tube.
+void Tube::resetActualPose(geometry_msgs::Pose &graspPose, geometry_msgs::Pose &wristPose)
+{
+    tf::Transform g = pose2tf(graspPose), w = pose2tf(wristPose), tube;
+    tube = w * g.inverse();
+    _pose = tf2pose(tube);
+    setPoseAsActualPose();
+}
+
 float isInCylinder( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt )
 {
     float dx, dy, dz;	// vector d  from line segment point 1 to point 2

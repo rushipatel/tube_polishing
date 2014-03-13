@@ -9,15 +9,8 @@ ControlSequence::ControlSequence(ros::NodeHandlePtr nh)
     _tube.reset(new TubePerception::Tube);
     _tube_mrkr_pub = _nh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
 
-    INIT = 1;
-    AT_APRCH = 2;
-    AT_PICKUP = 3;
-    GRASPED = 4;
-    STAGING = 5;
-    MCNING = 6;
-    BAD = -1;
-    GOOD = 0;
-    state = GOOD;
+    _attached_to_right_arm = false;
+    _attached_to_left_arm = false;
     //_cloud_process.reset(new TubePerception::CloudProcessing());
     //_grasp_analysis.reset(new TubeGrasp::GraspAnalysis);
 }
@@ -35,7 +28,6 @@ bool ControlSequence::initialize()
     {
         ROS_ERROR("ControlSequence - Unable to intitialize capture posture");
         good = false;
-        state = BAD;
         return good;
     }
 
@@ -43,11 +35,9 @@ bool ControlSequence::initialize()
     if(!_get_segmented_cloud()) //fills the clusters found by segmentation service
     {
         ROS_ERROR("ControlSequence - Segmentation error");
-        state = BAD;
         good = false;
         return good;
     }
-    state = INIT;
     return good;
 }
 
@@ -68,14 +58,43 @@ void ControlSequence::start()
             return;
         }
 
-        if(_pick_up_tube("left_arm"))
+        if(_pick_up_tube("right_arm"))
         {
-            ROS_INFO("Should be at approach position with tube grasped by right arm");
+            _get_attached_object();
+            if(!_repos_tube_and_regrasp())
+            {
+                ROS_ERROR("ControlSequence - Error in regrasping");
+                return;
+            }
+            _get_trajectory();
+            _move_to_staging_point();
         }
-        else if(_pick_up_tube("right_arm"))
+        else if( !_attached_to_right_arm )
         {
-            ROS_WARN("ControlSequence - Pick up failed with right arm. trying with left hand...");
-            ROS_INFO("Should be at approach position with tube grasped by left arm");
+            if(_pick_up_tube("left_arm"))
+            {
+                ROS_WARN("ControlSequence - Pick up failed with right arm. trying with left hand...");
+                geometry_msgs::Pose pose;
+                pose.position.x = 0.1;
+                pose.position.y = -0.6;
+                pose.position.z = 0.8;
+                pose.orientation.x = 0.0;
+                pose.orientation.y = 0.0;
+                pose.orientation.z = 0.0;
+                pose.orientation.w = 1.0;
+                _arms->moveRightArmWithMPlanning(pose);
+                _get_attached_object();
+                if(!_repos_tube_and_regrasp())
+                {
+                    ROS_ERROR("ControlSequence - Error in regrasping");
+                    return;
+                }
+            }
+            else
+            {
+                ROS_ERROR("ControlSequence - Error in picking tube. couldn't reach by any arm");
+                return;
+            }
         }
         else
         {
@@ -88,7 +107,6 @@ void ControlSequence::start()
         ROS_ERROR("ControlSequence - No cluster to generate tube model");
         return;
     }
-    state = GOOD;
     return;
 }
 
@@ -154,20 +172,23 @@ bool ControlSequence::_get_segmented_cloud()
         {
             if(seg_srv.response.result == 3) // if seg_service fails to convert cloud frame in 3 attempts
                 continue;
-            cnt = MAX_TRY;
-            if(seg_srv.response.result == seg_srv.response.SUCCESS)
-            {
-                sensor_msgs::PointCloud2 pc2;
-                for(size_t i=0; i<seg_srv.response.clusters.size(); i++)
-                {
-                    sensor_msgs::convertPointCloudToPointCloud2(seg_srv.response.clusters[i], pc2);
-                    _clusters.push_back(pc2);
-                }
-            }
             else
             {
-                ROS_ERROR("ControlSequence - Segmentation service returned error %d", seg_srv.response.result);
-                return false;
+                cnt = MAX_TRY;
+                if(seg_srv.response.result == seg_srv.response.SUCCESS)
+                {
+                    sensor_msgs::PointCloud2 pc2;
+                    for(size_t i=0; i<seg_srv.response.clusters.size(); i++)
+                    {
+                        sensor_msgs::convertPointCloudToPointCloud2(seg_srv.response.clusters[i], pc2);
+                        _clusters.push_back(pc2);
+                    }
+                }
+                else
+                {
+                    ROS_ERROR("ControlSequence - Segmentation service returned error %d", seg_srv.response.result);
+                    return false;
+                }
             }
         }
         else
@@ -175,28 +196,6 @@ bool ControlSequence::_get_segmented_cloud()
             ROS_ERROR("ControlSequence - Call to segmentation service failed");
             return false;
         }
-    }
-    if(_seg_srv_client.call(seg_srv))
-    {
-        if(seg_srv.response.result == seg_srv.response.SUCCESS)
-        {
-            sensor_msgs::PointCloud2 pc2;
-            for(size_t i=0; i<seg_srv.response.clusters.size(); i++)
-            {
-                sensor_msgs::convertPointCloudToPointCloud2(seg_srv.response.clusters[i], pc2);
-                _clusters.push_back(pc2);
-            }
-        }
-        else
-        {
-            ROS_ERROR("ControlSequence - Segmentation service returned error %d", seg_srv.response.result);
-            return false;
-        }
-    }
-    else
-    {
-        ROS_ERROR("ControlSequence - Call to segmentation service failed");
-        return false;
     }
     ROS_INFO("ControlSequence - In total, %d clusters found by segmentation service",_clusters.size());
     return true;
@@ -276,22 +275,27 @@ bool ControlSequence::_pick_up_tube(const std::string byWichArm)
             ROS_ERROR("ControlSequence - Couldn't move right arm to approach position for pick up");
             return false;
         }
-        state = AT_APRCH;
         if(!_arms->simpleMoveRightArm(_pick_pose))
         {
             ROS_ERROR("ControlSequence - Couldn't move right arm to pick up grasp position");
             return false;
         }
-        state = AT_PICKUP;
         //TODO:  index of _tube->cylinders[]
         gripper.setRightGripperPosition(_tube->cylinders[0].radius*1.95,-1);
-        ros::Duration(10).sleep();
-        if(!_arms->simpleMoveRightArm(aprch_pose))
+        _attached_to_right_arm = true;
+        ros::Duration(12).sleep();
+        aprch_pose = move_in_X(_pick_pose, -0.15);
+        if(!_arms->simpleMoveRightArm(aprch_pose)) //now aprch_pose is -0.15 m back
         {
             ROS_ERROR("ControlSequence - Couldn't move right arm back to approach position after pick up");
             return false;
         }
-        state = GRASPED;
+        tf::Transform tube_tf = _tube->getTransform(),
+                      pick_tf = pose2tf(_pick_pose), grasp_tf = tube_tf.inverseTimes(pick_tf);
+
+        _current_grasp.rightGrasp.wristPose = tf2pose(grasp_tf);
+        geometry_msgs::Pose wrist_pose = _arms->getRightArmFK();
+        _tube->resetActualPose(_current_grasp.rightGrasp.wristPose, wrist_pose);
     }
     else
     {
@@ -301,26 +305,169 @@ bool ControlSequence::_pick_up_tube(const std::string byWichArm)
             ROS_ERROR("ControlSequence - Couldn't move left arm to approach position for pick up");
             return false;
         }
-        state = AT_APRCH;
         if(!_arms->simpleMoveLeftArm(_pick_pose))
         {
             ROS_ERROR("ControlSequence - Couldn't move left arm to pick up grasp position");
             return false;
         }
-        state = AT_PICKUP;
         //TODO:  index of _tube->cylinders[]
         gripper.setLeftGripperPosition(_tube->cylinders[0].radius*1.95,-1);
-        ros::Duration(10).sleep();
+        _attached_to_left_arm = true;
+        ros::Duration(12).sleep();
         if(!_arms->simpleMoveLeftArm(aprch_pose))
         {
             ROS_ERROR("ControlSequence - Couldn't move left arm back to approach position after pick up");
             return false;
         }
-        state = GRASPED;
+        tf::Transform tube_tf = _tube->getTransform(),
+                      pick_tf = pose2tf(_pick_pose), grasp_tf = tube_tf.inverseTimes(pick_tf);
+
+        _current_grasp.leftGrasp.wristPose = tf2pose(grasp_tf);
+        geometry_msgs::Pose wrist_pose = _arms->getLeftArmFK();
+        _tube->resetActualPose(_current_grasp.leftGrasp.wristPose, wrist_pose);
     }
     return true;
 }
 
+void ControlSequence::_get_attached_object()
+{
+    //arm_navigation_msgs::AttachedCollisionObject att_obj;
+    if(_attached_to_right_arm && !_attached_to_left_arm)
+        _att_obj = _tube->getAttachedObjForRightGrasp(_current_grasp.rightGrasp.wristPose);
+    else if(!_attached_to_right_arm && _attached_to_left_arm)
+        _att_obj = _tube->getAttachedObjForLeftGrasp(_current_grasp.leftGrasp.wristPose);
+    else if(_attached_to_right_arm && _attached_to_left_arm)
+        _att_obj = _tube->getAttachedObjForBothGrasps(_current_grasp.rightGrasp.wristPose);
+    else
+    {
+        ROS_WARN("ControlSequence - attachedCollisionObject requested for tube! But tube is not grasped...");
+        ROS_WARN("ControlSequence - ...by any arm. Setting object to empty");
+        _att_obj.link_name.clear();
+        _att_obj.object.poses.clear();
+        _att_obj.object.shapes.clear();
+    }
+}
+
+bool ControlSequence::_repos_tube_and_regrasp()
+{
+    geometry_msgs::Pose tube_pose_out, new_wrist_pose;
+    if(_attached_to_right_arm && !_attached_to_left_arm)
+    {
+        _arms->getRegraspPoseRight(_current_grasp.rightGrasp.wristPose,
+                                   _arms->getRightArmFK(),
+                                   _grasp_pair.leftGrasp.wristPose,
+                                   _att_obj,
+                                   tube_pose_out);
+        tf::Transform tube = pose2tf(tube_pose_out), wrist;
+        wrist = pose2tf(_current_grasp.rightGrasp.wristPose);
+        wrist = tube * wrist;
+        new_wrist_pose = tf2pose(wrist);
+        if(!_arms->moveRightArmWithMPlanning(_att_obj, new_wrist_pose))
+        {
+            ROS_ERROR("ControlSequence - Failed to move right arm for regrasp pose.");
+            return false;
+        }
+        Gripper gripper;
+        gripper.openLeftGripper();
+        geometry_msgs::Pose aprch_pose = move_in_X(_grasp_pair.leftGrasp.wristPose, -0.1);
+        _tube->resetActualPose(_current_grasp.rightGrasp.wristPose,new_wrist_pose);
+        _get_attached_object();
+        if(!_arms->moveLeftArmWithMPlanning(_att_obj, aprch_pose))
+        {
+            ROS_ERROR("ControlSequence - Failed to move left arm to approach position for regrasping");
+            return false;
+        }
+        if(!_arms->simpleMoveLeftArm(_grasp_pair.leftGrasp.wristPose))
+        {
+            ROS_ERROR("ControlSequence - Failed to move left arm to grasp position regrasping");
+            return false;
+        }
+        gripper.setLeftGripperPosition(_tube->cylinders[0].radius*1.95,-1);
+        ros::Duration(5).sleep();
+        _attached_to_left_arm = true;
+        gripper.openRightGripper();
+        ros::Duration(5).sleep();
+        _attached_to_right_arm = false;
+        _current_grasp.leftGrasp = _grasp_pair.leftGrasp;
+        return true;
+    }
+    else if(!_attached_to_right_arm && _attached_to_left_arm)
+    {
+        _arms->getRegraspPoseLeft(_current_grasp.leftGrasp.wristPose,
+                                  _arms->getLeftArmFK(),
+                                  _grasp_pair.rightGrasp.wristPose,
+                                  _att_obj,
+                                  tube_pose_out);
+        tf::Transform tube = pose2tf(tube_pose_out), wrist;
+        wrist = pose2tf(_current_grasp.leftGrasp.wristPose);
+        wrist = tube * wrist;
+        new_wrist_pose = tf2pose(wrist);
+        if(!_arms->moveLeftArmWithMPlanning(_att_obj, new_wrist_pose))
+        {
+            ROS_ERROR("ControlSequence - Failed to move left arm for regrasp pose.");
+            return false;
+        }
+        Gripper gripper;
+        gripper.openRightGripper();
+        geometry_msgs::Pose aprch_pose = move_in_X(_grasp_pair.rightGrasp.wristPose, -0.1);
+        _tube->resetActualPose(_current_grasp.leftGrasp.wristPose,new_wrist_pose);
+        _get_attached_object();
+        if(!_arms->moveRightArmWithMPlanning(_att_obj, aprch_pose))
+        {
+            ROS_ERROR("ControlSequence - Failed to move right arm to approach position for regrasping");
+            return false;
+        }
+        if(!_arms->simpleMoveRightArm(_grasp_pair.rightGrasp.wristPose))
+        {
+            ROS_ERROR("ControlSequence - Failed to move right arm to grasp position regrasping");
+            return false;
+        }
+        gripper.setRightGripperPosition(_tube->cylinders[0].radius*1.95,-1);
+        ros::Duration(5).sleep();
+        _attached_to_right_arm = true;
+        gripper.openLeftGripper();
+        ros::Duration(5).sleep();
+        _attached_to_left_arm = false;
+        _current_grasp.rightGrasp = _grasp_pair.rightGrasp;
+        return true;
+    }
+    else
+    {
+        ROS_ERROR("ControlSequence - Error regrasping. Both or none is/are grasping.");
+        return false;
+    }
+}
 
 
+void ControlSequence::_get_trajectory()
+{
+    _arms->setWristOffset(_grasp_pair.rightGrasp.wristPose,
+                          _grasp_pair.leftGrasp.wristPose);
+    geometry_msgs::PoseArray tube_traj;
+    _grasp_analysis->getTubeWorkTrajectory(tube_traj);
+    _arms->setObjPoseTrajectory(tube_traj);
+}
 
+bool ControlSequence::_move_to_staging_point()
+{
+    if(_attached_to_right_arm && !_attached_to_left_arm)
+    {
+        if(_grasp_pair.qRight.size()>=7 && _grasp_pair.qLeft.size()>=7)
+        {
+            std::vector<double> right_joints(7), left_joints(7);
+            for(size_t i=0; i<7; i++) //first point i.e. first 7 joint values
+            {
+                right_joints[i] = _grasp_pair.qRight[i];
+                left_joints[i] = _grasp_pair.qLeft[i];
+            }
+
+            geometry_msgs::Pose pose = _arms->getRightArmFK(right_joints);
+            _arms->moveRightArmWithMPlanning(_att_obj,pose);
+            pose = _arms->getLeftArmFK(left_joints);
+            geometry_msgs::Pose aprch = move_in_X(pose, -0.1);
+            _arms->moveLeftArmWithMPlanning(_att_obj, aprch);
+            _arms->genTrajectory();
+            _arms->executeJointTrajectory();
+        }
+    }
+}

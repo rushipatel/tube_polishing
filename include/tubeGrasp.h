@@ -73,7 +73,9 @@ namespace TubeGrasp
         //returns grasp somewhere closer to center of object. very rough approximation.
         void pickUpTube(geometry_msgs::Pose &pickPose);
         bool getComputedGraspPair(GraspPair &graspPair);
+        void getTubeWorkTrajectory(geometry_msgs::PoseArray &tube_traj);
         geometry_msgs::Pose getPickUpPose();
+
         geometry_msgs::PoseArray _work_traj; //put this back in private after dbg/dev
         geometry_msgs::PoseArray _tube_traj;
         visualization_msgs::Marker vismsg_workNormalsX;

@@ -31,22 +31,21 @@ private:
     ros::Publisher _tube_mrkr_pub;
     TubeGrasp::GraspPair _grasp_pair;
     geometry_msgs::Pose _pick_pose;
+    TubeGrasp::GraspPair _current_grasp;
+    arm_navigation_msgs::AttachedCollisionObject _att_obj;
 
-    int state;
-    int INIT;
-    int AT_APRCH;
-    int AT_PICKUP;
-    int GRASPED;
-    int STAGING;
-    int MCNING;
-    int BAD;
-    int GOOD;
+    bool _attached_to_right_arm;
+    bool _attached_to_left_arm;
 
     bool _set_cloud_capture_posture();
     bool _get_segmented_cloud();
     bool _generate_tube_model(unsigned int cluster_idx);
     bool _get_grasps();
     bool _pick_up_tube(const std::string byWichArm);
+    bool _repos_tube_and_regrasp();
+    void _get_attached_object();
+    void _get_trajectory();
+    bool _move_to_staging_point();
 };
 
 

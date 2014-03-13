@@ -136,16 +136,28 @@ void TubeManipulation::Arms::_get_default_left_joints(std::vector<double> &joint
     joint_state[6] = 0;
 }
 
+geometry_msgs::Pose TubeManipulation::Arms::getRightArmFK()
+{
+    std::vector<double> joints;
+    _get_right_joints(joints);
+    return _get_right_fk(joints);
+}
+
+geometry_msgs::Pose TubeManipulation::Arms::getRightArmFK(std::vector<double> &right_joints)
+{
+    return _get_right_fk(right_joints);
+}
+
 geometry_msgs::Pose TubeManipulation::Arms::_get_right_fk(std::vector<double> &joints)
 {
     kinematics_msgs::GetPositionFK::Request req;
     kinematics_msgs::GetPositionFK::Response res;
 
     req.fk_link_names.push_back("r_wrist_roll_link");
-    req.header.frame_id = "\base_link";
+    req.header.frame_id = "base_link";
     req.header.stamp = ros::Time::now();
 
-    req.robot_state.joint_state.header.frame_id = "\base_link";
+    req.robot_state.joint_state.header.frame_id = "base_link";
     req.robot_state.joint_state.header.stamp = ros::Time::now();
 
     req.robot_state.joint_state.name.resize(joints.size());
@@ -158,8 +170,20 @@ geometry_msgs::Pose TubeManipulation::Arms::_get_right_fk(std::vector<double> &j
     if(_fk_client_r.call(req,res))
         pose_stamped = res.pose_stamped[0];
     else
-        ROS_ERROR("Right FK call failed");
+        ROS_ERROR("Right FK service call failed");
     return pose_stamped.pose;
+}
+
+geometry_msgs::Pose TubeManipulation::Arms::getLeftArmFK()
+{
+    std::vector<double> joints;
+    _get_left_joints(joints);
+    return _get_left_fk(joints);
+}
+
+geometry_msgs::Pose TubeManipulation::Arms::getLeftArmFK(std::vector<double> &left_joints)
+{
+    return _get_left_fk(left_joints);
 }
 
 geometry_msgs::Pose TubeManipulation::Arms::_get_left_fk(std::vector<double> &joints)
@@ -168,10 +192,10 @@ geometry_msgs::Pose TubeManipulation::Arms::_get_left_fk(std::vector<double> &jo
     kinematics_msgs::GetPositionFK::Response res;
 
     req.fk_link_names.push_back("l_wrist_roll_link");
-    req.header.frame_id = "\base_link";
+    req.header.frame_id = "base_link";
     req.header.stamp = ros::Time::now();
 
-    req.robot_state.joint_state.header.frame_id = "\base_link";
+    req.robot_state.joint_state.header.frame_id = "base_link";
     req.robot_state.joint_state.header.stamp = ros::Time::now();
 
     req.robot_state.joint_state.name.resize(joints.size());
@@ -184,7 +208,7 @@ geometry_msgs::Pose TubeManipulation::Arms::_get_left_fk(std::vector<double> &jo
     if(_fk_client_l.call(req,res))
         pose_stamped = res.pose_stamped[0];
     else
-        ROS_ERROR("Left FK call failed");
+        ROS_ERROR("Left FK service call failed");
     return pose_stamped.pose;
 }
 
@@ -575,15 +599,25 @@ bool TubeManipulation::Arms::moveRightArmWithMPlanning(geometry_msgs::Pose pose)
 bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
 {
     arm_navigation_msgs::MoveArmGoal goalA;
+    arm_navigation_msgs::GetPlanningScene::Request req;
+    arm_navigation_msgs::GetPlanningScene::Response res;
+    if(!attObj.object.shapes.empty())
+        req.planning_scene_diff.attached_collision_objects.push_back(attObj);
+    if(!_set_pln_scn_client.call(req,res))
+        ROS_ERROR("TubeManipulation - Move right arm with MPlanning - Can't set planning scene");
 
     goalA.motion_plan_request.group_name = "right_arm";
-    goalA.motion_plan_request.num_planning_attempts = 3;
+    goalA.motion_plan_request.num_planning_attempts = 10;
     goalA.motion_plan_request.planner_id = std::string("");
     goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
     goalA.motion_plan_request.allowed_planning_time = ros::Duration(60.0);
+    std::vector<double> joints;
+    _get_right_joints(joints);
 
-    if(!attObj.object.shapes.empty())
-        goalA.planning_scene_diff.attached_collision_objects.push_back(attObj);
+    goalA.motion_plan_request.start_state.joint_state.name = _r_jnt_nms;
+    goalA.motion_plan_request.start_state.joint_state.position = joints;
+    /*if(!attObj.object.shapes.empty())
+        goalA.planning_scene_diff.attached_collision_objects.push_back(attObj);*/
 
     arm_navigation_msgs::SimplePoseConstraint desired_pose;
     desired_pose.header.frame_id = "base_link";
@@ -616,7 +650,11 @@ bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::A
             actionlib::SimpleClientGoalState state = _mv_arm_client_r->getState();
             bool success = (state == actionlib::SimpleClientGoalState::SUCCEEDED);
             if(success)
-            ROS_INFO("TubeManipulation - Action finished: %s",state.toString().c_str());
+                ROS_INFO("TubeManipulation - Action finished: %s",state.toString().c_str());
+            /*else if(state==_mv_)
+            {
+                _move_right_arm_with_mplning(attObj, pose);
+            }*/
             else
             {
                 ROS_INFO("TubeManipulation - Action failed: %s",state.toString().c_str());
@@ -641,9 +679,15 @@ bool TubeManipulation::Arms::moveLeftArmWithMPlanning(geometry_msgs::Pose pose)
 bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
 {
     arm_navigation_msgs::MoveArmGoal goalA;
+    arm_navigation_msgs::GetPlanningScene::Request req;
+    arm_navigation_msgs::GetPlanningScene::Response res;
+    if(!attObj.object.shapes.empty())
+        req.planning_scene_diff.attached_collision_objects.push_back(attObj);
+    if(!_set_pln_scn_client.call(req,res))
+        ROS_ERROR("TubeManipulation - Move right arm with MPlanning - Can't set planning scene");
 
     goalA.motion_plan_request.group_name = "left_arm";
-    goalA.motion_plan_request.num_planning_attempts = 3;
+    goalA.motion_plan_request.num_planning_attempts = 10;
     goalA.motion_plan_request.planner_id = std::string("");
     goalA.planner_service_name = std::string("ompl_planning/plan_kinematic_path");
     std::vector<double> joints;
@@ -652,9 +696,6 @@ bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::At
     goalA.motion_plan_request.start_state.joint_state.name = _l_jnt_nms;
     goalA.motion_plan_request.start_state.joint_state.position = joints;
     goalA.motion_plan_request.allowed_planning_time = ros::Duration(60.0);
-
-    if(!attObj.object.shapes.empty())
-        goalA.planning_scene_diff.attached_collision_objects.push_back(attObj);
 
     arm_navigation_msgs::SimplePoseConstraint desired_pose;
     desired_pose.header.frame_id = "base_link";
@@ -903,7 +944,7 @@ bool TubeManipulation::Arms::_get_right_arm_ik(geometry_msgs::Pose pose,
         return 0;
     }
 
-    ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
+    ik_req.ik_request.pose_stamped.header.frame_id = "base_link";
     ik_req.ik_request.pose_stamped.pose = pose;
 
     if(_ik_client_r.call(ik_req, ik_res))
@@ -914,7 +955,7 @@ bool TubeManipulation::Arms::_get_right_arm_ik(geometry_msgs::Pose pose,
       }
       else
       {
-        ROS_WARN("Right arm Inverse kinematics failed for given pose.");
+        ROS_DEBUG("Right arm Inverse kinematics failed for given pose.");
         return 0;
       }
     }
@@ -959,7 +1000,7 @@ bool TubeManipulation::Arms::_get_simple_right_arm_ik(geometry_msgs::Pose &pose,
       }
       else
       {
-        ROS_WARN("Right arm Inverse kinematics failed for given pose.");
+        ROS_DEBUG("Right arm Inverse kinematics failed for given pose.");
         return 0;
       }
     }
@@ -1005,7 +1046,7 @@ bool TubeManipulation::Arms::_get_left_arm_ik(geometry_msgs::Pose pose,
       }
       else
       {
-        ROS_WARN("Left arm Inverse kinematics failed for given pose.");
+        ROS_DEBUG("Left arm Inverse kinematics failed for given pose.");
         return false;
       }
     }
@@ -1050,7 +1091,7 @@ bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose,
       }
       else
       {
-        ROS_WARN("Left arm Inverse kinematics failed for given pose.");
+        ROS_DEBUG("Left arm Inverse kinematics failed for given pose.");
         return false;
       }
     }
@@ -1082,7 +1123,7 @@ bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, 
     return flag;
 }
 
-//for object picked up by right arm
+//for object held up by right arm
 bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
                                                      geometry_msgs::Pose wrist_pose,
                                                      geometry_msgs::Pose other_hand_grasp,
@@ -1092,6 +1133,7 @@ bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
     bool pose_found = false;
     TubeManipulation::CollisionCheck collision_check(_rh);
     collision_check.setAttachedObj(att_obj);
+    collision_check.enableVisualization();
     tf::Transform obj_orig, obj, rand_tf,
             wrist=pose2tf(wrist_pose),
             grasp=pose2tf(crnt_grasp),
@@ -1102,7 +1144,8 @@ bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
     tf::Quaternion q;
     tf::Vector3 pos;
     double y,p,r;
-    int MAX_CNT = 1000;
+    double x_pos, y_pos, z_pos;
+    int MAX_CNT = 10000;
     int cnt = MAX_CNT;
     obj = obj_orig;
     std::vector<double> right_joints(7), right_seeds(7),
@@ -1124,6 +1167,8 @@ bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
         {
             if(collision_check.isStateValid(right_joints, left_joints))
             {
+                collision_check.setMarkerLifeTime(60);
+                collision_check.isStateValid(right_joints, left_joints);
                 ROS_INFO("TubeManipulation - Valid object pose found in %d iteration", (MAX_CNT-cnt));
                 cnt = 0;
                 obj_orig = obj;
@@ -1135,7 +1180,29 @@ bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
         p = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
         r = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
         q.setRPY(r,p,y);
-        pos.setZero();
+
+        // bounding box to move around is 0.5x0.5x0.5
+        double x_min = -0.25,
+                x_max = 0.25,
+                y_min = -0.5,
+                y_max = 0.5,
+                z_min = 0,
+                z_max = 0.5;
+
+        // random number between 0 and 1
+        x_pos = ((double)rand()/(double)RAND_MAX);
+        y_pos = ((double)rand()/(double)RAND_MAX);
+        z_pos = ((double)rand()/(double)RAND_MAX);
+
+        double len;
+        len = x_max - x_min;
+        x_pos = x_min + (len * x_pos);
+        len = y_max - y_min;
+        y_pos = y_min + (len * y_pos);
+        len = z_max - z_min;
+        z_pos = z_min + (len * z_pos);
+
+        pos.setValue(x_pos, y_pos, z_pos);
         rand_tf.setRotation(q);
         rand_tf.setOrigin(pos);
         obj = obj_orig * rand_tf;
@@ -1150,7 +1217,7 @@ bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
     return pose_found;
 }
 
-//for object picked up by left hand
+//for object held by left hand
 bool TubeManipulation::Arms::getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
                                                      geometry_msgs::Pose wrist_pose,
                                                      geometry_msgs::Pose other_hand_grasp,
@@ -1170,7 +1237,8 @@ bool TubeManipulation::Arms::getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
     tf::Quaternion q;
     tf::Vector3 pos;
     double y,p,r;
-    int MAX_CNT = 1000;
+    double x_pos, y_pos, z_pos;
+    int MAX_CNT = 10000;
     int cnt = MAX_CNT;
     obj = obj_orig;
     std::vector<double> right_joints(7), right_seeds(7),
@@ -1192,6 +1260,8 @@ bool TubeManipulation::Arms::getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
         {
             if(collision_check.isStateValid(right_joints, left_joints))
             {
+                collision_check.setMarkerLifeTime(60);
+                collision_check.isStateValid(right_joints, left_joints);
                 ROS_INFO("TubeManipulation - Valid object pose found in %d iteration", (MAX_CNT-cnt));
                 cnt = 0;
                 obj_orig = obj;
@@ -1199,11 +1269,28 @@ bool TubeManipulation::Arms::getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
             }
         }
 
-        y = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
-        p = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
-        r = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
-        q.setRPY(r,p,y);
-        pos.setZero();
+        // bounding box to move around is 0.5x0.5x0.5
+        double x_min = -0.25,
+                x_max = 0.25,
+                y_min = -0.5,
+                y_max = 0.5,
+                z_min = 0,
+                z_max = 0.5;
+
+        // random number between 0 and 1
+        x_pos = ((double)rand()/(double)RAND_MAX);
+        y_pos = ((double)rand()/(double)RAND_MAX);
+        z_pos = ((double)rand()/(double)RAND_MAX);
+
+        double len;
+        len = x_max - x_min;
+        x_pos = x_min + (len * x_pos);
+        len = y_max - y_min;
+        y_pos = y_min + (len * y_pos);
+        len = z_max - z_min;
+        z_pos = z_min + (len * z_pos);
+
+        pos.setValue(x_pos, y_pos, z_pos);
         rand_tf.setRotation(q);
         rand_tf.setOrigin(pos);
         obj = obj_orig * rand_tf;
@@ -1235,6 +1322,8 @@ TubeManipulation::CollisionCheck::CollisionCheck(ros::NodeHandlePtr nh)
     _point_markers.a = 1.0;
     _point_markers.r = 1.0;
     _point_markers.g = .8;
+    _mrk_life_time = 0.2;
+
 
     /*_r_jnts.resize(7);
     _l_jnts.resize(7);
@@ -1368,45 +1457,52 @@ bool TubeManipulation::CollisionCheck::_is_state_valid()
 
     std_msgs::ColorRGBA color;
     color = _good_color;
-    double mrk_life_time = 10;
+
 
     _state->setKinematicState(_jnt_values);
     if(!_state->areJointsWithinBounds(_r_jnt_nms))
     {
-        ROS_WARN("TubeManipulation - Right joints are out of bound");
+        ROS_DEBUG("TubeManipulation - Right joints are out of bound");
         color = _joint_limits_color;
         is_valid = false;
     }
     if(!_state->areJointsWithinBounds(_l_jnt_nms))
     {
-        ROS_WARN("TubeManipulation - Left joints are out of bound");
+        ROS_DEBUG("TubeManipulation - Left joints are out of bound");
         color = _joint_limits_color;
         is_valid = false;
     } else if(_collision_models->isKinematicStateInCollision(*_state))
     {
         std::stringstream ss;
+        ss.flush();
         color = _collision_color;
         is_valid = false;
         if(_collision_models->isKinematicStateInEnvironmentCollision(*_state))
             ss<<"environment ";
         if(_collision_models->isKinematicStateInSelfCollision(*_state))
         {
-            if(ss.gcount()>2)
+            if(ss.gcount()>5)
                 ss<<"and self";
             else
                 ss<<"self";
         }
-        ROS_WARN_STREAM("TubeManipulation - kinematic state is in collision with "<<ss.str());
-        _collision_models->getAllCollisionPointMarkers(*_state, _mrkr_arr, _point_markers, ros::Duration(mrk_life_time));
+        ROS_DEBUG_STREAM("TubeManipulation - kinematic state is in collision with "<<ss.str());
+        _collision_models->getAllCollisionPointMarkers(*_state, _mrkr_arr, _point_markers, ros::Duration(_mrk_life_time));
     }
 
     if(_visualize)
     {
-        _collision_models->getRobotMarkersGivenState(*_state, _mrkr_arr, color,"right_arm",ros::Duration(mrk_life_time),&_r_lnk_nms);
-        _collision_models->getRobotMarkersGivenState(*_state, _mrkr_arr, color,"left_arm",ros::Duration(mrk_life_time),&_l_lnk_nms);
-        _collision_models->getAttachedCollisionObjectMarkers(*_state, _mrkr_arr, "right_arm",color,ros::Duration(mrk_life_time), false, &_r_lnk_nms);
-        _collision_models->getAttachedCollisionObjectMarkers(*_state, _mrkr_arr, "left_arm",color,ros::Duration(mrk_life_time), false, &_l_lnk_nms);
+        _collision_models->getRobotMarkersGivenState(*_state, _mrkr_arr, color,"right_arm",ros::Duration(_mrk_life_time),&_r_lnk_nms);
+        _collision_models->getRobotMarkersGivenState(*_state, _mrkr_arr, color,"left_arm",ros::Duration(_mrk_life_time),&_l_lnk_nms);
+        _collision_models->getAttachedCollisionObjectMarkers(*_state, _mrkr_arr, "right_arm",color,ros::Duration(_mrk_life_time), false, &_r_lnk_nms);
+        _collision_models->getAttachedCollisionObjectMarkers(*_state, _mrkr_arr, "left_arm",color,ros::Duration(_mrk_life_time), false, &_l_lnk_nms);
         _mrkr_pub.publish(_mrkr_arr);
+        _mrkr_arr.markers.clear();
     }
     return is_valid;
+}
+
+void TubeManipulation::CollisionCheck::setMarkerLifeTime(double time)
+{
+    _mrk_life_time = time;
 }

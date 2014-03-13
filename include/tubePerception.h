@@ -86,6 +86,8 @@ namespace TubePerception
         void setPose(geometry_msgs::Pose &pose);
         void setPoseAsActualPose(); //copies pose in to actual pose
         geometry_msgs::Pose getActualPose();
+        void resetActualPose(geometry_msgs::Pose &graspPose,
+                             geometry_msgs::Pose &wristPose);
         tf::Transform getTransform();
         void reset(void);
         typedef boost::shared_ptr<TubePerception::Tube> Ptr;
