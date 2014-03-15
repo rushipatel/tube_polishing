@@ -12,12 +12,13 @@
 #include <geometry_msgs/Pose.h>
 #include <tf/tf.h>
 #include <arm_navigation_msgs/FilterJointTrajectory.h>
+#include <arm_navigation_msgs/FilterJointTrajectoryWithConstraints.h>
+#include <arm_navigation_msgs/AllowedCollisionEntry.h>
 #include <arm_navigation_msgs/PlanningScene.h>
 #include <arm_navigation_msgs/SetPlanningSceneDiff.h>
 #include <arm_navigation_msgs/GetPlanningScene.h>
 #include <arm_navigation_msgs/MoveArmAction.h>
 #include <arm_navigation_msgs/utils.h>
-//#include <arm_navigation_msgs/RobotState.h> //don't need it.
 #include <planning_environment/models/collision_models.h>
 #include <vector>
 
@@ -33,6 +34,55 @@ typedef actionlib::SimpleActionClient<arm_navigation_msgs::MoveArmAction> MoveAr
 namespace TubeManipulation
 {
 
+
+class CollisionCheck
+{
+public:
+    CollisionCheck(ros::NodeHandlePtr nh);
+    ~CollisionCheck();
+    void refreshState(void);
+    void setAttachedObj(arm_navigation_msgs::AttachedCollisionObject &attachedObj);
+    void clearAttachedObj(void);
+    void printState(void);
+    bool isStateValid(std::vector<double> &right_joints,
+                      std::vector<double> &left_joints);
+    void enableVisualization();
+    void disableVisualization();
+    void setMarkerLifeTime(double time);
+    typedef boost::shared_ptr<TubeManipulation::CollisionCheck> Ptr;
+
+private:
+    ros::NodeHandlePtr _nh;
+    ros::ServiceClient _get_scn_client; /*!< get planning scene diff */
+    arm_navigation_msgs::PlanningScene _scn;
+    planning_environment::CollisionModels *_collision_models;
+    arm_navigation_msgs::AttachedCollisionObject _att_obj;
+    arm_navigation_msgs::GetPlanningScene::Request _scn_req;
+    arm_navigation_msgs::GetPlanningScene::Response _scn_res;
+    std::map<std::string, double> _jnt_values;
+    std::vector<double> _r_jnts;
+    std::vector<double> _l_jnts;
+    std::vector<std::string> _r_jnt_nms;
+    std::vector<std::string> _r_lnk_nms;
+    std::vector<std::string> _l_jnt_nms;
+    std::vector<std::string> _l_lnk_nms;
+    std::vector<double> _actual_r_jnts;
+    std::vector<double> _actual_l_jnts;
+    ros::Publisher _mrkr_pub;
+    visualization_msgs::MarkerArray _mrkr_arr;
+    double _mrk_life_time;
+    planning_models::KinematicState* _state;
+    bool _visualize;
+
+    std_msgs::ColorRGBA _good_color;
+    std_msgs::ColorRGBA _collision_color;
+    std_msgs::ColorRGBA _joint_limits_color;
+    std_msgs::ColorRGBA _point_markers;
+
+    bool _is_state_valid();
+    void _reset_state();
+};
+
 /*! \brief Class to move both hands in sync for graspped object by both hands. 
  *
  *  This class takes in offset in transforms for both hands and _obj_pose_traj as pose array.
@@ -44,7 +94,7 @@ class Arms
 public:
     Arms(ros::NodeHandlePtr rh);
     bool genTrajectory();
-    bool genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &lefttJointTraj);
+    bool genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &leftJointTraj);
     bool genLeftTrajectory(std::vector<double> &jointTrajectory);  //Prerequisites: leftWristOffset and objPoseTraj
     bool genRightTrajectory(std::vector<double> &jointTrajectory); //Prerequisites: rightWristOffset and objPoseTraj
     bool executeJointTrajectory();
@@ -109,7 +159,8 @@ private:
     ros::ServiceClient _smpl_ik_client_l; /*!< Left arm IK client. */
     ros::ServiceClient _query_client_r; /*!< Right arm kinematic solver info query client. */
     ros::ServiceClient _query_client_l; /*!< Left arm kinematic solver info query client. */
-    ros::ServiceClient _filter_trajectory_client; /*!< Joint trajectory unnormalizer filter client. */
+    ros::ServiceClient _traj_unnormalizer_client; /*!< Joint trajectory unnormalizer filter client. */
+    ros::ServiceClient _traj_filter_client;
     ros::Publisher _att_obj_pub;
     pr2_controllers_msgs::JointTrajectoryGoal _right_goal, _left_goal; /*!< Joint trajectory goal to execute joint trajectory. */
     std::vector<double> _right_joint_traj,_left_joint_traj; /*!< Double linear array to store joint trajectory. */
@@ -118,6 +169,7 @@ private:
     geometry_msgs::PoseArray _obj_pose_traj; /*!< Pose trajectory of an object. */
     std::vector<std::string> _r_jnt_nms;
     std::vector<std::string> _l_jnt_nms;
+    CollisionCheck::Ptr _collision_check;
 
     void _get_right_goal();
     void _get_left_goal();
@@ -158,58 +210,16 @@ private:
                            std::vector<double> &left_joint_traj);
     bool _move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
     bool _move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
+    bool _get_motion_plan(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
+    bool _filter_trajectory(trajectory_msgs::JointTrajectory &trajectory_in,
+                            trajectory_msgs::JointTrajectory &trajectory_out, arm_navigation_msgs::GetMotionPlan::Request mplan_req);
+    void _fill_trajectory_msg(trajectory_msgs::JointTrajectory &trajectory_in,
+                              trajectory_msgs::JointTrajectory &trajectory_out);
+    void _execute_joint_trajectory(trajectory_msgs::JointTrajectory &right_traj, trajectory_msgs::JointTrajectory &left_traj);
 
     geometry_msgs::Pose _get_right_fk(std::vector<double> &joints);
     geometry_msgs::Pose _get_left_fk(std::vector<double> &joints);
 
-};
-
-class CollisionCheck
-{
-public:
-    CollisionCheck(ros::NodeHandlePtr nh);
-    ~CollisionCheck();
-    void refreshState(void);
-    void setAttachedObj(arm_navigation_msgs::AttachedCollisionObject &attachedObj);
-    void clearAttachedObj(void);
-    void printState(void);
-    bool isStateValid(std::vector<double> &right_joints,
-                      std::vector<double> &left_joints);
-    void enableVisualization();
-    void disableVisualization();
-    void setMarkerLifeTime(double time);
-    typedef boost::shared_ptr<TubeManipulation::CollisionCheck> Ptr;
-
-private:
-    ros::NodeHandlePtr _nh;
-    ros::ServiceClient _get_scn_client; /*!< get planning scene diff */
-    arm_navigation_msgs::PlanningScene _scn;
-    planning_environment::CollisionModels *_collision_models;
-    arm_navigation_msgs::AttachedCollisionObject _att_obj;
-    arm_navigation_msgs::GetPlanningScene::Request _scn_req;
-    arm_navigation_msgs::GetPlanningScene::Response _scn_res;
-    std::map<std::string, double> _jnt_values;
-    std::vector<double> _r_jnts;
-    std::vector<double> _l_jnts;
-    std::vector<std::string> _r_jnt_nms;
-    std::vector<std::string> _r_lnk_nms;
-    std::vector<std::string> _l_jnt_nms;
-    std::vector<std::string> _l_lnk_nms;
-    std::vector<double> _actual_r_jnts;
-    std::vector<double> _actual_l_jnts;
-    ros::Publisher _mrkr_pub;
-    visualization_msgs::MarkerArray _mrkr_arr;
-    double _mrk_life_time;
-    planning_models::KinematicState* _state;
-    bool _visualize;
-
-    std_msgs::ColorRGBA _good_color;
-    std_msgs::ColorRGBA _collision_color;
-    std_msgs::ColorRGBA _joint_limits_color;
-    std_msgs::ColorRGBA _point_markers;
-
-    bool _is_state_valid();
-    void _reset_state();
 };
 
 }//TubeManipulation

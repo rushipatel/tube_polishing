@@ -34,7 +34,6 @@ int main(int argc, char **argv)
     ros::AsyncSpinner spinner(1);
     spinner.start();
 
-
     ControlSequence control_seq(rh);
     control_seq.initialize();
     control_seq.start();

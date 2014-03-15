@@ -55,7 +55,7 @@ void ControlSequence::start()
             return;
         }
 
-        if(false/*_pick_up_tube("right_arm")*/)
+        if(_pick_up_tube("right_arm"))
         {
             _get_attached_object();
             if(!_repos_tube_and_regrasp())
@@ -117,8 +117,8 @@ bool ControlSequence::_set_cloud_capture_posture()
     //ros::Duration(5).sleep();
 
     geometry_msgs::Pose pose;
-    pose.position.x = 0.1;
-    pose.position.y = -0.6;
+    pose.position.x = 0.3;
+    pose.position.y = -0.7;
     pose.position.z = 0.8;
     pose.orientation.x = 0.0;
     pose.orientation.y = 0.0;
@@ -126,21 +126,21 @@ bool ControlSequence::_set_cloud_capture_posture()
     pose.orientation.w = 1.0;
 
 
-    if(!_arms->moveRightArmWithMPlanning(pose))
+    if(!_arms->moveRightArm(pose))
     {
         is_set = false;
         ROS_ERROR("ControlSequence - Unable to move right arm.");
     }
 
-    pose.position.x = 0.1;
-    pose.position.y = 0.6;
+    pose.position.x = 0.3;
+    pose.position.y = 0.7;
     pose.position.z = 0.8;
     pose.orientation.x = 0.0;
     pose.orientation.y = 0.0;
     pose.orientation.z = 0.0;
     pose.orientation.w = 1.0;
 
-    if(!_arms->moveLeftArmWithMPlanning(pose))
+    if(!_arms->moveLeftArm(pose))
     {
         is_set = false;
         ROS_ERROR("ControlSequence - Unable to move left arm.");
