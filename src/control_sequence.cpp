@@ -68,18 +68,22 @@ void ControlSequence::start()
         }
         else if( !_attached_to_right_arm )
         {
+            geometry_msgs::Pose pose;
+            pose.position.x = 0.1;
+            pose.position.y = -0.6;
+            pose.position.z = 0.8;
+            pose.orientation.x = 0.0;
+            pose.orientation.y = 0.0;
+            pose.orientation.z = 0.0;
+            pose.orientation.w = 1.0;
+            if(!_arms->moveRightArmWithMPlanning(pose))
+            {
+                return;
+            }
             if(_pick_up_tube("left_arm"))
             {
-                ROS_WARN("ControlSequence - Pick up failed with right arm. trying with left hand...");
-                geometry_msgs::Pose pose;
-                pose.position.x = 0.1;
-                pose.position.y = -0.6;
-                pose.position.z = 0.8;
-                pose.orientation.x = 0.0;
-                pose.orientation.y = 0.0;
-                pose.orientation.z = 0.0;
-                pose.orientation.w = 1.0;
-                _arms->moveRightArmWithMPlanning(pose);
+                ROS_WARN("ControlSequence - Pick up failed with right arm. trying with left arm...");
+
                 _get_attached_object();
                 if(!_repos_tube_and_regrasp())
                 {
@@ -303,16 +307,20 @@ bool ControlSequence::_pick_up_tube(const std::string byWichArm)
     if(is_right_arm)
     {
         gripper.openRightGripper();
+        ROS_INFO("Moving to approach position");
         if(!_arms->moveRightArmWithMPlanning(aprch_pose))
         {
             ROS_ERROR("ControlSequence - Couldn't move right arm to approach position for pick up");
             return false;
         }
+        ROS_INFO("moving arm to pick position");
         if(!_arms->simpleMoveRightArm(_pick_pose))
         {
             ROS_ERROR("ControlSequence - Couldn't move right arm to pick up grasp position");
             return false;
         }
+
+        ROS_INFO("Closing gripper");
         //TODO:  index of _tube->cylinders[]
         gripper.setRightGripperPosition(_tube->cylinders[0].radius*1.95,-1);
         _attached_to_right_arm = true;
@@ -333,7 +341,7 @@ bool ControlSequence::_pick_up_tube(const std::string byWichArm)
     else
     {
         gripper.openLeftGripper();
-        if(!_arms->moveRightArmWithMPlanning(aprch_pose))
+        if(!_arms->moveLeftArmWithMPlanning(aprch_pose))
         {
             ROS_ERROR("ControlSequence - Couldn't move left arm to approach position for pick up");
             return false;

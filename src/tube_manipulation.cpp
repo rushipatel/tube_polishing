@@ -925,7 +925,7 @@ bool TubeManipulation::Arms::simpleMoveRightArm(geometry_msgs::Pose pose)
         traj_goal.trajectory.points[0] = goal;
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
-        _traj_client_r->sendGoalAndWait(traj_goal);
+        _traj_client_r->sendGoalAndWait(traj_goal, ros::Duration(10));
         std::vector<double> joints(_r_jnt_nms.size());
         double err = 1;
         while(err>0.01)
@@ -972,7 +972,7 @@ bool TubeManipulation::Arms::simpleMoveLeftArm(geometry_msgs::Pose pose)
         traj_goal.trajectory.points[0] = goal;
         ros::Time time_to_start = ros::Time::now()+ros::Duration(0.1);
         traj_goal.trajectory.header.stamp = time_to_start;
-        _traj_client_l->sendGoalAndWait(traj_goal);
+        _traj_client_l->sendGoalAndWait(traj_goal,ros::Duration(10));
         std::vector<double> joints(_l_jnt_nms.size());
         double err = 1;
         while(err>0.01)
@@ -1201,7 +1201,7 @@ bool TubeManipulation::Arms::_get_left_arm_ik(geometry_msgs::Pose pose,
         return 0;
     }
 
-    ik_req.ik_request.pose_stamped.header.frame_id = "/base_link";
+    ik_req.ik_request.pose_stamped.header.frame_id = "base_link";
     ik_req.ik_request.pose_stamped.pose = pose;
 
     if(_ik_client_l.call(ik_req, ik_res))
@@ -1326,8 +1326,8 @@ bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
         other_wrist = obj * og;
         wrist_crnt_pose = tf2pose(wrist_crnt);
         other_wrist_pose = tf2pose(other_wrist);
-        if(_get_simple_right_arm_ik(wrist_crnt_pose, right_joints, right_seeds)
-           &&_get_simple_left_arm_ik(other_wrist_pose, left_joints, left_seeds) )
+        if(_get_right_arm_ik(wrist_crnt_pose, right_joints, right_seeds)
+           &&_get_left_arm_ik(other_wrist_pose, left_joints, left_seeds) )
         {
             if(collision_check.isStateValid(right_joints, left_joints))
             {
@@ -1345,11 +1345,11 @@ bool TubeManipulation::Arms::getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
         r = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
         q.setRPY(r,p,y);
 
-        // bounding box to move around is 0.5x0.5x0.5
+        // bounding box to move around
         double x_min = 0,
                 x_max = 0,
-                y_min = 0,
-                y_max = 0,
+                y_min = -0.25,
+                y_max = 0.25,
                 z_min = 0,
                 z_max = 0.5;
 
@@ -1421,8 +1421,8 @@ bool TubeManipulation::Arms::getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
         other_wrist = obj * og;
         wrist_crnt_pose = tf2pose(wrist_crnt);
         other_wrist_pose = tf2pose(other_wrist);
-        if(_get_simple_left_arm_ik(wrist_crnt_pose, left_joints, left_seeds)
-           &&_get_simple_right_arm_ik(other_wrist_pose, right_joints, right_seeds) )
+        if(_get_left_arm_ik(wrist_crnt_pose, left_joints, left_seeds)
+           &&_get_right_arm_ik(other_wrist_pose, right_joints, right_seeds) )
         {
             if(collision_check.isStateValid(right_joints, left_joints))
             {
