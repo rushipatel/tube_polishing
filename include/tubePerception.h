@@ -6,15 +6,15 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
-#include <arm_navigation_msgs/AttachedCollisionObject.h>
+//#include <arm_navigation_msgs/AttachedCollisionObject.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <pcl/ros/conversions.h>
+//#include <pcl/ros/conversions.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <Eigen/Core>
 #include <tf/LinearMath/Matrix3x3.h>
 
 #include <pcl/point_types.h>
 #include <pcl/common/io.h>
-#include <pcl/io/pcd_io.h>
 #include <pcl/pcl_base.h>
 #include <pcl/common/common.h>
 #include <pcl/features/normal_3d.h>
@@ -26,13 +26,13 @@
 #include <pcl/octree/octree_search.h>
 #include <pcl/kdtree/kdtree_flann.h>
 
-#include <LinearMath/btVector3.h>
-#include <LinearMath/btQuaternion.h>
+//#include <LinearMath/btVector3.h>
+//#include <LinearMath/btQuaternion.h>
 #include <tf/tf.h>
 
 #include <pcl/sample_consensus/sac_model_circle.h>
 
-#include <pcl/visualization/pcl_visualizer.h>
+//#include <pcl/visualization/pcl_visualizer.h>
 
 #include <pcl/surface/mls.h>
 #include <pcl/segmentation/extract_clusters.h>
@@ -102,21 +102,21 @@ namespace TubePerception
         void getCylinderMarker(visualization_msgs::MarkerArray &markerArray);
         void getCylinderPoses(geometry_msgs::PoseArray &pose_array);
 
-        arm_navigation_msgs::AttachedCollisionObject
+        /*arm_navigation_msgs::AttachedCollisionObject
         getAttachedObjForRightGrasp(geometry_msgs::Pose &right_grasp_pose);
 
         arm_navigation_msgs::AttachedCollisionObject
         getAttachedObjForLeftGrasp(geometry_msgs::Pose &left_grasp_pose);
 
         arm_navigation_msgs::AttachedCollisionObject
-        getAttachedObjForBothGrasps(geometry_msgs::Pose &right_grasp_pose);
+        getAttachedObjForBothGrasps(geometry_msgs::Pose &right_grasp_pose);*/
 
     protected:
         geometry_msgs::Pose _pose;  //in global(base_link) frame.
         geometry_msgs::Pose _actual_pose; //in global(base_link)
-        void _get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj, geometry_msgs::Pose &grasp_pose,
+        /*void _get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj, geometry_msgs::Pose &grasp_pose,
                                             std::string link_name,
-                                            bool right_side, bool left_side);
+                                            bool right_side, bool left_side);*/
     };
 
     class CloudProcessing
@@ -126,15 +126,15 @@ namespace TubePerception
         CloudProcessing(sensor_msgs::PointCloud2 &rosTubeCloud, TubePerception::Tube::Ptr tube_ptr);
         //~CloudProcessing();
 
-        void displayCloud(void);
+        /*void displayCloud(void);
         void displayAxisPoints(void);
         void displayCylinders(void);
         void displayCylinders(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer);
         void displayLines(void);
         void displayCylindersInLocalFrame(void);
+        void dispalyWorkTraj(void);*/
         void setZerror(float error);
         bool writeAxisPointsOnFile(std::string fileName);
-        void dispalyWorkTraj(void);
         void processCloud(void);
         typedef boost::shared_ptr<TubePerception::CloudProcessing> Ptr;
 

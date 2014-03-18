@@ -143,7 +143,7 @@ unsigned int Tube::whichCylinder(PointT point)
 }
 
 //pre requisites: right and/or left grasp
-arm_navigation_msgs::AttachedCollisionObject
+/*arm_navigation_msgs::AttachedCollisionObject
 Tube::getAttachedObjForRightGrasp(geometry_msgs::Pose &right_grasp_pose)
 {
     arm_navigation_msgs::AttachedCollisionObject obj;
@@ -235,7 +235,7 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
         obj.object.shapes.push_back(cyl_shape);
         obj.object.poses.push_back(pose);
     }
-}
+}*/
 
 void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
 {
@@ -377,6 +377,7 @@ tf::Transform Cylinder::getLocalTransform(void)
     t.setRotation(q);
     return t;
 }
+//***TUBE***//
 
 void Cylinder::setLocalPose(geometry_msgs::Pose &pose)
 {
@@ -509,8 +510,9 @@ void CloudProcessing::_generate_work_vectors()
 
 bool CloudProcessing::writeAxisPointsOnFile(std::string fileName)
 {
-    if(pcl::io::savePCDFileASCII(fileName,*_axis_points))
-        return true;
+    ROS_ERROR("bool CloudProcessing::writeAxisPointsOnFile(std::string fileName) is under work");
+    /*if(pcl::io::savePCDFileASCII(fileName,*_axis_points))
+        return true;*/
     return false;
 }
 

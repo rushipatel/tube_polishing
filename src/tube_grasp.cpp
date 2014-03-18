@@ -387,7 +387,8 @@ void GraspAnalysis::_gen_test_pairs()
 
 void GraspAnalysis::_test_pairs_for_ik()
 {
-    TubeManipulation::Arms manip(_nh);
+    ROS_ERROR("void GraspAnalysis::_test_pairs_for_ik() is commented out. rewrite with new move arm");
+    /*TubeManipulation::Arms manip(_nh);
 
     int idx;
     unsigned long test_grasps=1;
@@ -428,7 +429,7 @@ void GraspAnalysis::_test_pairs_for_ik()
                         <<MAX_ITERATION<<" iteration");
     }
     else
-        ROS_WARN_STREAM("No pair found to be valid for IK");
+        ROS_WARN_STREAM("No pair found to be valid for IK");*/
 }
 
 
