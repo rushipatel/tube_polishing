@@ -709,7 +709,11 @@ bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::A
     std::vector<double> ik_joints(7), crnt_joints, crnt_left_joints;
     _get_right_joints(crnt_joints);
     _get_left_joints(crnt_left_joints);
-    _get_right_arm_ik(pose,ik_joints,crnt_joints);
+    if(!_get_right_arm_ik(pose,ik_joints,crnt_joints))
+    {
+        ROS_WARN("Right arm IK returned with no solution");
+        return false;
+    }
 
     _collision_check->setAttachedObj(attObj);
     _collision_check->enableVisualization();
@@ -728,6 +732,7 @@ bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::A
         return false;
     }
     ROS_DEBUG("Goal state is valid");
+    
 
     req.motion_plan_request.group_name = "right_arm";
     req.motion_plan_request.num_planning_attempts = 3;
@@ -736,14 +741,15 @@ bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::A
     req.motion_plan_request.start_state.joint_state.name = _r_jnt_nms;
     req.motion_plan_request.start_state.joint_state.position = crnt_joints;
     req.motion_plan_request.goal_constraints.joint_constraints.resize(_r_jnt_nms.size());
-
-
+    
+    ROS_INFO("Adding following contraints in right arm GetPlan request...");
     for (unsigned int i = 0 ; i < req.motion_plan_request.goal_constraints.joint_constraints.size(); i++)
     {
       req.motion_plan_request.goal_constraints.joint_constraints[i].joint_name = _r_jnt_nms[i];
       req.motion_plan_request.goal_constraints.joint_constraints[i].position = ik_joints[i];
       req.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_below = 0.2;
       req.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_above = 0.2;
+      ROS_INFO_STREAM("Joint - Name : "<<_r_jnt_nms[i].c_str()<<"\tValue : "<<ik_joints[i]);
     }
 
     if(!_get_motion_plan(req,res))
@@ -788,7 +794,11 @@ bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::At
     std::vector<double> ik_joints(7), crnt_joints, crnt_right_joints;
     _get_left_joints(crnt_joints);
     _get_right_joints(crnt_right_joints);
-    _get_right_arm_ik(pose,ik_joints,crnt_joints);
+    if(!_get_left_arm_ik(pose,ik_joints,crnt_joints))
+    {
+        ROS_WARN("Lefr arm IK returned with no solution");
+        return false;
+    }
 
     _collision_check->setAttachedObj(attObj);
     _collision_check->enableVisualization();
@@ -816,12 +826,14 @@ bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::At
     req.motion_plan_request.start_state.joint_state.position = crnt_joints;
     req.motion_plan_request.goal_constraints.joint_constraints.resize(_l_jnt_nms.size());
 
+    ROS_INFO("Adding following contraints in left arm GetPlan request...");
     for (unsigned int i = 0 ; i < req.motion_plan_request.goal_constraints.joint_constraints.size(); i++)
     {
       req.motion_plan_request.goal_constraints.joint_constraints[i].joint_name = _l_jnt_nms[i];
       req.motion_plan_request.goal_constraints.joint_constraints[i].position = ik_joints[i];
       req.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_below = 0.2;
       req.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_above = 0.2;
+      ROS_INFO_STREAM("Joint - Name : "<<_l_jnt_nms[i].c_str()<<"\tValue : "<<ik_joints[i]);
     }
 
     if(!_get_motion_plan(req,res))
