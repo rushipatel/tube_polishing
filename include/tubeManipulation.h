@@ -35,6 +35,20 @@ namespace TubeManipulation
 {
 
 
+class Trajectory
+{
+public:
+    Trajectory();
+    void setTrajectory(std::vector<double> &rightTraj, std::vector<double> &leftTraj);
+
+private:
+    trajectory_msgs::JointTrajectory _right_traj;
+    trajectory_msgs::JointTrajectory _left_traj;
+    std::vector<std::string> _r_jnt_nms;
+    std::vector<std::string> _l_jnt_nms;
+};
+
+
 class CollisionCheck
 {
 public:
@@ -89,14 +103,13 @@ private:
  *  It generates joint trajectory for both hands using GetconstraintAwarePositionIK service 
  *  and executes both trajectory in synchronized fashion.
  */
-class Arms
+class Arms : public Trajectory
 {
 public:
     Arms(ros::NodeHandlePtr rh);
-    bool genTrajectory();
-    bool genTrajectory(std::vector<double> &rightJointTraj, std::vector<double> &leftJointTraj);
-    bool genLeftTrajectory(std::vector<double> &jointTrajectory);  //Prerequisites: leftWristOffset and objPoseTraj
-    bool genRightTrajectory(std::vector<double> &jointTrajectory); //Prerequisites: rightWristOffset and objPoseTraj
+    bool genTrajectory(geometry_msgs::PoseArray &objPoseArray, geometry_msgs::Pose &rightArmOffset, geometry_msgs::Pose &leftArmOffset, arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &rightJointTraj, std::vector<double> &leftJointTraj);
+    bool genLeftTrajectory(std::vector<double> &jointTrajectory, geometry_msgs::Pose &leftArmOffset);
+    bool genRightTrajectory(std::vector<double> &jointTrajectory, geometry_msgs::Pose &rightArmOffset);
     bool executeJointTrajectory();
     bool executeJointTrajectory(std::vector<double> &qRight,
                                 std::vector<double> &qLeft);
@@ -118,22 +131,22 @@ public:
                                  std::vector<double> &jointsOut);
     bool getSimpleLeftArmIK(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &jointState);
-    void setObjPoseTrajectory(geometry_msgs::PoseArray &pose_array);
-    void setWristOffset(tf::Transform &right_offset, tf::Transform &left_offset);
-    void setWristOffset(geometry_msgs::Pose &right_offset, geometry_msgs::Pose &left_offset);
     bool getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
                                  geometry_msgs::Pose wrist_pose,
                                  geometry_msgs::Pose other_hand_grasp,
                                  arm_navigation_msgs::AttachedCollisionObject att_obj,
-                                 geometry_msgs::Pose &obj_pose_out);
+                                 geometry_msgs::Pose &obj_pose_out, std::vector<double> &ik_soln);
     bool getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
                                  geometry_msgs::Pose wrist_pose,
                                  geometry_msgs::Pose other_hand_grasp,
                                  arm_navigation_msgs::AttachedCollisionObject att_obj,
-                                 geometry_msgs::Pose &obj_pose_out);
+                                 geometry_msgs::Pose &obj_pose_out, std::vector<double> &ik_soln);
+    bool moveRightArmWithMPlanning(std::vector<double> &ik_soln);
+    bool moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_soln);
     bool moveRightArmWithMPlanning(geometry_msgs::Pose pose);
-    bool moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, 
-                                   geometry_msgs::Pose pose);
+    bool moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
+    bool moveLeftArmWithMPlanning(std::vector<double> &ik_soln);
+    bool moveLeftArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_soln);
     bool moveLeftArmWithMPlanning(geometry_msgs::Pose pose);
     bool moveLeftArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
     geometry_msgs::Pose getRightArmFK();
@@ -170,6 +183,7 @@ private:
     std::vector<std::string> _r_jnt_nms;
     std::vector<std::string> _l_jnt_nms;
     CollisionCheck::Ptr _collision_check;
+    std::map<std::string, std::pair<double, double> > _joint_bounds;
 
     void _get_right_goal();
     void _get_left_goal();
@@ -206,16 +220,19 @@ private:
     bool _get_simple_left_arm_ik(geometry_msgs::Pose &pose,
                                   std::vector<double> &joints,
                                   std::vector<double> &seed_state);
-    bool _gen_trarajectory(std::vector<double> &right_joint_traj,
+    bool _gen_trajectory(arm_navigation_msgs::AttachedCollisionObject &attObj,
+                           std::vector<double> &right_joint_traj,
                            std::vector<double> &left_joint_traj);
-    bool _move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
-    bool _move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
+    bool _move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_joints);
+    bool _move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_joints);
     bool _get_motion_plan(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
     bool _filter_trajectory(trajectory_msgs::JointTrajectory &trajectory_in,
                             trajectory_msgs::JointTrajectory &trajectory_out, arm_navigation_msgs::GetMotionPlan::Request mplan_req);
     void _fill_trajectory_msg(trajectory_msgs::JointTrajectory &trajectory_in,
                               trajectory_msgs::JointTrajectory &trajectory_out);
     void _execute_joint_trajectory(trajectory_msgs::JointTrajectory &right_traj, trajectory_msgs::JointTrajectory &left_traj);
+    bool _planner_error_handeling(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
+    void _get_bounds_from_description();
 
     geometry_msgs::Pose _get_right_fk(std::vector<double> &joints);
     geometry_msgs::Pose _get_left_fk(std::vector<double> &joints);

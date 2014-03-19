@@ -4,6 +4,21 @@
 
 namespace TubeGrasp
 {
+
+geometry_msgs::Pose Grasp::getGlobalPose(geometry_msgs::Pose objectPose)
+{
+    tf::Transform obj = pose2tf(objectPose), grasp = pose2tf(wristPose);
+    grasp = obj*grasp;
+    tf2pose(grasp);
+}
+
+geometry_msgs::Pose Grasp::getGlobalPose(tf::Transform objectTf)
+{
+    tf::Transform grasp = pose2tf(wristPose);
+    grasp = objectTf * grasp;
+    return tf2pose(grasp);
+}
+
 GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh)
 {
     _nh = nh;
@@ -77,17 +92,18 @@ bool GraspAnalysis::getComputedGraspPair(GraspPair &graspPair)
 }
 
 //returns global pick pose
-geometry_msgs::Pose GraspAnalysis::getPickUpPose()
+//using current_pair this function tries to avoind generating pick poses near to current_pair
+geometry_msgs::Pose GraspAnalysis::getPickUpPose(std::vector<tf::Vector3> &pointsToAvoid, double min_dist)
 {
     //will generate only vertical grasps
     GraspArray::Ptr grasp_array;
     grasp_array.reset(new (GraspArray));
-    //offset is 0.18 for picking so that fingers don't hit table.
+    //offset is 0.185 for picking so that fingers don't hit table.
     _gen_grasps(_axis_step_size, 180, grasp_array, 0.185);
 
     tf::Transform g,t = _tube->getTransform();
 
-    //Convert all grasps in world frame so vertical grasps can be tested
+    //Convert all grasps in world frame so we can choose vertical grasps out of it
     for(size_t i=0; i<grasp_array->grasps.size(); i++)
     {
         g = pose2tf(grasp_array->grasps[i].wristPose);
@@ -109,6 +125,7 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
     x_step.setRotation(tf::Quaternion(0,0,0,1));
     int idx;
     double angle, max_angle = M_PI*2;
+
     for(size_t i=0; i<grasp_array->grasps.size(); i++)
     {
         if(grasp_array->grasps[i].group==prev_grp)
@@ -128,9 +145,24 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose()
         }
         else
         {
-
-            grasp_sorted->grasps.push_back(grasp_array->grasps[idx]);
             max_angle = M_PI*2;
+
+            double dist;
+            tf::Vector3 pick_grasp_pos;
+            pick_grasp_pos.setValue(grasp_array->grasps[idx].wristPose.position.x,
+                                    grasp_array->grasps[idx].wristPose.position.y,
+                                    grasp_array->grasps[idx].wristPose.position.z);
+            bool violeted_dist = false;
+            for(unsigned int i=0; i<pointsToAvoid.size(); i++){
+                dist = pick_grasp_pos.distance(pointsToAvoid[i]);
+                if(dist<min_dist){
+                    violeted_dist = true;
+                    break;
+                }
+            }
+            if(!violeted_dist) // if pick grasp is away from two current grasps
+                grasp_sorted->grasps.push_back(grasp_array->grasps[idx]);
+
         }
         prev_grp = grasp_array->grasps[i].group;
     }
@@ -390,23 +422,20 @@ void GraspAnalysis::_test_pairs_for_ik()
     TubeManipulation::Arms manip(_nh);
 
     int idx;
-    unsigned long test_grasps=1;
+    unsigned long test_grasps=0;
 
     ROS_INFO_STREAM("Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
     GraspPair gp;
-    manip.setObjPoseTrajectory(_tube_traj);
 
     unsigned long it=MAX_ITERATION;
     _valid_pairs->graspPairs.reserve(MAX_TEST_GRASPS);
     while(it>0)
     {
-        std::cout<<'.';
         it--;
         idx = rand()%(_test_pairs->graspPairs.size()+1);
         gp = _test_pairs->graspPairs[idx];
-        manip.setWristOffset(gp.rightGrasp.wristPose, gp.leftGrasp.wristPose);
-        //genTrajectory clears vectors(qRight, qLeft) in arguement
-        if(manip.genTrajectory(gp.qRight, gp.qLeft))
+        arm_navigation_msgs::AttachedCollisionObject att_obj = _tube->getAttachedObjForBothGrasps(gp.rightGrasp.wristPose);
+        if(manip.genTrajectory(_tube_traj,gp.rightGrasp.wristPose, gp.leftGrasp.wristPose,att_obj, gp.qRight, gp.qLeft))
         {
             gp.isValid = true;
             _valid_pairs->graspPairs.push_back(gp);
@@ -416,11 +445,11 @@ void GraspAnalysis::_test_pairs_for_ik()
         }
         else
         {
-            std::cout<<" ";
             //fail_cnt++;
         }
+        std::cout<<"\r["<<MAX_ITERATION-it<<'\t'<<test_grasps<<']'<<std::flush;
     }
-    std::cout<<"\n";
+    std::cout<<'\n';
     if(!_valid_pairs->graspPairs.empty())
     {
         ROS_INFO_STREAM("GraspAnalysis - "<<_valid_pairs->graspPairs.size()

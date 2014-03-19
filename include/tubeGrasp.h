@@ -22,6 +22,8 @@ namespace TubeGrasp
         geometry_msgs::Pose wristPose;
         unsigned int group; //circular group. it helps reduce pairs to test
         unsigned int cylinderIdx;
+        geometry_msgs::Pose getGlobalPose(geometry_msgs::Pose objectPose);
+        geometry_msgs::Pose getGlobalPose(tf::Transform objectTf);
     };
 
     class GraspPair
@@ -74,7 +76,7 @@ namespace TubeGrasp
         void pickUpTube(geometry_msgs::Pose &pickPose);
         bool getComputedGraspPair(GraspPair &graspPair);
         void getTubeWorkTrajectory(geometry_msgs::PoseArray &tube_traj);
-        geometry_msgs::Pose getPickUpPose();
+        geometry_msgs::Pose getPickUpPose(std::vector<tf::Vector3> &pointsToAvoid, double min_dist);
 
         geometry_msgs::PoseArray _work_traj; //put this back in private after dbg/dev
         geometry_msgs::PoseArray _tube_traj;
