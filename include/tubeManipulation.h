@@ -26,6 +26,7 @@
 
 #define MAX_JOINT_VEL 0.2
 #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
+#define GET_PLANNING_SCENE_NAME "/environment_server/get_planning_scene"
 
 /*! \brief  Simple action server client definition for JointTrajectoryAction */
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryAction> TrajClient;
@@ -63,7 +64,19 @@ public:
     void enableVisualization();
     void disableVisualization();
     void setMarkerLifeTime(double time);
+    int  getLastError();
+    std::string getLastErrorAsString();
     typedef boost::shared_ptr<TubeManipulation::CollisionCheck> Ptr;
+    enum{
+        VALID,
+        OUT_OF_BOUND_R,
+        IN_ENV_CLSN_R,
+        IN_SLF_CLSN_R,
+        OUT_OF_BOUND_L,
+        IN_ENV_CLSN_L,
+        IN_SLF_CLSN_L,
+        ERROR
+    };
 
 private:
     ros::NodeHandlePtr _nh;
@@ -73,7 +86,8 @@ private:
     arm_navigation_msgs::AttachedCollisionObject _att_obj;
     arm_navigation_msgs::GetPlanningScene::Request _scn_req;
     arm_navigation_msgs::GetPlanningScene::Response _scn_res;
-    std::map<std::string, double> _jnt_values;
+    std::map<std::string, double> _r_jnt_values;
+    std::map<std::string, double> _l_jnt_values;
     std::vector<double> _r_jnts;
     std::vector<double> _l_jnts;
     std::vector<std::string> _r_jnt_nms;
@@ -87,11 +101,13 @@ private:
     double _mrk_life_time;
     planning_models::KinematicState* _state;
     bool _visualize;
+    int _error;
 
     std_msgs::ColorRGBA _good_color;
     std_msgs::ColorRGBA _collision_color;
     std_msgs::ColorRGBA _joint_limits_color;
     std_msgs::ColorRGBA _point_markers;
+    std::map<int, std::string> _map;
 
     bool _is_state_valid();
     void _reset_state();
@@ -142,7 +158,7 @@ public:
                                  arm_navigation_msgs::AttachedCollisionObject att_obj,
                                  geometry_msgs::Pose &obj_pose_out, std::vector<double> &ik_soln);
     bool moveRightArmWithMPlanning(std::vector<double> &ik_soln);
-    bool moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_soln);
+    bool moveRightArmWithMPlanning(std::vector<double> &goalJoints);
     bool moveRightArmWithMPlanning(geometry_msgs::Pose pose);
     bool moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
     bool moveLeftArmWithMPlanning(std::vector<double> &ik_soln);
@@ -220,19 +236,19 @@ private:
     bool _get_simple_left_arm_ik(geometry_msgs::Pose &pose,
                                   std::vector<double> &joints,
                                   std::vector<double> &seed_state);
-    bool _gen_trajectory(arm_navigation_msgs::AttachedCollisionObject &attObj,
-                           std::vector<double> &right_joint_traj,
+    bool _gen_trajectory(std::vector<double> &right_joint_traj,
                            std::vector<double> &left_joint_traj);
-    bool _move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_joints);
-    bool _move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_joints);
+    bool _move_right_arm_with_mplning(std::vector<double> &ik_joints);
+    bool _move_left_arm_with_mplning(std::vector<double> &ik_joints);
     bool _get_motion_plan(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
     bool _filter_trajectory(trajectory_msgs::JointTrajectory &trajectory_in,
                             trajectory_msgs::JointTrajectory &trajectory_out, arm_navigation_msgs::GetMotionPlan::Request mplan_req);
     void _fill_trajectory_msg(trajectory_msgs::JointTrajectory &trajectory_in,
                               trajectory_msgs::JointTrajectory &trajectory_out);
     void _execute_joint_trajectory(trajectory_msgs::JointTrajectory &right_traj, trajectory_msgs::JointTrajectory &left_traj);
-    bool _planner_error_handeling(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
+    bool _handle_planning_error(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
     void _get_bounds_from_description();
+    bool _start_is_goal(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
 
     geometry_msgs::Pose _get_right_fk(std::vector<double> &joints);
     geometry_msgs::Pose _get_left_fk(std::vector<double> &joints);

@@ -67,14 +67,38 @@ void ControlSequence::start()
         _tube->getCylinderMarker(tube_mrkr);
         _tube_mrkr_pub.publish(tube_mrkr);
 
-        ROS_INFO("Getting Grasps");
+        /*ROS_INFO("Getting Grasps");
         if(!_get_grasps())
         {
             ROS_ERROR("ControlSequence - Error in computing grasp");
             return;
-        }
+        }*/
+        _current_grasp.rightGrasp.wristPose.orientation.x = 0.0;
+        _current_grasp.rightGrasp.wristPose.orientation.y = 0.0;
+        _current_grasp.rightGrasp.wristPose.orientation.z = 0.0;
+        _current_grasp.rightGrasp.wristPose.orientation.w = 1.0;
+        _current_grasp.rightGrasp.wristPose.position.x = 0;
+        _current_grasp.rightGrasp.wristPose.position.y = 0;
+        _current_grasp.rightGrasp.wristPose.position.z = 0;
+        ros::ServiceClient _set_scn_client = _nh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
+        ros::ServiceClient _get_scn_client = _nh->serviceClient<arm_navigation_msgs::GetPlanningScene>(GET_PLANNING_SCENE_NAME);
+        _attached_to_right_arm = true;
+        _get_attached_object();
+        arm_navigation_msgs::SetPlanningSceneDiff::Request req;
+        arm_navigation_msgs::SetPlanningSceneDiff::Response res;
+        req.planning_scene_diff.attached_collision_objects.push_back(_att_obj);
+        if(!_set_scn_client.call(req,res))
+            ROS_ERROR("Couldn't set planning scn");
+        ROS_INFO("Planning scene set with object. Sleeping for 10 sec...");
+        sleep(10);
+        ROS_INFO("Getting planning scene");
+        arm_navigation_msgs::GetPlanningScene::Request get_req;
+        arm_navigation_msgs::GetPlanningScene::Response get_res;
+        if(!_get_scn_client.call(get_req,get_res))
+            ROS_ERROR("Couldn't get planning scn");
 
-        if(_pick_up_tube("right_arm"))
+
+        /*if(_pick_up_tube("right_arm"))
         {
             _get_attached_object();
             if(!_repos_tube_and_regrasp())
@@ -120,7 +144,7 @@ void ControlSequence::start()
         {
             ROS_ERROR("ControlSequence - Error in picking tube");
             return;
-        }
+        }*/
     }
     else
     {

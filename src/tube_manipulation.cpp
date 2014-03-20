@@ -135,9 +135,9 @@ void TubeManipulation::Arms::_get_bounds_from_description()
         jnt_mdl->getVariableBounds(_r_jnt_nms[i].c_str(), bounds);
         _joint_bounds[_r_jnt_nms[i].c_str()] = bounds;
 
-        std::cout<<i<<"   "<<"[\t"<<_joint_bounds[_r_jnt_nms[i].c_str()].first
+        /*std::cout<<i<<"   "<<"[\t"<<_joint_bounds[_r_jnt_nms[i].c_str()].first
                 <<" \t"<<_joint_bounds[_r_jnt_nms[i].c_str()].second
-               <<"\t]\t"<<_r_jnt_nms[i].c_str()<<std::endl;
+               <<"\t]\t"<<_r_jnt_nms[i].c_str()<<std::endl;*/
     }
 
     for(int i=0; i<_l_jnt_nms.size(); i++)
@@ -146,9 +146,9 @@ void TubeManipulation::Arms::_get_bounds_from_description()
         jnt_mdl->getVariableBounds(_l_jnt_nms[i].c_str(), bounds);
         _joint_bounds[_l_jnt_nms[i].c_str()] = bounds;
 
-        std::cout<<i<<"   "<<"["<<_joint_bounds[_l_jnt_nms[i].c_str()].first
+        /*std::cout<<i<<"   "<<"["<<_joint_bounds[_l_jnt_nms[i].c_str()].first
                 <<"\t"<<_joint_bounds[_l_jnt_nms[i].c_str()].second
-               <<"]\t"<<_l_jnt_nms[i].c_str()<<std::endl;
+               <<"]\t"<<_l_jnt_nms[i].c_str()<<std::endl;*/
     }
 }
 
@@ -301,7 +301,7 @@ bool TubeManipulation::Arms::genTrajectory(geometry_msgs::PoseArray &objPoseArra
 
 
 //Assumes that wrist offsets and obj pose trajectory is set
-bool TubeManipulation::Arms::_gen_trajectory(arm_navigation_msgs::AttachedCollisionObject &attObj,
+bool TubeManipulation::Arms::_gen_trajectory(/*arm_navigation_msgs::AttachedCollisionObject &attObj,*/
                                              std::vector<double> &right_joint_traj,
                                              std::vector<double> &left_joint_traj)
 {
@@ -320,7 +320,7 @@ bool TubeManipulation::Arms::_gen_trajectory(arm_navigation_msgs::AttachedCollis
         ROS_ERROR("dualArms - Object trajectory is empty");
         return false;
     }
-    _collision_check->setAttachedObj(attObj);
+    //_collision_check->setAttachedObj(attObj);
     _collision_check->setMarkerLifeTime(5);
     _collision_check->enableVisualization();
     _collision_check->refreshState();
@@ -683,16 +683,16 @@ bool TubeManipulation::Arms::moveRightArm(geometry_msgs::Pose pose)
     return 1;
 }
 
-bool TubeManipulation::Arms::moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &goalJoints){
-    return _move_right_arm_with_mplning(attObj, goalJoints);
+bool TubeManipulation::Arms::moveRightArmWithMPlanning(std::vector<double> &goalJoints){
+    return _move_right_arm_with_mplning(goalJoints);
 }
 
 bool TubeManipulation::Arms::moveRightArmWithMPlanning(std::vector<double> &goalJoints){
         arm_navigation_msgs::AttachedCollisionObject attObj;
-    return _move_right_arm_with_mplning(attObj, goalJoints);
+    return _move_right_arm_with_mplning(goalJoints);
 }
 
-bool TubeManipulation::Arms::moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose)
+bool TubeManipulation::Arms::moveRightArmWithMPlanning(geometry_msgs::Pose pose)
 {
     std::vector<double> ik_joints(7), crnt_joints;
     _get_right_joints(crnt_joints);
@@ -717,47 +717,27 @@ bool TubeManipulation::Arms::moveRightArmWithMPlanning(geometry_msgs::Pose pose)
     return _move_right_arm_with_mplning(attObj, ik_joints);
 }
 
-bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_joints)
+bool TubeManipulation::Arms::_move_right_arm_with_mplning(/*arm_navigation_msgs::AttachedCollisionObject &attObj,*/ std::vector<double> &ik_joints)
 {
-    arm_navigation_msgs::SetPlanningSceneDiff::Request scn_req;
+    /*arm_navigation_msgs::SetPlanningSceneDiff::Request scn_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response scn_res;
-    if(!attObj.object.shapes.empty())
-    {
+
+    if(!attObj.object.shapes.empty()){
         scn_req.planning_scene_diff.attached_collision_objects.push_back(attObj);
         ROS_DEBUG("Adding attached object in to planning scene.");
     }
-    if(!_set_pln_scn_client.call(scn_req,scn_res))
+    if(!_set_pln_scn_client.call(scn_req,scn_res)){
         ROS_ERROR("TubeManipulation - Move right arm with MPlanning - Can't set planning scene");
+    }
     if(ik_joints.empty()||ik_joints.size()!=_r_jnt_nms.size()){
         ROS_WARN("Size of input argument ik_joints is not %d",_r_jnt_nms.size());
         return false;
-    }
-
+    }*/
 
     arm_navigation_msgs::GetMotionPlan::Request req;
     arm_navigation_msgs::GetMotionPlan::Response res;
-
-    std::vector<double> crnt_right_joints, crnt_left_joints;
+    std::vector<double> crnt_right_joints;
     _get_right_joints(crnt_right_joints);
-    _get_left_joints(crnt_left_joints);
-
-    _collision_check->setAttachedObj(attObj);
-    _collision_check->enableVisualization();
-    _collision_check->setMarkerLifeTime(30);
-
-    /*if(!_collision_check->isStateValid(crnt_joints,crnt_left_joints))
-    {
-        ROS_WARN("TubeManipulation - Start state is not valid");
-        return false;
-    }
-    ROS_DEBUG("Start state is valid");*/
-
-    if(!_collision_check->isStateValid(ik_joints,crnt_left_joints)){
-        ROS_WARN("TubeManipulation - Goal state joints are not valid");
-        return false;
-    }
-    ROS_DEBUG("Goal state is valid");
-    
 
     req.motion_plan_request.group_name = "right_arm";
     req.motion_plan_request.num_planning_attempts = 3;
@@ -777,12 +757,14 @@ bool TubeManipulation::Arms::_move_right_arm_with_mplning(arm_navigation_msgs::A
       //ROS_INFO_STREAM("Joint - Name : "<<_r_jnt_nms[i].c_str()<<"\tValue : "<<ik_joints[i]);
     }
 
+    if(_start_is_goal(req,res)){
+        ROS_INFO("Current state already is goal state. Skipping motion planning");
+        return true;
+    }
+
     if(!_get_motion_plan(req,res)){
-        if(res.error_code.val == res.error_code.START_STATE_IN_COLLISION || res.error_code.val==res.error_code.JOINT_LIMITS_VIOLATED){
-            ROS_INFO("Planner returned with error. Handeling exception...");
-            if(!_planner_error_handeling(req, res)){
-                return false;
-            }
+        if(!_handle_planning_error(req, res)){
+            return false;
         }
     }
 
@@ -828,9 +810,9 @@ bool TubeManipulation::Arms::moveLeftArmWithMPlanning(geometry_msgs::Pose pose)
     return _move_left_arm_with_mplning(attObj, ik_joints);
 }
 
-bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_joints)
+bool TubeManipulation::Arms::_move_left_arm_with_mplning(/*arm_navigation_msgs::AttachedCollisionObject &attObj, */std::vector<double> &ik_joints)
 {
-    arm_navigation_msgs::SetPlanningSceneDiff::Request scn_req;
+    /*arm_navigation_msgs::SetPlanningSceneDiff::Request scn_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response scn_res;
     if(!attObj.object.shapes.empty()){
         scn_req.planning_scene_diff.attached_collision_objects.push_back(attObj);
@@ -838,7 +820,7 @@ bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::At
     }
     if(!_set_pln_scn_client.call(scn_req,scn_res)){
         ROS_ERROR("TubeManipulation - Move left arm with MPlanning - Can't set planning scene");
-    }
+    }*/
     if(ik_joints.empty() || ik_joints.size()!=_l_jnt_nms.size()){
         ROS_WARN("Size of input argument ik_joints is not %d",_l_jnt_nms.size());
         return false;
@@ -846,27 +828,9 @@ bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::At
 
     arm_navigation_msgs::GetMotionPlan::Request req;
     arm_navigation_msgs::GetMotionPlan::Response res;
-    std::vector<double>  crnt_right_joints, crnt_left_joints;
-    _get_right_joints(crnt_right_joints);
+
+    std::vector<double> crnt_left_joints;
     _get_left_joints(crnt_left_joints);
-
-    _collision_check->setAttachedObj(attObj);
-    _collision_check->enableVisualization();
-    _collision_check->setMarkerLifeTime(30);
-
-    /*if(!_collision_check->isStateValid(crnt_right_joints,crnt_joints))
-    {
-        ROS_WARN("TubeManipulation - Start state is not valid");
-        return false;
-    }
-    ROS_DEBUG("Start state is valid");*/
-
-    if(!_collision_check->isStateValid(crnt_right_joints, ik_joints))
-    {
-        ROS_WARN("TubeManipulation - Goal state joints are not valid");
-        return false;
-    }
-    ROS_DEBUG("Goal state is valid");
 
     req.motion_plan_request.group_name = "left_arm";
     req.motion_plan_request.num_planning_attempts = 3;
@@ -886,12 +850,13 @@ bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::At
       //ROS_INFO_STREAM("Joint - Name : "<<_l_jnt_nms[i].c_str()<<"\tValue : "<<ik_joints[i]);
     }
 
+    if(_start_is_goal(req,res)){
+        ROS_INFO("Current state already is goal state. Skipping motion planning");        return true;
+    }
+
     if(!_get_motion_plan(req,res)){
-        if(res.error_code.val == res.error_code.START_STATE_IN_COLLISION || res.error_code.val==res.error_code.JOINT_LIMITS_VIOLATED){
-            ROS_INFO("Planner returned with error. Handeling exception...");
-            if(!_planner_error_handeling(req, res)){
-                return false;
-            }
+        if(!_handle_planning_error(req, res)){
+            return false;
         }
     }
 
@@ -905,21 +870,67 @@ bool TubeManipulation::Arms::_move_left_arm_with_mplning(arm_navigation_msgs::At
     return true;
 }
 
-bool TubeManipulation::Arms::_planner_error_handeling(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res)
+bool TubeManipulation::Arms::_start_is_goal(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res)
 {
-    if(res.error_code.val == res.error_code.START_STATE_IN_COLLISION)
+    bool right_arm = false, left_arm = false;
+    if(req.motion_plan_request.group_name.compare("right_arm")==0)
+        right_arm = true;
+    else if(req.motion_plan_request.group_name.compare("left_arm")==0)
+        left_arm = true;
+    else{
+        ROS_ERROR("invalid group name");
+        return false;
+    }
+
+    std::vector<double> right_joints, left_joints;
+    _get_right_joints(right_joints);
+    _get_left_joints(left_joints);
+
+    double err = 0;
+    if(right_arm){
+        for(int i=0; i<_r_jnt_nms.size(); i++){
+            err += req.motion_plan_request.goal_constraints.joint_constraints[i].position - right_joints[i];
+        }
+        //ROS_WARN("ERROR = %f",err);
+        if(err<0.001)
+            return true;
+    }
+    if(left_arm){
+        for(int i=0; i<_l_jnt_nms.size(); i++){
+            err += req.motion_plan_request.goal_constraints.joint_constraints[i].position - left_joints[i];
+        }
+        //ROS_WARN("ERROR = %f",err);
+        if(err<0.001)
+            return true;
+    }
+    return false; //should never come to this point
+}
+
+bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res)
+{
+    bool right_arm = false, left_arm = false;
+    if(req.motion_plan_request.group_name.compare("right_arm")==0){
+        right_arm = true;
+    }
+    if(req.motion_plan_request.group_name.compare("left_arm")==0){
+        left_arm = true;
+    }
+
+    switch(res.error_code.val){
+    case -3 : //START_STATE_IN_COLLISION
     {
+        ROS_INFO("Trying to resolve error -3...");
         double box_size = 0.1; //box dimentions are box_size x box_size x box_size
         ROS_INFO("Planner says start state is in collision. Choosing another start state within %f x %f x %f box", box_size, box_size, box_size);
         geometry_msgs::Pose pose;
         std::vector<double> ik_soln, crnt_joints;
         bool right_arm;
-        if(req.motion_plan_request.group_name.compare("right_arm")==0){
+        if(right_arm){
             right_arm = true;
             pose = getRightArmFK();
             _get_right_joints(crnt_joints);
         }
-        else if(req.motion_plan_request.group_name.compare("left_arm")==0){
+        else if(left_arm){
             right_arm = false;
             pose = getLeftArmFK();
             _get_left_joints(crnt_joints);
@@ -957,14 +968,95 @@ bool TubeManipulation::Arms::_planner_error_handeling(arm_navigation_msgs::GetMo
             }
             cnt--;
         }while(cnt>0);
-        return false;
+        break;
     }
-    if(res.error_code.val == res.error_code.START_STATE_VIOLATES_PATH_CONSTRAINTS)
+
+    case -21 : //JOINT_LIMITS_VIOLATED
     {
-        ROS_INFO("Planner says start state violates path constrints. TODO...");
+        ROS_INFO("Trying to resolve error -21...");
+        _collision_check->refreshState();
+        //_collision_check->setAttachedObj(attObj);
+        _collision_check->enableVisualization();
+        _collision_check->setMarkerLifeTime(30);
+        std::vector<double> right_joints, left_joints;
+        if(right_arm){
+            for(int i=0; i<_r_jnt_nms.size(); i++){
+                right_joints[i] = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
+            }
+            _get_left_joints(left_joints);
+        }
+        if(left_arm){
+            for(int i=0; i<_l_jnt_nms.size(); i++){
+                left_joints[i] = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
+            }
+            _get_right_joints(right_joints);
+        }
+
+        if(!_collision_check->isStateValid(right_joints, left_joints)){
+            ROS_WARN_STREAM("State validity error : "<<_collision_check->getLastErrorAsString());
+            int err = _collision_check->getLastError();
+            if(err==_collision_check->OUT_OF_BOUND_R){
+                ROS_ERROR("TODO: IF JOINTS ARE OUT OF BOUND");
+                //TODO:
+            }
+            if(err==_collision_check->OUT_OF_BOUND_L){
+                ROS_ERROR("TODO: IF GOAL STATE IS IN COLLISION");
+                //TODO:
+            }
+        }
+        else{
+            ROS_INFO("State looks fine");
+        }
+        break;
+    }
+
+    case -5 : //GOAL_IN_COLLISION
+    {
+        ROS_INFO("Trying to resolving error -5...");
+        _collision_check->refreshState();
+        //_collision_check->setAttachedObj(attObj);
+        _collision_check->enableVisualization();
+        _collision_check->setMarkerLifeTime(30);
+        std::vector<double> right_joints, left_joints;
+        if(right_arm){
+            for(int i=0; i<_r_jnt_nms.size(); i++){
+                right_joints[i] = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
+            }
+            _get_left_joints(left_joints);
+        }
+        if(left_arm){
+            for(int i=0; i<_l_jnt_nms.size(); i++){
+                left_joints[i] = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
+            }
+            _get_right_joints(right_joints);
+        }
+
+        if(!_collision_check->isStateValid(right_joints, left_joints)){
+            ROS_WARN_STREAM("State validity error : "<<_collision_check->getLastErrorAsString());
+            int err = _collision_check->getLastError();
+            if(err==_collision_check->OUT_OF_BOUND_L ||
+                    err==_collision_check->OUT_OF_BOUND_R){
+                ROS_ERROR("TODO: IF JOINTS ARE OUT OF BOUND");
+                //TODO:
+            }
+            if(err==_collision_check->IN_ENV_CLSN_R ||
+                    err==_collision_check->IN_ENV_CLSN_L ||
+                    err==_collision_check->IN_SLF_CLSN_R ||
+                    err==_collision_check->IN_SLF_CLSN_L ){
+                ROS_ERROR("TODO: IF GOAL STATE IS IN COLLISION");
+                //TODO:
+            }
+        }
+        break;
+    }
+
+    default :
+    {
+        ROS_ERROR("Could not resolve error %d. Case handeling for this error is not implemented yet",res.error_code.val);
         return false;
     }
-    return false;
+    }//switch
+    return true;
 }
 
 /*! \brief Simple move arm function to move individual arm for given pose.
@@ -1648,7 +1740,7 @@ bool TubeManipulation::Arms::_filter_trajectory(trajectory_msgs::JointTrajectory
 
     req.group_name =  mplan_req.motion_plan_request.group_name;
 
-    req.allowed_time = ros::Duration(5);
+    req.allowed_time = ros::Duration(2);
     req.start_state.joint_state.name = trajectory_in.joint_names;
     req.start_state.joint_state.position.resize(trajectory_in.joint_names.size());
 
@@ -1702,6 +1794,15 @@ TubeManipulation::CollisionCheck::CollisionCheck(ros::NodeHandlePtr nh)
     _l_jnt_nms.resize(7);*/
 
     _reset_state();
+
+    _map[VALID] = "state is valid";
+    _map[OUT_OF_BOUND_R] = "right joint(s) is/are out of bound";
+    _map[IN_ENV_CLSN_R] = "right arm is in collision with environment";
+    _map[IN_SLF_CLSN_R] = "right arm is in self collision";
+    _map[OUT_OF_BOUND_L] = "right joint(s) is/are out of bound";
+    _map[IN_ENV_CLSN_L] = "right arm is in collision with environment";
+    _map[IN_SLF_CLSN_L] = "right arm is in self collision";
+    _map[ERROR] = "unknown error";
 }
 
 void TubeManipulation::CollisionCheck::enableVisualization()
@@ -1757,15 +1858,15 @@ void TubeManipulation::CollisionCheck::_reset_state(void)
     _r_lnk_nms = _collision_models->getKinematicModel()->getModelGroup("right_arm")->getUpdatedLinkModelNames();
     _l_lnk_nms = _collision_models->getKinematicModel()->getModelGroup("left_arm")->getUpdatedLinkModelNames();
 
-    _state->getJointStateGroup("right_arm")->getKinematicStateValues(_jnt_values);
+    _state->getJointStateGroup("right_arm")->getKinematicStateValues(_r_jnt_values);
     _actual_r_jnts.resize(_r_jnt_nms.size());
     for(size_t i=0; i<_r_jnt_nms.size(); i++)
-        _actual_r_jnts[i] = _jnt_values[_r_jnt_nms[i].c_str()];
+        _actual_r_jnts[i] = _r_jnt_values[_r_jnt_nms[i].c_str()];
 
     _actual_l_jnts.resize(_l_jnt_nms.size());
-    _state->getJointStateGroup("left_arm")->getKinematicStateValues(_jnt_values);
+    _state->getJointStateGroup("left_arm")->getKinematicStateValues(_l_jnt_values);
     for(size_t i=0; i<_l_jnt_nms.size(); i++)
-        _actual_l_jnts[i] = _jnt_values[_l_jnt_nms[i].c_str()];
+        _actual_l_jnts[i] = _l_jnt_values[_l_jnt_nms[i].c_str()];
 }
 
 void TubeManipulation::CollisionCheck::printState(void)
@@ -1811,12 +1912,13 @@ bool TubeManipulation::CollisionCheck::isStateValid(std::vector<double> &right_j
     _r_jnts = right_joints;
     _l_jnts = left_joints;
 
-    _jnt_values.clear();
+    _r_jnt_values.clear();
+    _l_jnt_values.clear();
 
     for(size_t i=0; i<_r_jnts.size(); i++)
     {
-        _jnt_values[_r_jnt_nms[i]] = _r_jnts[i];
-        _jnt_values[_l_jnt_nms[i]] = _l_jnts[i];
+        _r_jnt_values[_r_jnt_nms[i]] = _r_jnts[i];
+        _l_jnt_values[_l_jnt_nms[i]] = _l_jnts[i];
     }
     return _is_state_valid();
 }
@@ -1830,39 +1932,49 @@ bool TubeManipulation::CollisionCheck::_is_state_valid()
     color = _good_color;
 
 
-    _state->setKinematicState(_jnt_values);
-    if(!_state->areJointsWithinBounds(_r_jnt_nms))
-    {
-        ROS_DEBUG("TubeManipulation - Right joints are out of bound");
+    _state->setKinematicState(_r_jnt_values);  //set test state for right arm
+    if(!_state->areJointsWithinBounds(_r_jnt_nms)){
+        ROS_DEBUG("Right joints are out of bound");
         color = _joint_limits_color;
         is_valid = false;
-    }
-    if(!_state->areJointsWithinBounds(_l_jnt_nms))
-    {
-        ROS_DEBUG("TubeManipulation - Left joints are out of bound");
-        color = _joint_limits_color;
-        is_valid = false;
-    } else if(_collision_models->isKinematicStateInCollision(*_state))
-    {
-        std::stringstream ss;
-        ss.flush();
+        _error = OUT_OF_BOUND_R;
+    } else if(_collision_models->isKinematicStateInCollision(*_state)){
+        ROS_DEBUG("Right arm state is in collision");
         color = _collision_color;
         is_valid = false;
+        _error = ERROR;
         if(_collision_models->isKinematicStateInEnvironmentCollision(*_state))
-            ss<<"environment ";
+            _error = IN_ENV_CLSN_R;
         if(_collision_models->isKinematicStateInSelfCollision(*_state))
-        {
-            if(ss.gcount()>5)
-                ss<<"and self";
-            else
-                ss<<"self";
-        }
-        ROS_DEBUG_STREAM("TubeManipulation - kinematic state is in collision with "<<ss.str());
-        _collision_models->getAllCollisionPointMarkers(*_state, _mrkr_arr, _point_markers, ros::Duration(_mrk_life_time));
+            _error = IN_SLF_CLSN_R;
+        _collision_models->getAllCollisionPointMarkers(*_state, _mrkr_arr,
+                                 _point_markers, ros::Duration(_mrk_life_time));
     }
+    _state->setKinematicState(_actual_r_jnts); //reset to what was initially
 
-    if(_visualize)
-    {
+    _state->setKinematicState(_l_jnt_values); //set left test state
+    if(!_state->areJointsWithinBounds(_l_jnt_nms)){
+        ROS_DEBUG("Left joints are out of bound");
+        color = _joint_limits_color;
+        is_valid = false;
+        _error = OUT_OF_BOUND_L;
+    } else if(_collision_models->isKinematicStateInCollision(*_state)){
+        ROS_DEBUG("Left arm state is in collision");
+        color = _collision_color;
+        is_valid = false;
+        _error = ERROR;
+        if(_collision_models->isKinematicStateInEnvironmentCollision(*_state)){
+            _error = IN_ENV_CLSN_L;
+        }
+        if(_collision_models->isKinematicStateInSelfCollision(*_state)){
+            _error = IN_SLF_CLSN_L;
+        }
+        _collision_models->getAllCollisionPointMarkers(*_state, _mrkr_arr,
+                                 _point_markers, ros::Duration(_mrk_life_time));
+    }
+    _state->setKinematicState(_actual_l_jnts); //reset to what was initially
+
+    if(_visualize){
         _collision_models->getRobotMarkersGivenState(*_state, _mrkr_arr, color,"right_arm",ros::Duration(_mrk_life_time),&_r_lnk_nms);
         _collision_models->getRobotMarkersGivenState(*_state, _mrkr_arr, color,"left_arm",ros::Duration(_mrk_life_time),&_l_lnk_nms);
         _collision_models->getAttachedCollisionObjectMarkers(*_state, _mrkr_arr, "right_arm",color,ros::Duration(_mrk_life_time), false, &_r_lnk_nms);
@@ -1870,10 +1982,20 @@ bool TubeManipulation::CollisionCheck::_is_state_valid()
         _mrkr_pub.publish(_mrkr_arr);
         _mrkr_arr.markers.clear();
     }
+    if(is_valid)
+        _error = VALID;
     return is_valid;
 }
 
-void TubeManipulation::CollisionCheck::setMarkerLifeTime(double time)
-{
+void TubeManipulation::CollisionCheck::setMarkerLifeTime(double time){
     _mrk_life_time = time;
+}
+
+int TubeManipulation::CollisionCheck::getLastError(){
+    return _error;
+}
+
+std::string TubeManipulation::CollisionCheck::getLastErrorAsString(){
+    std::string str = _map[_error];
+    return str;
 }
