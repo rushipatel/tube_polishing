@@ -5,13 +5,20 @@ ControlSequence::ControlSequence(ros::NodeHandlePtr nh)
 {
     _nh = nh;
     _seg_srv_client = _nh->serviceClient<tabletop_object_detector::TabletopSegmentation>("/tabletop_segmentation");
-    _arms.reset(new TubeManipulation::Arms(_nh));
+
     _tube.reset(new TubePerception::Tube);
     _tube_mrkr_pub = _nh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
     _collosion_obj_pub = _nh->advertise<arm_navigation_msgs::CollisionObject>("collision_object",10);
+    if(!ros::service::waitForService(SET_PLANNING_SCENE_DIFF_NAME,5))
+        ROS_WARN_STREAM("Con not find "<<SET_PLANNING_SCENE_DIFF_NAME<<" service");
+    _set_pln_scn = _nh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
+    _att_obj.object.shapes.clear();
+    _set_planning_scene();
+    _arms.reset(new TubeManipulation::Arms(_nh));
 
     _attached_to_right_arm = false;
     _attached_to_left_arm = false;
+
     //_cloud_process.reset(new TubePerception::CloudProcessing());
     //_grasp_analysis.reset(new TubeGrasp::GraspAnalysis);
 
@@ -41,15 +48,13 @@ ControlSequence::~ControlSequence()
 
 bool ControlSequence::initialize()
 {
-    if(!_set_cloud_capture_posture())
-    {
+    if(!_set_cloud_capture_posture()){
         ROS_ERROR("ControlSequence - Unable to intitialize capture posture");
         return false;
     }
 
     _clusters.clear();
-    if(!_get_segmented_cloud()) //fills the clusters found by segmentation service
-    {
+    if(!_get_segmented_cloud()){    //fills the clusters found by segmentation service
         ROS_ERROR("ControlSequence - Segmentation error");
         return false;
     }
@@ -67,44 +72,27 @@ void ControlSequence::start()
         _tube->getCylinderMarker(tube_mrkr);
         _tube_mrkr_pub.publish(tube_mrkr);
 
-        /*ROS_INFO("Getting Grasps");
-        if(!_get_grasps())
-        {
+        ROS_INFO("Getting Grasps");
+        if(!_get_grasps()){
             ROS_ERROR("ControlSequence - Error in computing grasp");
             return;
-        }*/
-        _current_grasp.rightGrasp.wristPose.orientation.x = 0.0;
-        _current_grasp.rightGrasp.wristPose.orientation.y = 0.0;
-        _current_grasp.rightGrasp.wristPose.orientation.z = 0.0;
-        _current_grasp.rightGrasp.wristPose.orientation.w = 1.0;
-        _current_grasp.rightGrasp.wristPose.position.x = 0;
-        _current_grasp.rightGrasp.wristPose.position.y = 0;
-        _current_grasp.rightGrasp.wristPose.position.z = 0;
-        ros::ServiceClient _set_scn_client = _nh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
-        ros::ServiceClient _get_scn_client = _nh->serviceClient<arm_navigation_msgs::GetPlanningScene>(GET_PLANNING_SCENE_NAME);
-        _attached_to_right_arm = true;
-        _get_attached_object();
-        arm_navigation_msgs::SetPlanningSceneDiff::Request req;
-        arm_navigation_msgs::SetPlanningSceneDiff::Response res;
-        req.planning_scene_diff.attached_collision_objects.push_back(_att_obj);
-        if(!_set_scn_client.call(req,res))
-            ROS_ERROR("Couldn't set planning scn");
-        ROS_INFO("Planning scene set with object. Sleeping for 10 sec...");
-        sleep(10);
-        ROS_INFO("Getting planning scene");
-        arm_navigation_msgs::GetPlanningScene::Request get_req;
-        arm_navigation_msgs::GetPlanningScene::Response get_res;
-        if(!_get_scn_client.call(get_req,get_res))
-            ROS_ERROR("Couldn't get planning scn");
+        }
 
-
-        /*if(_pick_up_tube("right_arm"))
-        {
+        if(_pick_up_tube("right_arm")){
             _get_attached_object();
-            if(!_repos_tube_and_regrasp())
-            {
+            if(!_repos_tube_and_regrasp()){
                 ROS_ERROR("ControlSequence - Error in regrasping");
                 return;
+            }
+            else{
+                bool r = _attached_to_right_arm, l = _attached_to_left_arm;
+                /*_attached_to_right_arm = true;
+                _attached_to_left_arm = true;*/
+                _get_attached_object();
+                _set_planning_scene();
+                /*_attached_to_right_arm = r;
+                _attached_to_left_arm = l;*/
+                _move_arm_to_home_position("right_arm");
             }
             _get_trajectory();
             _move_to_staging_point();
@@ -119,35 +107,29 @@ void ControlSequence::start()
             pose.orientation.y = 0.0;
             pose.orientation.z = 0.0;
             pose.orientation.w = 1.0;
-            if(!_arms->moveRightArmWithMPlanning(pose))
-            {
+            if(!_arms->moveRightArmWithMPlanning(pose)){
                 return;
             }
-            if(_pick_up_tube("left_arm"))
-            {
+            if(_pick_up_tube("left_arm")){
                 ROS_WARN("ControlSequence - Pick up failed with right arm. trying with left arm...");
 
                 _get_attached_object();
-                if(!_repos_tube_and_regrasp())
-                {
+                if(!_repos_tube_and_regrasp()){
                     ROS_ERROR("ControlSequence - Error in regrasping");
                     return;
                 }
             }
-            else
-            {
+            else{
                 ROS_ERROR("ControlSequence - Error in picking tube. couldn't reach by any arm");
                 return;
             }
         }
-        else
-        {
+        else{
             ROS_ERROR("ControlSequence - Error in picking tube");
             return;
-        }*/
+        }
     }
-    else
-    {
+    else{
         ROS_ERROR("ControlSequence - No cluster to generate tube model");
         return;
     }
@@ -156,6 +138,7 @@ void ControlSequence::start()
 
 bool ControlSequence::_set_cloud_capture_posture()
 {
+    ROS_INFO("Setting posture to cloud capture...");
     bool is_set = true;
 
     Gripper gripper;
@@ -432,25 +415,38 @@ void ControlSequence::_get_attached_object()
         _att_obj.object.poses.clear();
         _att_obj.object.shapes.clear();
     }
+    _set_planning_scene();
+}
+
+void ControlSequence::_set_planning_scene()
+{
+    arm_navigation_msgs::SetPlanningSceneDiff::Request req;
+    arm_navigation_msgs::SetPlanningSceneDiff::Response res;
+    if(!_att_obj.object.shapes.empty()){
+        req.planning_scene_diff.attached_collision_objects.push_back(_att_obj);
+    }
+    if(!_set_pln_scn.call(req,res)){
+        ROS_ERROR("Couldn't set planning scene");
+    }
 }
 
 bool ControlSequence::_repos_tube_and_regrasp()
 {
+    _set_planning_scene();
     geometry_msgs::Pose tube_pose_out, new_wrist_pose;
     if(_attached_to_right_arm && !_attached_to_left_arm)
     {
         std::vector<double> left_ik_joints;
-        _arms->getRegraspPoseRight(_current_grasp.rightGrasp.wristPose,
+        _arms->getRegraspPoseRight(_att_obj, _current_grasp.rightGrasp.wristPose,
                                    _arms->getRightArmFK(),
                                    _grasp_pair.leftGrasp.wristPose,
-                                   _att_obj,
                                    tube_pose_out,
                                    left_ik_joints);
         tf::Transform tube = pose2tf(tube_pose_out), wrist;
         wrist = pose2tf(_current_grasp.rightGrasp.wristPose);
         wrist = tube * wrist;
         new_wrist_pose = tf2pose(wrist);
-        if(!_arms->moveRightArmWithMPlanning(_att_obj, new_wrist_pose))
+        if(!_arms->moveRightArmWithMPlanning(new_wrist_pose))
         {
             ROS_ERROR("ControlSequence - Failed to move right arm for regrasp pose.");
             return false;
@@ -460,13 +456,12 @@ bool ControlSequence::_repos_tube_and_regrasp()
         geometry_msgs::Pose aprch_pose = move_in_X(_grasp_pair.leftGrasp.wristPose, -0.1);
         _tube->resetActualPose(_current_grasp.rightGrasp.wristPose,new_wrist_pose);
         _get_attached_object();
-        /*if(!_arms->moveLeftArmWithMPlanning(_att_obj, aprch_pose))
+        /*if(!_arms->moveLeftArmWithMPlanning(aprch_pose))
         {
             ROS_ERROR("ControlSequence - Failed to move left arm to approach position for regrasping");
             return false;
         }*/
-        if(!_arms->moveLeftArmWithMPlanning(_att_obj, left_ik_joints))
-        {
+        if(!_arms->moveLeftArmWithMPlanning(left_ik_joints)){
             ROS_ERROR("ControlSequence - Failed to move left arm to grasp position regrasping");
             return false;
         }
@@ -477,22 +472,22 @@ bool ControlSequence::_repos_tube_and_regrasp()
         ros::Duration(5).sleep();
         _attached_to_right_arm = false;
         _current_grasp.leftGrasp = _grasp_pair.leftGrasp;
+        _set_planning_scene();
         return true;
     }
     else if(!_attached_to_right_arm && _attached_to_left_arm)
     {
         std::vector<double> right_ik_joints;
-        _arms->getRegraspPoseLeft(_current_grasp.leftGrasp.wristPose,
+        _arms->getRegraspPoseLeft(_att_obj, _current_grasp.leftGrasp.wristPose,
                                   _arms->getLeftArmFK(),
                                   _grasp_pair.rightGrasp.wristPose,
-                                  _att_obj,
                                   tube_pose_out,
                                   right_ik_joints);
         tf::Transform tube = pose2tf(tube_pose_out), wrist;
         wrist = pose2tf(_current_grasp.leftGrasp.wristPose);
         wrist = tube * wrist;
         new_wrist_pose = tf2pose(wrist);
-        if(!_arms->moveLeftArmWithMPlanning(_att_obj, new_wrist_pose))
+        if(!_arms->moveLeftArmWithMPlanning(new_wrist_pose))
         {
             ROS_ERROR("ControlSequence - Failed to move left arm for regrasp pose.");
             return false;
@@ -502,7 +497,7 @@ bool ControlSequence::_repos_tube_and_regrasp()
         geometry_msgs::Pose aprch_pose = move_in_X(_grasp_pair.rightGrasp.wristPose, -0.1);
         _tube->resetActualPose(_current_grasp.leftGrasp.wristPose,new_wrist_pose);
         _get_attached_object();
-        /*if(!_arms->moveRightArmWithMPlanning(_att_obj, aprch_pose))
+        /*if(!_arms->moveRightArmWithMPlanning(aprch_pose))
         {
             ROS_ERROR("ControlSequence - Failed to move right arm to approach position for regrasping");
             return false;
@@ -531,16 +526,28 @@ bool ControlSequence::_repos_tube_and_regrasp()
 
 void ControlSequence::_get_trajectory()
 {
+    bool attached_to_right = _attached_to_right_arm,
+            attached_to_left = _attached_to_left_arm;
     geometry_msgs::PoseArray tube_traj;
     _grasp_analysis->getTubeWorkTrajectory(tube_traj);
     std::vector<double> right_traj, left_traj;
+    arm_navigation_msgs::AttachedCollisionObject att_obj = _att_obj;
     _att_obj = _tube->getAttachedObjForBothGrasps(_grasp_pair.rightGrasp.wristPose);
-    _arms->genTrajectory(tube_traj,_grasp_pair.rightGrasp.wristPose, _grasp_pair.leftGrasp.wristPose, _att_obj, right_traj, left_traj);
+    _attached_to_right_arm = true;
+    _attached_to_left_arm = true;
+    _set_planning_scene();
+    _arms->genTrajectory(_att_obj, tube_traj,_grasp_pair.rightGrasp.wristPose, _grasp_pair.leftGrasp.wristPose, right_traj, left_traj);
     _arms->setTrajectory(right_traj, left_traj);
+    //as it was
+    _att_obj = att_obj;
+    _attached_to_right_arm = attached_to_right;
+    _attached_to_left_arm = attached_to_left;
+    _set_planning_scene();
 }
 
 bool ControlSequence::_move_arm_to_home_position(std::string which_arm)
 {
+    ROS_INFO_STREAM("Moving "<<which_arm<<" to home position...");
     bool right_arm = false,
          left_arm = false;
 
@@ -582,6 +589,7 @@ bool ControlSequence::_move_arm_to_home_position(std::string which_arm)
 
 bool ControlSequence::_move_to_staging_point()
 {
+    _set_planning_scene();
     if(_attached_to_right_arm && !_attached_to_left_arm)
     {
         ROS_INFO("ControlSequence - Moving Right arm to first trajectory point");
@@ -595,10 +603,10 @@ bool ControlSequence::_move_to_staging_point()
             }
 
             geometry_msgs::Pose pose = _arms->getRightArmFK(right_joints);
-            _arms->moveRightArmWithMPlanning(_att_obj,pose);
+            _arms->moveRightArmWithMPlanning(pose);
             pose = _arms->getLeftArmFK(left_joints);
             geometry_msgs::Pose aprch = move_in_X(pose, -0.1);
-            _arms->moveLeftArmWithMPlanning(_att_obj, aprch);
+            _arms->moveLeftArmWithMPlanning(aprch);
             /*_arms->genTrajectory();
             _arms->executeJointTrajectory();*/
             return true;
@@ -624,10 +632,10 @@ bool ControlSequence::_move_to_staging_point()
                 left_joints[i] = _grasp_pair.qLeft[i];
             }
             geometry_msgs::Pose pose = _arms->getRightArmFK(right_joints);
-            _arms->moveLeftArmWithMPlanning(_att_obj,left_joints);
+            _arms->moveLeftArmWithMPlanning(left_joints);
             pose = _arms->getLeftArmFK(left_joints);
             //geometry_msgs::Pose aprch = move_in_X(pose, -0.1);
-            _arms->moveRightArmWithMPlanning(_att_obj, right_joints);
+            _arms->moveRightArmWithMPlanning(right_joints);
             /*_arms->genTrajectory();
             _arms->executeJointTrajectory();*/
             return true;

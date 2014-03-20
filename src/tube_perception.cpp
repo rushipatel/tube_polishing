@@ -184,32 +184,32 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
     if(right_side)
     {
         //obj.touch_links.push_back("r_end_effector");
-        //obj.touch_links.push_back("r_gripper_palm_link");
+        obj.touch_links.push_back("r_gripper_palm_link");
         obj.touch_links.push_back("r_gripper_l_finger_link");
         obj.touch_links.push_back("r_gripper_l_finger_tip_link");
-        //obj.touch_links.push_back("r_gripper_motor_accelerometer_link");
-        //obj.touch_links.push_back("r_gripper_led_frame");
-        //obj.touch_links.push_back("r_gripper_motor_slider_link");
-        //obj.touch_links.push_back("r_gripper_motor_screw_link");
+        obj.touch_links.push_back("r_gripper_motor_accelerometer_link");
+        obj.touch_links.push_back("r_gripper_led_frame");
+        obj.touch_links.push_back("r_gripper_motor_slider_link");
+        obj.touch_links.push_back("r_gripper_motor_screw_link");
         obj.touch_links.push_back("r_gripper_r_finger_link");
         obj.touch_links.push_back("r_gripper_r_finger_tip_link");
-        //obj.touch_links.push_back("r_gripper_l_finger_tip_frame");
-        //obj.touch_links.push_back("r_gripper_tool_frame");
+        obj.touch_links.push_back("r_gripper_l_finger_tip_frame");
+        obj.touch_links.push_back("r_gripper_tool_frame");
     }
     if(left_side)
     {
         //obj.touch_links.push_back("l_end_effector");
-        //obj.touch_links.push_back("l_gripper_palm_link");
+        obj.touch_links.push_back("l_gripper_palm_link");
         obj.touch_links.push_back("l_gripper_l_finger_link");
         obj.touch_links.push_back("l_gripper_l_finger_tip_link");
-        //obj.touch_links.push_back("l_gripper_motor_accelerometer_link");
-        //obj.touch_links.push_back("l_gripper_led_frame");
-        //obj.touch_links.push_back("l_gripper_motor_slider_link");
-        //obj.touch_links.push_back("l_gripper_motor_screw_link");
+        obj.touch_links.push_back("l_gripper_motor_accelerometer_link");
+        obj.touch_links.push_back("l_gripper_led_frame");
+        obj.touch_links.push_back("l_gripper_motor_slider_link");
+        obj.touch_links.push_back("l_gripper_motor_screw_link");
         obj.touch_links.push_back("l_gripper_r_finger_link");
         obj.touch_links.push_back("l_gripper_r_finger_tip_link");
-        //obj.touch_links.push_back("l_gripper_l_finger_tip_frame");
-        //obj.touch_links.push_back("l_gripper_tool_frame");
+        obj.touch_links.push_back("l_gripper_l_finger_tip_frame");
+        obj.touch_links.push_back("l_gripper_tool_frame");
     }
 
     obj.object.id = "tube";
@@ -275,7 +275,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.r = 0.0;
     marker.color.g = 0.3;
     marker.color.b = 0.3;
-    marker.color.a = 0.4;
+    marker.color.a = 0.8;
     marker.lifetime = ros::Duration(20);
     for(size_t i=0; i<cylinders.size(); i++)
     {
@@ -301,9 +301,9 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.r = 1.0;
     marker.color.g = 0.0;
     marker.color.b = 0.0;
-    marker.color.a = 1.0;
+    marker.color.a = 0.5;
     marker.id = 1;
-    marker.scale.x = marker.scale.y = marker.scale.z = 0.01;
+    marker.scale.x = marker.scale.y = marker.scale.z = 0.005;
     marker.lifetime = ros::Duration(20);
     for(size_t i=0; i<cylinders.size(); i++)
     {
@@ -490,7 +490,7 @@ void CloudProcessing::_generate_work_vectors()
     vec1 = perp_vec.rotate(axis, ((double)rand()/RAND_MAX)*M_PI );
     //vec1 = perp_vec;
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
-    for(int i=0; i<90; i++)
+    for(int i=0; i<45; i++)
     {
         vec2 = vec1.rotate(axis,(i*M_PI)/180);
         point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);

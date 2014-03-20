@@ -12,6 +12,8 @@
 #include "gripper.h"
 #include "robotHead.h"
 
+#define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
+
 namespace TubeGrasp
 {
 

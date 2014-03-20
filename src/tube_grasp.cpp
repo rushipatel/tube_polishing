@@ -33,7 +33,7 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr 
     _grasp_pair_found = false;
     _traj_idx = 0;
     MAX_TEST_GRASPS = 30;
-    MAX_ITERATION = 200;
+    MAX_ITERATION = 400;
 }
 
 void GraspAnalysis::setWorkPose(geometry_msgs::Pose &p)
@@ -435,23 +435,20 @@ void GraspAnalysis::_test_pairs_for_ik()
         idx = rand()%(_test_pairs->graspPairs.size()+1);
         gp = _test_pairs->graspPairs[idx];
         arm_navigation_msgs::AttachedCollisionObject att_obj = _tube->getAttachedObjForBothGrasps(gp.rightGrasp.wristPose);
-        if(manip.genTrajectory(_tube_traj,gp.rightGrasp.wristPose, gp.leftGrasp.wristPose,att_obj, gp.qRight, gp.qLeft))
-        {
+        if(manip.genTrajectory(att_obj, _tube_traj,gp.rightGrasp.wristPose, gp.leftGrasp.wristPose, gp.qRight, gp.qLeft)){
             gp.isValid = true;
             _valid_pairs->graspPairs.push_back(gp);
             test_grasps++;
             if(test_grasps>MAX_TEST_GRASPS)
                 break;
         }
-        else
-        {
+        else{
             //fail_cnt++;
         }
         std::cout<<"\r["<<MAX_ITERATION-it<<'\t'<<test_grasps<<']'<<std::flush;
     }
     std::cout<<'\n';
-    if(!_valid_pairs->graspPairs.empty())
-    {
+    if(!_valid_pairs->graspPairs.empty()){
         ROS_INFO_STREAM("GraspAnalysis - "<<_valid_pairs->graspPairs.size()
                         <<" valid pairs found from "
                         <<MAX_ITERATION<<" iteration");
@@ -459,7 +456,6 @@ void GraspAnalysis::_test_pairs_for_ik()
     else
         ROS_WARN_STREAM("No pair found to be valid for IK");
 }
-
 
 //To compute manipulability metric and assign rank
 //for each trajectory point and ultimatlly accumulative rank
@@ -578,7 +574,7 @@ void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.r = 1.0;
     marker.color.g = 0.0;
     marker.color.b = 0.0;
-    marker.color.a = 1.0;
+    marker.color.a = 0.5;
     marker.id = 1;
     marker.scale.x = marker.scale.y = marker.scale.z = 0.005;
 

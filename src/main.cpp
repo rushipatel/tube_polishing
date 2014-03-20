@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 
     ros::AsyncSpinner spinner(1);
     spinner.start();
-
+    ROS_INFO("STARTING");
     ControlSequence control_seq(rh);
     control_seq.initialize();
     control_seq.start();

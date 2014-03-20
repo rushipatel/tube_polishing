@@ -25,7 +25,6 @@
 #include "utility.h"
 
 #define MAX_JOINT_VEL 0.2
-#define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
 #define GET_PLANNING_SCENE_NAME "/environment_server/get_planning_scene"
 
 /*! \brief  Simple action server client definition for JointTrajectoryAction */
@@ -57,7 +56,7 @@ public:
     ~CollisionCheck();
     void refreshState(void);
     void setAttachedObj(arm_navigation_msgs::AttachedCollisionObject &attachedObj);
-    void clearAttachedObj(void);
+    void clearAttachedObj();
     void printState(void);
     bool isStateValid(std::vector<double> &right_joints,
                       std::vector<double> &left_joints);
@@ -123,9 +122,15 @@ class Arms : public Trajectory
 {
 public:
     Arms(ros::NodeHandlePtr rh);
-    bool genTrajectory(geometry_msgs::PoseArray &objPoseArray, geometry_msgs::Pose &rightArmOffset, geometry_msgs::Pose &leftArmOffset, arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &rightJointTraj, std::vector<double> &leftJointTraj);
-    bool genLeftTrajectory(std::vector<double> &jointTrajectory, geometry_msgs::Pose &leftArmOffset);
-    bool genRightTrajectory(std::vector<double> &jointTrajectory, geometry_msgs::Pose &rightArmOffset);
+    bool genTrajectory(arm_navigation_msgs::AttachedCollisionObject &attObj,
+                       geometry_msgs::PoseArray &objPoseArray,
+                       geometry_msgs::Pose &rightArmOffset,
+                       geometry_msgs::Pose &leftArmOffset,
+                       std::vector<double> &rightJointTraj, std::vector<double> &leftJointTraj);
+    bool genLeftTrajectory(std::vector<double> &jointTrajectory,
+                           geometry_msgs::Pose &leftArmOffset);
+    bool genRightTrajectory(std::vector<double> &jointTrajectory,
+                            geometry_msgs::Pose &rightArmOffset);
     bool executeJointTrajectory();
     bool executeJointTrajectory(std::vector<double> &qRight,
                                 std::vector<double> &qLeft);
@@ -147,24 +152,21 @@ public:
                                  std::vector<double> &jointsOut);
     bool getSimpleLeftArmIK(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &jointState);
-    bool getRegraspPoseRight(geometry_msgs::Pose crnt_grasp,
+    bool getRegraspPoseRight(arm_navigation_msgs::AttachedCollisionObject &attObj,
+                                 geometry_msgs::Pose crnt_grasp,
                                  geometry_msgs::Pose wrist_pose,
                                  geometry_msgs::Pose other_hand_grasp,
-                                 arm_navigation_msgs::AttachedCollisionObject att_obj,
                                  geometry_msgs::Pose &obj_pose_out, std::vector<double> &ik_soln);
-    bool getRegraspPoseLeft(geometry_msgs::Pose crnt_grasp,
+    bool getRegraspPoseLeft(arm_navigation_msgs::AttachedCollisionObject &attObj,
+                            geometry_msgs::Pose crnt_grasp,
                                  geometry_msgs::Pose wrist_pose,
                                  geometry_msgs::Pose other_hand_grasp,
-                                 arm_navigation_msgs::AttachedCollisionObject att_obj,
-                                 geometry_msgs::Pose &obj_pose_out, std::vector<double> &ik_soln);
+                                 geometry_msgs::Pose &obj_pose_out,
+                                 std::vector<double> &ik_soln);
     bool moveRightArmWithMPlanning(std::vector<double> &ik_soln);
-    bool moveRightArmWithMPlanning(std::vector<double> &goalJoints);
     bool moveRightArmWithMPlanning(geometry_msgs::Pose pose);
-    bool moveRightArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
     bool moveLeftArmWithMPlanning(std::vector<double> &ik_soln);
-    bool moveLeftArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, std::vector<double> &ik_soln);
     bool moveLeftArmWithMPlanning(geometry_msgs::Pose pose);
-    bool moveLeftArmWithMPlanning(arm_navigation_msgs::AttachedCollisionObject &attObj, geometry_msgs::Pose pose);
     geometry_msgs::Pose getRightArmFK();
     geometry_msgs::Pose getRightArmFK(std::vector<double> &left_joints);
     geometry_msgs::Pose getLeftArmFK();
@@ -176,9 +178,6 @@ private:
     ros::NodeHandlePtr _rh;
     TrajClient* _traj_client_r; /*!< Right arm trajectory action client. */
     TrajClient* _traj_client_l; /*!< Left arm trajectory action client. */
-    MoveArmClient* _mv_arm_client_r;
-    MoveArmClient* _mv_arm_client_l;
-    ros::ServiceClient _set_pln_scn_client; /*!< set planning scene diff */
     ros::ServiceClient _get_pln_scn_client; /*!< get planning scene diff */
     ros::ServiceClient _ik_client_r; /*!< Right arm IK client. */
     ros::ServiceClient _ik_client_l; /*!< Left arm IK client. */
@@ -210,8 +209,6 @@ private:
     void _call_left_joints_unnormalizer(void);
     void _get_right_joints(std::vector<double> &joint_state);
     void _get_left_joints(std::vector<double> &joint_state);
-    void _get_default_right_joints(std::vector<double> &joint_state);
-    void _get_default_left_joints(std::vector<double> &joint_state);
     bool _get_right_arm_ik(geometry_msgs::Pose pose,
                           sensor_msgs::JointState &joint_state,
                           std::vector<double> &seed_state);
@@ -236,8 +233,8 @@ private:
     bool _get_simple_left_arm_ik(geometry_msgs::Pose &pose,
                                   std::vector<double> &joints,
                                   std::vector<double> &seed_state);
-    bool _gen_trajectory(std::vector<double> &right_joint_traj,
-                           std::vector<double> &left_joint_traj);
+    bool _gen_trajectory(arm_navigation_msgs::AttachedCollisionObject &att_obj,
+                           std::vector<double> &right_joint_traj, std::vector<double> &left_joint_traj);
     bool _move_right_arm_with_mplning(std::vector<double> &ik_joints);
     bool _move_left_arm_with_mplning(std::vector<double> &ik_joints);
     bool _get_motion_plan(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
@@ -252,8 +249,7 @@ private:
 
     geometry_msgs::Pose _get_right_fk(std::vector<double> &joints);
     geometry_msgs::Pose _get_left_fk(std::vector<double> &joints);
-
-};
+};//Arms
 
 }//TubeManipulation
 

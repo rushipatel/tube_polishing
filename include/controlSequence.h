@@ -11,6 +11,8 @@
 #include "tubeGrasp.h"
 #include "utility.h"
 
+#define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
+
 class ControlSequence
 {
 public:
@@ -37,6 +39,7 @@ private:
     arm_navigation_msgs::CollisionObject _table;
     std::vector<double> _right_arm_home_jnts;
     std::vector<double> _left_arm_home_jnts;
+    ros::ServiceClient _set_pln_scn;
 
     bool _attached_to_right_arm;
     bool _attached_to_left_arm;
@@ -52,6 +55,7 @@ private:
     bool _move_to_staging_point();
     void _get_table_as_object(tabletop_object_detector::TabletopSegmentation &seg_srv);
     bool _move_arm_to_home_position(std::string which_arm);
+    void _set_planning_scene();
 };
 
 
