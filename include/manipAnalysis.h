@@ -50,23 +50,19 @@ ManipAnalysis::ManipAnalysis(std::string whichArm, const ros::NodeHandlePtr nh)
         right_arm = true;
     else if(whichArm.compare("left_arm")==0)
         right_arm = false;
-    else
-    {
+    else{
         ROS_ERROR("manip_analysis: Please specify 'right_arm' or 'left_arm'. Using right_arm as default");
         right_arm = true;
     }
     KDL::Tree pr2;
-    /*if (!kdl_parser::treeFromFile("../pr2.urdf", pr2))
-    {
+    /*if (!kdl_parser::treeFromFile("../pr2.urdf", pr2)){
        ROS_ERROR("Failed to construct kdl tree from file");
     }*/
     std::string robot_desc;
     nh->getParam("robot_description", robot_desc);
-    if (!kdl_parser::treeFromString(robot_desc,pr2))
-    {
+    if (!kdl_parser::treeFromString(robot_desc,pr2)){
         ROS_ERROR("Failed to construct kdl tree from parameter server");
     }
-    
     if(right_arm)
         pr2.getChain("base_footprint","r_wrist_roll_link",chain_);
     else
@@ -121,8 +117,7 @@ void ManipAnalysis::update_jacobian_(void)
     jacobian_r_ = jacobian_.bottomRows(3);
 }
 
-double ManipAnalysis::getForceMetric(const std::vector<double> &q)
-{
+double ManipAnalysis::getForceMetric(const std::vector<double> &q){
     q_=q;
     update_jacobian_();
     q_.clear();
@@ -130,24 +125,21 @@ double ManipAnalysis::getForceMetric(const std::vector<double> &q)
 }
 
 
-double ManipAnalysis::getRotationMetric(const std::vector<double> &q)
-{
+double ManipAnalysis::getRotationMetric(const std::vector<double> &q){
     q_=q;
     update_jacobian_();
     q_.clear();
     return find_intersecting_len_(false);
 }
 
-double ManipAnalysis::getManipIndex(const std::vector<double> &q)
-{
+double ManipAnalysis::getManipIndex(const std::vector<double> &q){
     q_ = q;
     update_jacobian_();
     q_.clear();
     return get_manipulability_index_();
 }
 
-double ManipAnalysis::get_manipulability_index_()
-{
+double ManipAnalysis::get_manipulability_index_(){
     Eigen::MatrixXd matrix = jacobian_ * jacobian_.transpose();
     Eigen::MatrixXd eigen_values;
     Eigen::EigenSolver<Eigen::MatrixXd> eigensolver(matrix);
@@ -183,14 +175,12 @@ double ManipAnalysis::find_intersecting_len_(bool force)
   
     Eigen::MatrixXd sigma = eigen_values.real();
     double s1,s2,s3;
-    if(force)  //invert sigmas for force measure
-    {
+    if(force){  //invert sigmas for force measure
         s1 = 1/sigma(0);
         s2 = 1/sigma(1);
         s3 = 1/sigma(2);
     }
-    else
-    {
+    else{
         s1 = sigma(0);
         s2 = sigma(1);
         s3 = sigma(2);
@@ -204,22 +194,19 @@ double ManipAnalysis::find_intersecting_len_(bool force)
     return l;
 }
 
-void ManipAnalysis::setForceVec(tf::Vector3 vec)
-{
+void ManipAnalysis::setForceVec(tf::Vector3 vec){
     force_vec_(0) = vec.x();
     force_vec_(1) = vec.y();
     force_vec_(2) = vec.z();
 }
 
-void ManipAnalysis::setRotationAxis(tf::Vector3 vec)
-{
+void ManipAnalysis::setRotationAxis(tf::Vector3 vec){
     axis_vec_(0) = vec.x();
     axis_vec_(1) = vec.y();
     axis_vec_(2) = vec.z();
 }
 
-void ManipAnalysis::setReferencePoint(tf::Vector3 inTipFrame)
-{
+void ManipAnalysis::setReferencePoint(tf::Vector3 inTipFrame){
     ref_point_(0) = inTipFrame.x();
     ref_point_(1) = inTipFrame.y();
     ref_point_(2) = inTipFrame.z();

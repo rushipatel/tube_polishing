@@ -171,6 +171,10 @@ public:
     geometry_msgs::Pose getRightArmFK(std::vector<double> &left_joints);
     geometry_msgs::Pose getLeftArmFK();
     geometry_msgs::Pose getLeftArmFK(std::vector<double> &left_joints);
+    // For testing of KDL. should go back in private afterwards
+    void _get_right_joints(std::vector<double> &joint_state);
+    void _get_left_joints(std::vector<double> &joint_state);
+    bool _get_planning_scene();
 
     typedef boost::shared_ptr<TubeManipulation::Arms> Ptr;
 
@@ -207,8 +211,7 @@ private:
     //bool _call_left_arm_gpik(std::vector<double> &left_joint_trajectory);
     void _call_right_joints_unnormalizer(void);
     void _call_left_joints_unnormalizer(void);
-    void _get_right_joints(std::vector<double> &joint_state);
-    void _get_left_joints(std::vector<double> &joint_state);
+
     bool _get_right_arm_ik(geometry_msgs::Pose pose,
                           sensor_msgs::JointState &joint_state,
                           std::vector<double> &seed_state);

@@ -1,4 +1,5 @@
 #include "tubeManipulation.h"
+#include <arm_kinematics_constraint_aware/arm_kinematics_solver_constraint_aware.h>
 
 TubeManipulation::Trajectory::Trajectory()
 {
@@ -674,14 +675,14 @@ bool TubeManipulation::Arms::_move_right_arm_with_mplning(std::vector<double> &i
     req.motion_plan_request.start_state.joint_state.position = crnt_right_joints;
     req.motion_plan_request.goal_constraints.joint_constraints.resize(_r_jnt_nms.size());
     
-    ROS_INFO("Adding following contraints in right arm GetPlan request...");
+    //ROS_INFO("Adding following contraints in right arm GetPlan request...");
     for (unsigned int i = 0 ; i < req.motion_plan_request.goal_constraints.joint_constraints.size(); i++)
     {
       req.motion_plan_request.goal_constraints.joint_constraints[i].joint_name = _r_jnt_nms[i];
       req.motion_plan_request.goal_constraints.joint_constraints[i].position = ik_joints[i];
       req.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_below = 0.2;
       req.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_above = 0.2;
-      ROS_INFO_STREAM("Joint - Name : "<<_r_jnt_nms[i].c_str()<<"\tValue : "<<ik_joints[i]);
+      //ROS_INFO_STREAM("Joint - Name : "<<_r_jnt_nms[i].c_str()<<"\tValue : "<<ik_joints[i]);
     }
 
     if(_start_is_goal(req,res)){
@@ -874,24 +875,38 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
     case -21 : //JOINT_LIMITS_VIOLATED
     {
         ROS_INFO("Trying to resolve error -21...");
-        std::vector<double> right_joints, left_joints;
         if(right_arm){
-            double first_err, second_err;
+            double jnt_val, lower_bound, upper_bound;
             for(int i=0; i<_r_jnt_nms.size(); i++){
-                first_err = _joint_bounds[_r_jnt_nms[i].c_str()].first - req.motion_plan_request.goal_constraints.joint_constraints[i].position;
-                second_err = _joint_bounds[_r_jnt_nms[i].c_str()].second + req.motion_plan_request.goal_constraints.joint_constraints[i].position;
-                if(first_err<_joint_bounds[_r_jnt_nms[i].c_str()].first || second_err>_joint_bounds[_r_jnt_nms[i].c_str()].second){
-                    ROS_INFO_STREAM("Right Joint Number "<<i<<" is out of bound ["<<_joint_bounds[_r_jnt_nms[i].c_str()].first<<" "<<_joint_bounds[_r_jnt_nms[i].c_str()].second<<"]");
+                jnt_val = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
+                lower_bound = _joint_bounds[_r_jnt_nms[i].c_str()].first;
+                upper_bound = _joint_bounds[_r_jnt_nms[i].c_str()].second;
+                ROS_INFO_STREAM(" "<<_r_jnt_nms[i].c_str()<<"\tBounds = ["
+                                <<lower_bound<<"  "<<upper_bound
+                                <<"]\tRequested value : "<<jnt_val);
+                if(jnt_val<lower_bound){
+                    ROS_INFO_STREAM("Joint value "<<jnt_val<<" of "<<_r_jnt_nms[i].c_str()<<" joint is out of lower bound");
+                }
+                else if(jnt_val>upper_bound){
+                    ROS_INFO_STREAM("Joint value "<<jnt_val<<" of "<<_r_jnt_nms[i].c_str()<<" joint is out of upper bound");
                 }
             }
         }
         if(left_arm){
-            double first_err, second_err;
+            double jnt_val, lower_bound, upper_bound;
             for(int i=0; i<_l_jnt_nms.size(); i++){
-                first_err = _joint_bounds[_l_jnt_nms[i].c_str()].first - req.motion_plan_request.goal_constraints.joint_constraints[i].position;
-                second_err = _joint_bounds[_l_jnt_nms[i].c_str()].second - req.motion_plan_request.goal_constraints.joint_constraints[i].position;
-                if(first_err<_joint_bounds[_l_jnt_nms[i].c_str()].first || second_err>_joint_bounds[_l_jnt_nms[i].c_str()].second)
-                    ROS_INFO_STREAM("Left Joint Number "<<i<<" is out of bound ["<<_joint_bounds[_l_jnt_nms[i].c_str()].first<<" "<<_joint_bounds[_l_jnt_nms[i].c_str()].second<<"]");
+                jnt_val = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
+                lower_bound = _joint_bounds[_l_jnt_nms[i].c_str()].first;
+                upper_bound = _joint_bounds[_l_jnt_nms[i].c_str()].second;
+                ROS_INFO_STREAM(" "<<_l_jnt_nms[i].c_str()<<"\tBounds = ["
+                                <<lower_bound<<"  "<<upper_bound
+                                <<"]\tRequested value : "<<jnt_val);
+                if(jnt_val<lower_bound){
+                    ROS_INFO_STREAM("Joint value "<<jnt_val<<" of "<<_l_jnt_nms[i].c_str()<<" is out of lower bound");
+                }
+                else if(jnt_val>upper_bound){
+                    ROS_INFO_STREAM("Joint value "<<jnt_val<<" of "<<_l_jnt_nms[i].c_str()<<" is out of upper bound");
+                }
             }
         }
         break;
@@ -1185,12 +1200,26 @@ bool TubeManipulation::Arms::_get_simple_left_arm_ik(geometry_msgs::Pose &pose, 
     return flag;
 }
 
+bool TubeManipulation::Arms::_get_planning_scene()
+{
+    arm_navigation_msgs::GetPlanningScene::Request req;
+    arm_navigation_msgs::GetPlanningScene::Response res;
+
+    if(!_get_pln_scn_client.call(req, res)){
+        ROS_ERROR("Couldn't get planning scene");
+        return false;
+    }
+    return true;
+}
+
 bool TubeManipulation::Arms::_get_right_arm_ik(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &joint_state,
                                  std::vector<double> &seed_state)
 {
     kinematics_msgs::GetConstraintAwarePositionIK::Request  ik_req;
     kinematics_msgs::GetConstraintAwarePositionIK::Response ik_res;
+
+    _get_planning_scene();
 
     ik_req.timeout = ros::Duration(5.0);
     ik_req.ik_request.ik_link_name = "r_wrist_roll_link";

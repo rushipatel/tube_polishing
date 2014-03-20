@@ -5,7 +5,7 @@
 #include <tf/tf.h>
 //#include <arm_navigation_msgs/ArmNavigationErrorCodes.h>
 
-geometry_msgs::Pose tf2pose(tf::Transform &t)
+geometry_msgs::Pose tf2pose(const tf::Transform &t)
 {
     geometry_msgs::Pose p;
     tf::Vector3 v = t.getOrigin();
@@ -21,7 +21,7 @@ geometry_msgs::Pose tf2pose(tf::Transform &t)
     return p;
 }
 
-tf::Transform pose2tf(geometry_msgs::Pose &p)
+tf::Transform pose2tf(const geometry_msgs::Pose &p)
 {
     tf::Transform t;
     tf::Quaternion q;
