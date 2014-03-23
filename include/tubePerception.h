@@ -25,10 +25,14 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/octree/octree_search.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/segmentation/extract_polygonal_prism_data.h>
+#include <pcl/surface/convex_hull.h>
+#include <pcl_ros/transforms.h>
 
 #include <LinearMath/btVector3.h>
 #include <LinearMath/btQuaternion.h>
-#include <tf/tf.h>
+#include <tf/transform_listener.h>
+#include <tf/exceptions.h>
 
 #include <pcl/sample_consensus/sac_model_circle.h>
 
@@ -123,25 +127,30 @@ namespace TubePerception
     {
     public:
 
-        CloudProcessing(sensor_msgs::PointCloud2 &rosTubeCloud, TubePerception::Tube::Ptr tube_ptr);
+        CloudProcessing();
         //~CloudProcessing();
 
-        void displayCloud(void);
+        /*void displayCloud(void);
         void displayAxisPoints(void);
         void displayCylinders(void);
         void displayCylinders(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer);
         void displayLines(void);
-        void displayCylindersInLocalFrame(void);
+        void displayCylindersInLocalFrame(void);*/
         void setZerror(float error);
+        bool writePointCloudOnfile(const sensor_msgs::PointCloud2 &rosCloud, std::string fileName);
+        bool readPointCloud(std::string fileName, pcl::PointCloud<PointT>::Ptr cloudOut);
         bool writeAxisPointsOnFile(std::string fileName);
         void dispalyWorkTraj(void);
-        void processCloud(void);
+        void genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud, Tube::Ptr tube_ptr);
+        void segmentizeCloud(const sensor_msgs::PointCloud2 &cloudIn);
         typedef boost::shared_ptr<TubePerception::CloudProcessing> Ptr;
+        bool _convert_cloud_to(std::string target_frame, const sensor_msgs::PointCloud2 &cloud_in, sensor_msgs::PointCloud2 &cloud_out);
 
     private:
-        void _segmentize_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
-        void _estimate_normals(void);
-        void _get_radius(void);
+        void _segmentize_cloud(pcl::PointCloud<PointT>::Ptr cloud, pcl::PointCloud<PointT>::Ptr hull_points);
+        void _estimate_normals(pcl::PointCloud<PointT>::Ptr cloud);
+        double _get_radius();
+        void _get_cylinder(pcl::PointCloud<PointT>::Ptr cloud, double r_min, double r_max, pcl::ModelCoefficients &coeff);
         void _collaps_normals(void);
         bool _find_line(pcl::PointIndices::Ptr inliers, Cylinder *cyl);
         void _remove_inliers(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices);
@@ -154,7 +163,10 @@ namespace TubePerception
         tf::Vector3 _get_perp_vec3(tf::Vector3 v3);
         void _define_pose(void);
         void _generate_work_vectors();
+        void _convert_to_pcl(const sensor_msgs::PointCloud2 &rosTubeCloud, pcl::PointCloud<PointT>::Ptr pcl_cloud);
+//        bool _convert_cloud_to(std::string target_frame, const sensor_msgs::PointCloud2 &cloud_in, sensor_msgs::PointCloud2 &cloud_out);
         float _r;
+        float _r_min, _r_max;
         float _strong_line_thr; //not being used. please remove.
         float _min_points;
         float _weak_line_thr; //not being used. please remove.

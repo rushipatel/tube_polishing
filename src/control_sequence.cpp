@@ -244,9 +244,9 @@ bool ControlSequence::_generate_tube_model(unsigned int cluster_idx)
     ROS_ASSERT_MSG(_clusters.size()>cluster_idx,"ControlSequence - Invalid cluster index");
 
     ROS_INFO("ControlSequence - Generating tube model using cluster no. %d", cluster_idx);
-    _cloud_process.reset(new TubePerception::CloudProcessing(_clusters[cluster_idx], _tube));
+    _cloud_process.reset(new TubePerception::CloudProcessing);
     _cloud_process->setZerror(0);
-    _cloud_process->processCloud();
+    _cloud_process->genTubeModel(_clusters[cluster_idx], _tube);
 }
 
 
