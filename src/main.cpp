@@ -18,12 +18,6 @@ int main(int argc, char **argv)
 
     ControlSequence control_seq(nh);
     control_seq.initialize();
-    sensor_msgs::PointCloud2ConstPtr pc_ptr =
-            ros::topic::waitForMessage<sensor_msgs::PointCloud2>
-            ("/head_mount_kinect/depth_registered/points",*nh,ros::Duration(4));
-    sensor_msgs::PointCloud2 pc = *pc_ptr;
-    cloud_process.segmentizeCloud(pc);
-
-    //control_seq.start();
+    control_seq.start();
     ros::shutdown();
 }

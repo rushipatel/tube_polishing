@@ -61,11 +61,13 @@ namespace TubePerception
         tf::Vector3 getAxisVector();
         float getAxisLength();
         pcl::ModelCoefficients coefficients; // global
-        tf::Transform getLocalTransform(void); //tf to last (strong) cylinder in vector(array)
-        geometry_msgs::Pose getLocalPose(void);
-        tf::Vector3 getLocalAxisVector(void); // in a tube frame
-        void setLocalPose(geometry_msgs::Pose &pose);
-        void setLocalPose(tf::Transform &t);
+        tf::Transform getTransform(void); //tf to last (strong) cylinder in vector(array)
+        geometry_msgs::Pose getPose(void);
+        //tf::Vector3 getLocalAxisVector(void); // in a tube frame
+        void setPose(const geometry_msgs::Pose &pose);
+        void setPose(const tf::Transform &t);
+        void getMarkers(visualization_msgs::MarkerArray &markerArray);
+        tf::Vector3 getMidPoint(void);
 
     private:
         geometry_msgs::Pose _local_pose;  //Local to first (strong) cylinder in vector(array)
@@ -118,7 +120,8 @@ namespace TubePerception
     protected:
         geometry_msgs::Pose _pose;  //in global(base_link) frame.
         geometry_msgs::Pose _actual_pose; //in global(base_link)
-        void _get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj, geometry_msgs::Pose &grasp_pose,
+        void _get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj,
+                                            geometry_msgs::Pose &grasp_pose,
                                             std::string link_name,
                                             bool right_side, bool left_side);
     };
@@ -130,40 +133,63 @@ namespace TubePerception
         CloudProcessing();
         //~CloudProcessing();
 
-        /*void displayCloud(void);
-        void displayAxisPoints(void);
+        void displayCloud(pcl::PointCloud<PointT>::Ptr cloud);
+        /*void displayAxisPoints(void);
         void displayCylinders(void);
         void displayCylinders(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer);
         void displayLines(void);
         void displayCylindersInLocalFrame(void);*/
         void setZerror(float error);
-        bool writePointCloudOnfile(const sensor_msgs::PointCloud2 &rosCloud, std::string fileName);
-        bool readPointCloud(std::string fileName, pcl::PointCloud<PointT>::Ptr cloudOut);
+        bool writePointCloudOnfile(const sensor_msgs::PointCloud2 &rosCloud,
+                                   std::string fileName);
+        bool readPointCloud(std::string fileName,
+                            pcl::PointCloud<PointT>::Ptr cloudOut);
         bool writeAxisPointsOnFile(std::string fileName);
         void dispalyWorkTraj(void);
-        void genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud, Tube::Ptr tube_ptr);
+        void genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
+                          Tube::Ptr tube_ptr);
         void segmentizeCloud(const sensor_msgs::PointCloud2 &cloudIn);
         typedef boost::shared_ptr<TubePerception::CloudProcessing> Ptr;
-        bool _convert_cloud_to(std::string target_frame, const sensor_msgs::PointCloud2 &cloud_in, sensor_msgs::PointCloud2 &cloud_out);
+        bool findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
+                      double minRadius, double maxRadius,
+                      TubePerception::Cylinder &disk,
+                      geometry_msgs::Pose &workPose);
 
     private:
-        void _segmentize_cloud(pcl::PointCloud<PointT>::Ptr cloud, pcl::PointCloud<PointT>::Ptr hull_points);
+        bool _convert_cloud_to(std::string target_frame,
+                               const sensor_msgs::PointCloud2 &cloud_in,
+                               sensor_msgs::PointCloud2 &cloud_out);
+        void _segmentize_cloud(pcl::PointCloud<PointT>::Ptr cloud,
+                               pcl::PointCloud<PointT>::Ptr hull_points);
         void _estimate_normals(pcl::PointCloud<PointT>::Ptr cloud);
         double _get_radius();
-        void _get_cylinder(pcl::PointCloud<PointT>::Ptr cloud, double r_min, double r_max, pcl::ModelCoefficients &coeff);
+        bool _get_cylinder(pcl::PointCloud<PointT>::Ptr cloud, double r_min,
+                           double r_max, pcl::ModelCoefficients &coeff,
+                           pcl::PointIndices::Ptr inliers);
         void _collaps_normals(void);
+        void _collaps_normals(pcl::PointCloud<PointT>::Ptr cloud_in, double dist, pcl::PointCloud<PointT>::Ptr cloud_out);
         bool _find_line(pcl::PointIndices::Ptr inliers, Cylinder *cyl);
-        void _remove_inliers(pcl::PointCloud<PointT>::Ptr points, pcl::PointIndices::Ptr indices);
-        void _remove_inliers(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices);
-        void _get_line_points(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2);
+        bool _find_line(pcl::PointCloud<PointT>::Ptr raw_axis_cloud, pcl::PointIndices::Ptr inliers, Cylinder *cyl, double num_of_points);
+        void _remove_inliers(pcl::PointCloud<PointT>::Ptr points,
+                             pcl::PointIndices::Ptr indices);
+        void _remove_inliers(pcl::PointCloud<PointT>::Ptr points,
+                             std::vector<int> &indices);
+        void _get_line_points(pcl::PointIndices::Ptr inliers,
+                              pcl::ModelCoefficients line_coeff,
+                              PointT &p1, PointT &p2);
         void _segmentize_axis(void);
         void _compensate_error(void);
-        void _cylinder_filter(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers);
-        float _is_in_cylinder( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt );
+        void _cylinder_filter(Cylinder cyl,
+                              pcl::PointCloud<PointT>::Ptr cloud_in,
+                              pcl::PointIndices::Ptr inliers);
+        float _is_in_cylinder( const PointT & pt1, const PointT & pt2,
+                               float length_sq, float radius_sq,
+                               const PointT & testpt );
         tf::Vector3 _get_perp_vec3(tf::Vector3 v3);
         void _define_pose(void);
         void _generate_work_vectors();
-        void _convert_to_pcl(const sensor_msgs::PointCloud2 &rosTubeCloud, pcl::PointCloud<PointT>::Ptr pcl_cloud);
+        void _convert_to_pcl(const sensor_msgs::PointCloud2 &rosTubeCloud,
+                             pcl::PointCloud<PointT>::Ptr pcl_cloud);
 //        bool _convert_cloud_to(std::string target_frame, const sensor_msgs::PointCloud2 &cloud_in, sensor_msgs::PointCloud2 &cloud_out);
         float _r;
         float _r_min, _r_max;

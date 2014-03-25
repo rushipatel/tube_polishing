@@ -243,7 +243,7 @@ void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, Grasp
                 quaternion.setEulerZYX(k*circular_step_size, 0, 0);
                 step_tf.setRotation(quaternion);
                 tf_grasp_cyl = step_tf*wrist_axis_tf;
-                tf_grasp_tube = _tube->cylinders[i].getLocalTransform() * tf_grasp_cyl;
+                tf_grasp_tube = _tube->cylinders[i].getTransform() * tf_grasp_cyl;
                 tf::Vector3 orig = tf_grasp_tube.getOrigin();
                 tf::Quaternion q = tf_grasp_tube.getRotation();
                 grasp.wristPose.position.x = orig.x();
