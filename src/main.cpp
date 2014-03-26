@@ -1,6 +1,6 @@
 #include <ros/ros.h>
-#include "controlSequence.h"
-#include "tubePerception.h"
+//#include "controlSequence.h"
+#include "state_machine.h"
 
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 
@@ -14,10 +14,11 @@ int main(int argc, char **argv)
     ros::AsyncSpinner spinner(1);
     spinner.start();
 
-    TubePerception::CloudProcessing cloud_process;
-
-    ControlSequence control_seq(nh);
+    /*ControlSequence control_seq(nh);
     control_seq.initialize();
-    control_seq.start();
+    control_seq.start();*/
+
+    stateMachine stmc(nh);
+    stmc.start();
     ros::shutdown();
 }

@@ -5,25 +5,75 @@
 namespace TubeGrasp
 {
 
-geometry_msgs::Pose Grasp::getGlobalPose(geometry_msgs::Pose objectPose)
-{
-    tf::Transform obj = pose2tf(objectPose), grasp = pose2tf(wristPose);
-    grasp = obj*grasp;
-    tf2pose(grasp);
+double Grasp::getWristOffset(void){
+    return _wrist_offset;
 }
 
-geometry_msgs::Pose Grasp::getGlobalPose(tf::Transform objectTf)
+geometry_msgs::Pose Grasp::getWristGlobalPose(const geometry_msgs::Pose &objectPose)
 {
-    tf::Transform grasp = pose2tf(wristPose);
-    grasp = objectTf * grasp;
+    tf::Transform obj = pose2tf(objectPose), grasp = getWristTransform();
+    grasp = obj*grasp;
     return tf2pose(grasp);
 }
 
-GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh)
+tf::Transform Grasp::getWristGlobalPose(const tf::Transform &objectTf)
+{
+    tf::Transform grasp = getWristTransform();
+    grasp = objectTf * grasp;
+    return grasp;
+}
+
+// Do not use if not necessory
+geometry_msgs::Pose Grasp::getPose(void){
+    return _pose;
+}
+
+tf::Transform Grasp::getTransform(void){
+    return pose2tf(_pose);
+}
+
+geometry_msgs::Pose Grasp::getWristPose(){
+    ROS_WARN_COND(_wrist_offset==0.0, "Wrist Offset is set to zero. Did you forget to update it using setWristOffset()?");
+    return tf2pose(_get_wrist_pose(_wrist_offset));
+}
+
+tf::Transform Grasp::getWristTransform(){
+    ROS_WARN_COND(_wrist_offset==0.0, "Wrist Offset is set to zero. Did you forget to update it using setWristOffset()?");
+    return _get_wrist_pose(_wrist_offset);
+}
+
+tf::Transform Grasp::_get_wrist_pose(double offset){
+    tf::Transform xform;
+    xform.setIdentity();
+    xform.setOrigin(tf::Vector3(-offset, 0.0, 0.0));
+    return (pose2tf(_pose)*xform);
+}
+
+tf::Transform Grasp::getWristTransform(double offset){
+    return _get_wrist_pose(offset);
+}
+
+geometry_msgs::Pose Grasp::getWristPose(double offset){
+    return tf2pose(_get_wrist_pose(offset));
+}
+
+void Grasp::setWristOffset(const double offset){
+    _wrist_offset = offset;
+}
+
+void Grasp::setPose(const geometry_msgs::Pose &pose){
+    _pose = pose;
+}
+
+void Grasp::setPose(const tf::Transform &tf){
+    _pose = tf2pose(tf);
+}
+
+GraspAnalysis::GraspAnalysis(ros::NodeHandlePtr nh)
 {
     _nh = nh;
     //_grasp_array = grasp_array;
-    _tube = tube;
+    //_tube = tube;
     _grasp_array.reset(new (TubeGrasp::GraspArray));
     _test_pairs.reset(new (TubeGrasp::GraspPairArray));
     _valid_pairs.reset(new (TubeGrasp::GraspPairArray));
@@ -34,6 +84,10 @@ GraspAnalysis::GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr 
     _traj_idx = 0;
     MAX_TEST_GRASPS = 30;
     MAX_ITERATION = 400;
+}
+
+void GraspAnalysis::setTubePtr(TubePerception::Tube::Ptr tube){
+    _tube = tube;
 }
 
 void GraspAnalysis::setWorkPose(geometry_msgs::Pose &p)
@@ -67,8 +121,9 @@ void GraspAnalysis::setWorkTrajIdx(int trajIdx)
     _traj_idx = trajIdx;
 }
 
-void GraspAnalysis::analyze()
+void GraspAnalysis::compute()
 {
+    _grasp_pair_found = false;
     _gen_work_trajectory();
     _grasp_array->grasps.clear();
     _gen_grasps(_axis_step_size, _circular_steps, _grasp_array, _wrist_axis_offset);
@@ -79,21 +134,19 @@ void GraspAnalysis::analyze()
 
 bool GraspAnalysis::getComputedGraspPair(GraspPair &graspPair)
 {
-    if(_grasp_pair_found)
-    {
+    if(_grasp_pair_found){
         graspPair = _computed_pair;
         return true;
     }
-    else
-    {
+    else{
         ROS_ERROR("GraspAnalysis - There is no valid grasp pair or grasps hasn't been computed yet. did you call analyze()?");
         return false;
     }
 }
 
 //returns global pick pose
-//using current_pair this function tries to avoind generating pick poses near to current_pair
-geometry_msgs::Pose GraspAnalysis::getPickUpPose(std::vector<tf::Vector3> &pointsToAvoid, double min_dist)
+//using current_pair this function tries to avoid generating pick poses near to pointsToAvoid
+TubeGrasp::Grasp GraspAnalysis::getPickPose(std::vector<tf::Vector3> &pointsToAvoid, double min_dist)
 {
     //will generate only vertical grasps
     GraspArray::Ptr grasp_array;
@@ -101,15 +154,15 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose(std::vector<tf::Vector3> &point
     //offset is 0.185 for picking so that fingers don't hit table.
     _gen_grasps(_axis_step_size, 180, grasp_array, 0.185);
 
-    tf::Transform g,t = _tube->getTransform();
+//    tf::Transform g;
+    const tf::Transform t = _tube->getTransform();
 
     //Convert all grasps in world frame so we can choose vertical grasps out of it
-    for(size_t i=0; i<grasp_array->grasps.size(); i++)
-    {
-        g = pose2tf(grasp_array->grasps[i].wristPose);
-        g = t * g;
-        grasp_array->grasps[i].wristPose = tf2pose(g);
-    }
+//    for(size_t i=0; i<grasp_array->grasps.size(); i++){
+//        g = grasp_array->grasps[i].getPose();
+//        g = t * g;
+//        grasp_array->grasps[i].setPose(g);
+//    }
 
     //store sorted(close to negative Z axis)
     GraspArray::Ptr grasp_sorted;
@@ -119,26 +172,36 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose(std::vector<tf::Vector3> &point
     if(!grasp_array->grasps.empty())
         prev_grp = grasp_array->grasps[0].group;
     // neg_z is to compare grasp's x axis with to check downward grasps
-    tf::Vector3 neg_z(0,0,-1), grasp_x, vec;
-    tf::Transform x_step, grasp_step;
-    x_step.setOrigin(tf::Vector3(1,0,0));
-    x_step.setRotation(tf::Quaternion(0,0,0,1));
+    tf::Vector3 neg_z(0,0,-1);//, grasp_x, vec;
+//    tf::Transform x_step, grasp_step;
+//    x_step.setOrigin(tf::Vector3(1,0,0));
+//    x_step.setRotation(tf::Quaternion(0,0,0,1));
     int idx;
     double angle, max_angle = M_PI*2;
 
     for(size_t i=0; i<grasp_array->grasps.size(); i++)
     {
-        if(grasp_array->grasps[i].group==prev_grp)
-        {
-            grasp_step = pose2tf(grasp_array->grasps[i].wristPose)*x_step;
-            vec.setValue(grasp_array->grasps[i].wristPose.position.x,
-                         grasp_array->grasps[i].wristPose.position.y,
-                         grasp_array->grasps[i].wristPose.position.z);
-            grasp_x = grasp_step.getOrigin();
-            grasp_x = grasp_x - vec;
-            angle = grasp_x.angle(neg_z);
-            if(angle<max_angle)
-            {
+        if(grasp_array->grasps[i].group==prev_grp){
+
+            TubeGrasp::Grasp grasp = grasp_array->grasps[i];
+            // compute x vector of grasp pose
+            double offset = grasp.getWristOffset();
+            grasp.setWristOffset(0.01); //0.01 so it doesn't complain
+            tf::Transform step0 = grasp.getWristGlobalPose(t);
+            grasp.setWristOffset(1.0); //remember that next function interpolates in negative x
+            tf::Transform step1 = grasp.getWristGlobalPose(t);
+            grasp.setWristOffset(offset); //set it back what was before
+
+            tf::Vector3 grasp_x_vec, vec0= step0.getOrigin(), vec1 = step1.getOrigin();
+            grasp_x_vec = vec0 - vec1;
+//            grasp_step = grasp_array->grasps[i].getWristPose*x_step;
+//            vec.setValue(grasp_array->grasps[i].wristPose.position.x,
+//                         grasp_array->grasps[i].wristPose.position.y,
+//                         grasp_array->grasps[i].wristPose.position.z);
+//            grasp_x = grasp_step.getOrigin();
+//            grasp_x = grasp_x - vec;
+            angle = grasp_x_vec.angle(neg_z);
+            if(angle<max_angle){
                 max_angle = angle;
                 idx = i;
             }
@@ -146,12 +209,12 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose(std::vector<tf::Vector3> &point
         else
         {
             max_angle = M_PI*2;
-
             double dist;
-            tf::Vector3 pick_grasp_pos;
-            pick_grasp_pos.setValue(grasp_array->grasps[idx].wristPose.position.x,
-                                    grasp_array->grasps[idx].wristPose.position.y,
-                                    grasp_array->grasps[idx].wristPose.position.z);
+            tf::Transform grasp_tf = grasp_array->grasps[idx].getWristGlobalPose(t);
+            tf::Vector3 pick_grasp_pos = grasp_tf.getOrigin();
+//            pick_grasp_pos.setValue(grasp_array->grasps[idx].wristPose.position.x,
+//                                    grasp_array->grasps[idx].wristPose.position.y,
+//                                    grasp_array->grasps[idx].wristPose.position.z);
             bool violeted_dist = false;
             for(unsigned int i=0; i<pointsToAvoid.size(); i++){
                 dist = pick_grasp_pos.distance(pointsToAvoid[i]);
@@ -162,11 +225,11 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose(std::vector<tf::Vector3> &point
             }
             if(!violeted_dist) // if pick grasp is away from two current grasps
                 grasp_sorted->grasps.push_back(grasp_array->grasps[idx]);
-
         }
         prev_grp = grasp_array->grasps[i].group;
     }
 
+    //get very rough estimation of CG (reference point) to figure out nearest grasp
     //tf::Vector3 ref_point;
     geometry_msgs::Point ref_point;
     ref_point.x = 0;
@@ -184,26 +247,27 @@ geometry_msgs::Pose GraspAnalysis::getPickUpPose(std::vector<tf::Vector3> &point
     ref_point.y /= _tube->cylinders.size();
     ref_point.z /= _tube->cylinders.size();
 
+    //check all sorted grasps for distance between ref point and it's origin. select closest
     std::vector<double> dist(grasp_sorted->grasps.size());
-    tf::Vector3 c,r(ref_point.x, ref_point.y, ref_point.z);
-    double max = 1000;
+    tf::Vector3 test_point,ref(ref_point.x, ref_point.y, ref_point.z);
+    double max = std::numeric_limits<double>::max(); //lets start with maximum
     unsigned int grasp_idx = 0;
-    grasp_pose_array.poses.clear();
-    for(size_t i=0; i<grasp_sorted->grasps.size(); i++)
-    {
-        grasp_pose_array.poses.push_back(grasp_sorted->grasps[i].wristPose);
-        c.setValue(grasp_sorted->grasps[i].wristPose.position.x,
+    //grasp_pose_array.poses.clear();
+
+    tf::Transform grsp_tf;
+    for(size_t i=0; i<grasp_sorted->grasps.size(); i++){
+        //grasp_pose_array.poses.push_back(grasp_sorted->grasps[i].wristPose);
+        grsp_tf = grasp_sorted->grasps[i].getWristGlobalPose(t);
+        test_point = grsp_tf.getOrigin();/*.setValue(grasp_sorted->grasps[i].wristPose.position.x,
                    grasp_sorted->grasps[i].wristPose.position.y,
-                   grasp_sorted->grasps[i].wristPose.position.z );
-        dist[i] = c.distance(r);
-        if(dist[i] < max)
-        {
+                   grasp_sorted->grasps[i].wristPose.position.z );*/
+        dist[i] = test_point.distance(ref); //store distance from reference point
+        if(dist[i] < max){ //remember index of the grasp closest to reference point
             grasp_idx = i;
             max = dist[i];
         }
     }
-    geometry_msgs::Pose grasp_pose = grasp_sorted->grasps[grasp_idx].wristPose;
-    return grasp_pose;
+    return grasp_sorted->grasps.at(grasp_idx);
 }
 
 
@@ -213,7 +277,7 @@ void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, Grasp
     TubeGrasp::Grasp grasp;
 
     tf::Quaternion quaternion;
-    tf::Transform step_tf,wrist_axis_tf, tf_grasp_cyl, tf_grasp_tube;
+    tf::Transform step_tf, wrist_axis_tf, tf_grasp_cyl, tf_grasp_tube;
 
     //wrist_axis_tf.setOrigin(tf::Vector3(0.0, _wrist_axis_offset,0.0));
     //quaternion.setEulerZYX(-(M_PI/2), 0.0, (M_PI/2));
@@ -242,18 +306,19 @@ void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, Grasp
             {
                 quaternion.setEulerZYX(k*circular_step_size, 0, 0);
                 step_tf.setRotation(quaternion);
-                tf_grasp_cyl = step_tf*wrist_axis_tf;
+                tf_grasp_cyl = step_tf/**wrist_axis_tf*/;
                 tf_grasp_tube = _tube->cylinders[i].getTransform() * tf_grasp_cyl;
-                tf::Vector3 orig = tf_grasp_tube.getOrigin();
-                tf::Quaternion q = tf_grasp_tube.getRotation();
-                grasp.wristPose.position.x = orig.x();
-                grasp.wristPose.position.y = orig.y();
-                grasp.wristPose.position.z = orig.z();
-                grasp.wristPose.orientation.x = q.x();
-                grasp.wristPose.orientation.y = q.y();
-                grasp.wristPose.orientation.z = q.z();
-                grasp.wristPose.orientation.w = q.w();
-
+//                tf::Vector3 orig = tf_grasp_tube.getOrigin();
+//                tf::Quaternion q = tf_grasp_tube.getRotation();
+//                grasp.wristPose.position.x = orig.x();
+//                grasp.wristPose.position.y = orig.y();
+//                grasp.wristPose.position.z = orig.z();
+//                grasp.wristPose.orientation.x = q.x();
+//                grasp.wristPose.orientation.y = q.y();
+//                grasp.wristPose.orientation.z = q.z();
+//                grasp.wristPose.orientation.w = q.w();
+                grasp.setPose(tf_grasp_tube);
+                grasp.setWristOffset(offset);
                 grasp.group = group_n;
                 grasp.cylinderIdx = i;
 
@@ -429,13 +494,15 @@ void GraspAnalysis::_test_pairs_for_ik()
 
     unsigned long it=MAX_ITERATION;
     _valid_pairs->graspPairs.reserve(MAX_TEST_GRASPS);
+    std::string ss;
     while(it>0)
     {
         it--;
         idx = rand()%(_test_pairs->graspPairs.size()+1);
         gp = _test_pairs->graspPairs[idx];
-        arm_navigation_msgs::AttachedCollisionObject att_obj = _tube->getAttachedObjForBothGrasps(gp.rightGrasp.wristPose);
-        if(manip.genTrajectory(att_obj, _tube_traj,gp.rightGrasp.wristPose, gp.leftGrasp.wristPose, gp.qRight, gp.qLeft)){
+        geometry_msgs::Pose right_wrist_pose = gp.rightGrasp.getWristPose(), left_wrist_pose=gp.leftGrasp.getWristPose();
+        arm_navigation_msgs::AttachedCollisionObject att_obj = _tube->getAttachedObjForBothGrasps(right_wrist_pose);
+        if(manip.genTrajectory(att_obj, _tube_traj,right_wrist_pose, left_wrist_pose, gp.qRight, gp.qLeft)){
             gp.isValid = true;
             _valid_pairs->graspPairs.push_back(gp);
             test_grasps++;
@@ -446,6 +513,12 @@ void GraspAnalysis::_test_pairs_for_ik()
             //fail_cnt++;
         }
         std::cout<<"\r["<<MAX_ITERATION-it<<'\t'<<test_grasps<<']'<<std::flush;
+        //std::cout<<"\rpres 'q' to continue  ["<<MAX_ITERATION-it<<'\t'<<test_grasps<<']'<<std::flush;
+        /*ss.clear();
+        std::cin>>ss;
+        if(ss.compare("q")==0){
+            break;
+        }*/
     }
     std::cout<<'\n';
     if(!_valid_pairs->graspPairs.empty()){
@@ -560,7 +633,7 @@ void GraspAnalysis::_compute_metric()
                               _valid_pairs->graspPairs[best_grasp].qRight);*/
 }
 
-void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
+void GraspAnalysis::getGraspMarker(TubePerception::Tube::Ptr tube, double wrist_offset, visualization_msgs::MarkerArray &markerArray)
 {
     visualization_msgs::Marker marker, x_axis, z_axis;
 
@@ -580,13 +653,14 @@ void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
 
     geometry_msgs::Pose pose;
     TubeGrasp::Grasp g;
-    tf::Transform wrist;
     for(size_t i=0; i<_grasp_array->grasps.size(); i++)
     {
         g = _grasp_array->grasps[i];
-        wrist = pose2tf(g.wristPose);
-        wrist = _tube->getTransform()*wrist;
-        pose = tf2pose(wrist);
+        /*wrist = pose2tf(g.getWristGlobalPose());
+        wrist = tube->getTransform()*wrist;
+        pose = tf2pose(wrist);*/
+        g.setWristOffset(wrist_offset);
+        pose = g.getWristGlobalPose(tube->getPose());
         marker.pose = pose;
         markerArray.markers.push_back(marker);
         marker.id++;
@@ -608,9 +682,11 @@ void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
     for(size_t i=0; i<_grasp_array->grasps.size(); i++)
     {
         g = _grasp_array->grasps[i];
-        wrist = pose2tf(g.wristPose);
-        wrist = _tube->getTransform()*wrist;
-        pose = tf2pose(wrist);
+        /*wrist = pose2tf(g.getWristGlobalPose);
+        wrist = tube->getTransform()*wrist;
+        pose = tf2pose(wrist);*/
+        g.setWristOffset(wrist_offset);
+        pose = g.getWristGlobalPose(tube->getPose());
         p.x = pose.position.x;
         p.y = pose.position.y;
         p.z = pose.position.z;
@@ -646,9 +722,11 @@ void GraspAnalysis::getGraspMarker(visualization_msgs::MarkerArray &markerArray)
     for(size_t i=0; i<_grasp_array->grasps.size(); i++)
     {
         g = _grasp_array->grasps[i];
-        wrist = pose2tf(g.wristPose);
-        wrist = _tube->getTransform()*wrist;
-        pose = tf2pose(wrist);
+        /*wrist = pose2tf(g.getWristGlobalPose);
+        wrist = tube->getTransform()*wrist;
+        pose = tf2pose(wrist);*/
+        g.setWristOffset(wrist_offset);
+        pose = g.getWristGlobalPose(tube->getPose());
         p.x = pose.position.x;
         p.y = pose.position.y;
         p.z = pose.position.z;

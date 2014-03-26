@@ -11,8 +11,6 @@
 #include "tubeGrasp.h"
 #include "utility.h"
 
-#define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
-
 class ControlSequence
 {
 public:

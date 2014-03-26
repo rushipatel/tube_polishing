@@ -145,8 +145,8 @@ namespace TubePerception
         bool readPointCloud(std::string fileName,
                             pcl::PointCloud<PointT>::Ptr cloudOut);
         bool writeAxisPointsOnFile(std::string fileName);
-        void dispalyWorkTraj(void);
-        void genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
+        //void dispalyWorkTraj(void);
+        bool genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
                           Tube::Ptr tube_ptr);
         void segmentizeCloud(const sensor_msgs::PointCloud2 &cloudIn);
         typedef boost::shared_ptr<TubePerception::CloudProcessing> Ptr;
@@ -167,9 +167,7 @@ namespace TubePerception
                            double r_max, pcl::ModelCoefficients &coeff,
                            pcl::PointIndices::Ptr inliers);
         void _collaps_normals(void);
-        void _collaps_normals(pcl::PointCloud<PointT>::Ptr cloud_in, double dist, pcl::PointCloud<PointT>::Ptr cloud_out);
         bool _find_line(pcl::PointIndices::Ptr inliers, Cylinder *cyl);
-        bool _find_line(pcl::PointCloud<PointT>::Ptr raw_axis_cloud, pcl::PointIndices::Ptr inliers, Cylinder *cyl, double num_of_points);
         void _remove_inliers(pcl::PointCloud<PointT>::Ptr points,
                              pcl::PointIndices::Ptr indices);
         void _remove_inliers(pcl::PointCloud<PointT>::Ptr points,

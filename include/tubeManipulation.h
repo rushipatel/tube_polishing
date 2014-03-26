@@ -152,6 +152,8 @@ public:
                                  std::vector<double> &jointsOut);
     bool getSimpleLeftArmIK(geometry_msgs::Pose pose,
                                  sensor_msgs::JointState &jointState);
+    bool getSimpleLeftArmIK(geometry_msgs::Pose pose,
+                                 std::vector<double> &jointsOut);
     bool getRegraspPoseRight(arm_navigation_msgs::AttachedCollisionObject &attObj,
                                  geometry_msgs::Pose crnt_grasp,
                                  geometry_msgs::Pose wrist_pose,
@@ -171,10 +173,9 @@ public:
     geometry_msgs::Pose getRightArmFK(std::vector<double> &left_joints);
     geometry_msgs::Pose getLeftArmFK();
     geometry_msgs::Pose getLeftArmFK(std::vector<double> &left_joints);
+    void getRightJoints(std::vector<double> &joints);
+    void getLeftJoints(std::vector<double> &joints);
     // For testing of KDL. should go back in private afterwards
-    void _get_right_joints(std::vector<double> &joint_state);
-    void _get_left_joints(std::vector<double> &joint_state);
-    bool _get_planning_scene();
 
     typedef boost::shared_ptr<TubeManipulation::Arms> Ptr;
 
@@ -204,9 +205,14 @@ private:
     CollisionCheck::Ptr _collision_check;
     std::map<std::string, std::pair<double, double> > _joint_bounds;
 
+    void _get_right_joints(std::vector<double> &joint_state);
+    void _get_left_joints(std::vector<double> &joint_state);
+    bool _get_planning_scene();
+
     void _get_right_goal();
     void _get_left_goal();
     void _sync_start_times(void);
+
     //bool _call_right_arm_gpik(std::vector<double> &right_joint_trajectory);
     //bool _call_left_arm_gpik(std::vector<double> &left_joint_trajectory);
     void _call_right_joints_unnormalizer(void);

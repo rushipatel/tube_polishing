@@ -342,7 +342,9 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.scale.x = 0.001;
     marker.scale.y = 0.001;
     marker.color.b = 1;
-    marker.color.a = 0.5;
+    marker.color.r = 1;
+    marker.color.g = 1;
+    marker.color.a = 1;
     marker.lifetime = ros::Duration(20);
     for(size_t i=0; i<cylinders.size(); i++){
         marker.scale.z = cylinders[i].getAxisLength();
@@ -364,7 +366,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.r = 0.0;
     marker.color.g = 0.3;
     marker.color.b = 0.3;
-    marker.color.a = 0.8;
+    marker.color.a = 0.7;
     marker.lifetime = ros::Duration(20);
     for(size_t i=0; i<cylinders.size(); i++){
         marker.scale.x = marker.scale.y = cylinders[i].radius*2;
@@ -454,7 +456,7 @@ CloudProcessing::CloudProcessing()
     _z_error = 0;
 }
 
-void CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud, Tube::Ptr tube_ptr)
+bool CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud, Tube::Ptr tube_ptr)
 {
     //copy cloud in pcl type and initialize pointers
     _tube_cloud.reset(new pcl::PointCloud<PointT>);
@@ -472,7 +474,13 @@ void CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
     _segmentize_axis();
     _define_pose(); // <<< Cylinders gets converted in local frame including p1 and p2
     _tube->setPoseAsActualPose();
+    if(_tube->cylinders.empty()){
+        _tube->reset();
+        ROS_WARN("No cylinder found in cluster!");
+        return false;
+    }
     _generate_work_vectors();
+    return true;
 }
 
 bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
@@ -482,66 +490,53 @@ bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
     pcl::PointCloud<PointT>::Ptr disk_cloud(new pcl::PointCloud<PointT>);
     _convert_to_pcl(clusterCloud, disk_cloud);
     _estimate_normals(disk_cloud);
-    displayCloud(disk_cloud);
+    //displayCloud(disk_cloud);
     pcl::ModelCoefficients coeff;
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
     if(!_get_cylinder(disk_cloud, minRadius, maxRadius, coeff, inliers)){
         ROS_WARN("Couldn't find disk in given cloud cluster");
         return false;
     }
-    pcl::PointCloud<PointT>::Ptr cylinder_cloud(new pcl::PointCloud<PointT>);
+    _tube_cloud.reset(new pcl::PointCloud<PointT>);
     pcl::ExtractIndices<PointT> extract;
     extract.setIndices(inliers);
     extract.setInputCloud(disk_cloud);
     extract.setNegative(false);
-    extract.filter(*cylinder_cloud);
-    displayCloud(cylinder_cloud);
+    extract.filter(*_tube_cloud);
 
-    pcl::PointCloud<PointT>::Ptr raw_axis_points(new pcl::PointCloud<PointT>);
-    _collaps_normals(cylinder_cloud, coeff[6], raw_axis_points);
-    _find_line()
-    disk.p1.x = coeff.values[0];
-    disk.p1.y = coeff.values[1];
-    disk.p1.z = coeff.values[2];
-    disk.p2.x = coeff.values[3];
-    disk.p2.y = coeff.values[4];
-    disk.p2.z = coeff.values[5];
-    disk.radius = coeff.values[6];
-    cylinder_cloud->points.push_back(disk.p1);
-    cylinder_cloud->points.push_back(disk.p2);
-    displayCloud(cylinder_cloud);
-    tf::Vector3 y = disk.getAxisVector(), mid_point = disk.getMidPoint();
-    tf::Vector3 horizon;
-    //subtract point p1 from point(0, 0,p1.z);
-    horizon.setX(0 - disk.p1.x);
-    horizon.setY(0 - disk.p1.y);
-    horizon.setZ(0);
-    y.normalize();
-    horizon.normalize();
-    tf::Vector3 x, z = y.cross(horizon);
-    z.normalize();
-    x = z.cross(y);
-    x.normalize();
-    //rotate around z by pi
-    tf::Vector3 x2 = -x;
-    /*if(abs(x.angle(tf::Vector3(1,0,0)))>abs(x2.angle(tf::Vector3(1,0,0)))){
-        x = x2;
-        y = -y;
-    }*/
+    _axis_points.reset(new pcl::PointCloud<PointT>);
+    _r = coeff.values[6];
+    _collaps_normals(); //resets _raw_axis_points pointer uses _r and _tube_cloud
+    _num_of_points = _raw_axis_points->points.size();
+    inliers->indices.clear();
+    TubePerception::Cylinder cyl;
+    _find_line(inliers, &cyl);
+
+    //had to use following from _define_poses. behaviour of setValue is not fully known
+    tf::Vector3 ux, uy, uz = cyl.getAxisVector();
+    uz.normalize();
+    ux = _get_perp_vec3(uz);
+    ux.normalize();
+    uy = uz.cross(ux);
+    uy.normalize();
     tf::Matrix3x3 mat;
+    mat.setValue(ux.getX(), uy.getX(), uz.getX(),
+                 ux.getY(), uy.getY(), uz.getY(),
+                 ux.getZ(), uy.getZ(), uz.getZ() );
+    tf::Vector3 mid_point = cyl.getMidPoint();
 
-    mat.setValue(x.getX(), y.getX(), z.getX(),
-                 x.getY(), y.getY(), z.getY(),
-                 x.getZ(), y.getZ(), z.getZ());
     tf::Transform disk_tf(mat, mid_point);
+    disk.setPose(tf2pose(disk_tf));
+    disk.p1 = cyl.p1;
+    disk.p2 = cyl.p2;
+    disk.isStrong = cyl.isStrong;
+    disk.radius = cyl.radius;
     tf::Transform xform;
     xform.setIdentity();
+    xform.setRotation(tf::Quaternion(tf::Vector3(1,0,0),M_PI/2));
     xform.setOrigin(tf::Vector3(-disk.radius, 0, 0));
     tf::Transform work_pose = disk_tf * xform;
     workPose = tf2pose(work_pose);
-
-    geometry_msgs::Pose pose = tf2pose(disk_tf);
-    disk.setPose(pose);
     return true;
 }
 
@@ -748,7 +743,7 @@ void CloudProcessing::_define_pose(void)
         pose.orientation.y = q.getY();
         pose.orientation.z = q.getZ();
         pose.orientation.w = q.getW();
-        //For temporary use only
+        //For temporary use only. Will get converted local to tube
         _tube->cylinders[i].setPose(pose);
     }
 
@@ -877,6 +872,8 @@ bool CloudProcessing::_get_cylinder(pcl::PointCloud<PointT>::Ptr cloud,
     return true;
 }
 
+// resets _raw_axis_point pointer
+// needs _tube_cloud initialized and _r
 void CloudProcessing::_collaps_normals(void)
 {
     _raw_axis_points.reset(new pcl::PointCloud<PointT>);
@@ -890,22 +887,6 @@ void CloudProcessing::_collaps_normals(void)
     }
     _raw_axis_points->width = _raw_axis_points->points.size();
     _raw_axis_points->height = 1;
-    //get_largest_cluster(raw_axis_points, axis_points);
-}
-
-// requires normals computed
-void CloudProcessing::_collaps_normals(pcl::PointCloud<PointT>::Ptr cloud_in, double dist, pcl::PointCloud<PointT>::Ptr cloud_out)
-{
-    cloud_out->header = cloud_in->header;
-    cloud_out->points.resize(cloud_in->points.size());
-
-    for(unsigned int i=0; i<cloud_in->points.size(); i++){
-        cloud_out->points[i].x = cloud_in->points[i].x - cloud_in->points[i].normal_x * dist;
-        cloud_out->points[i].y = cloud_in->points[i].y - cloud_in->points[i].normal_y * dist;
-        cloud_out->points[i].z = cloud_in->points[i].z - cloud_in->points[i].normal_z * dist;
-    }
-    cloud_out->width = cloud_out->points.size();
-    cloud_out->height = 1;
     //get_largest_cluster(raw_axis_points, axis_points);
 }
 
@@ -931,9 +912,9 @@ void CloudProcessing::_segmentize_axis(void)
     ROS_INFO("%d Cylinder found", _tube->cylinders.size());
 }
 
-bool CloudProcessing::_find_line(pcl::PointCloud<PointT>::Ptr raw_axis_cloud, pcl::PointIndices::Ptr inliers, Cylinder *cyl, double num_of_points)
+bool CloudProcessing::_find_line(pcl::PointIndices::Ptr inliers, Cylinder *cyl)
 {
-    if(raw_axis_points->points.size()< (_min_points*num_of_points) ) //check if there are enough points to generate model
+    if(_raw_axis_points->points.size()< (_min_points*_num_of_points) ) //check if there are enough points to generate model
         return false;
     pcl::SACSegmentation<PointT> seg;
     pcl::ModelCoefficients coeff;
@@ -947,22 +928,22 @@ bool CloudProcessing::_find_line(pcl::PointCloud<PointT>::Ptr raw_axis_cloud, pc
     seg.setProbability(0.99);
     seg.setMaxIterations (20000);
     seg.setDistanceThreshold (0.001);
-    seg.setInputCloud (raw_axis_points);
+    seg.setInputCloud (_raw_axis_points);
     // Obtain the cylinder inliers and coefficients
     seg.segment (*inliers, coeff);
 
     PointT p1,p2;
 
-    if( inliers->indices.size()>(_min_points*num_of_points) ){
+    if( inliers->indices.size()>(_min_points*_num_of_points) ){
         ROS_INFO("Number of Strong Line inliers : %d",inliers->indices.size());
-        ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
+        //ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
 
         _get_line_points(inliers,coeff, p1, p2);
         cyl->p1 = p1;
         cyl->p2 = p2;
         cyl->isStrong = true;
         cyl->radius = _r;
-        cyl->coefficients.header = coeff.header;
+        cyl->coefficients.header = coeff.header; //need for cylinder filter
         cyl->coefficients.values.resize(7);
         cyl->coefficients.values[0] = p1.x;
         cyl->coefficients.values[1] = p1.y;
@@ -975,16 +956,16 @@ bool CloudProcessing::_find_line(pcl::PointCloud<PointT>::Ptr raw_axis_cloud, pc
     }
     else{
         ROS_INFO("Trying to find weak line...");
-        seg.setProbability(0.97);
-        seg.setMaxIterations (10000);
-        seg.setDistanceThreshold (0.002);
+        seg.setProbability(0.96);
+        seg.setMaxIterations (20000);
+        seg.setDistanceThreshold (0.003);
         inliers->indices.clear();
         seg.segment (*inliers, coeff);
     }
 
-    if( inliers->indices.size() > (_min_points*num_of_points) ){ // if confidence in line
+    if( inliers->indices.size() > (_min_points*_num_of_points) ){ // if confidence in line
         ROS_INFO("Number of Weak Line inliers : %d",inliers->indices.size());
-        ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
+        //ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
 
         _get_line_points(inliers,coeff, p1, p2);
         cyl->p1 = p1;
@@ -1002,80 +983,6 @@ bool CloudProcessing::_find_line(pcl::PointCloud<PointT>::Ptr raw_axis_cloud, pc
         return true;
     }
     return false;
-}
-
-bool CloudProcessing::_find_line(pcl::PointIndices::Ptr inliers, Cylinder *cyl)
-{
-    return _find_line(
-//    if(_raw_axis_points->points.size()< (_min_points*_num_of_points) ) //check if there are enough points to generate model
-//        return false;
-//    pcl::SACSegmentation<PointT> seg;
-//    pcl::ModelCoefficients coeff;
-//    //pcl::PointIndices inliers;
-
-//    // Create the segmentation object for cylinder segmentation and set all the parameters
-//    seg.setOptimizeCoefficients (true);
-//    seg.setModelType (pcl::SACMODEL_LINE);
-//    seg.setMethodType (pcl::SAC_RANSAC);
-//    seg.setOptimizeCoefficients(true);
-//    seg.setProbability(0.99);
-//    seg.setMaxIterations (20000);
-//    seg.setDistanceThreshold (0.001);
-//    seg.setInputCloud (_raw_axis_points);
-//    // Obtain the cylinder inliers and coefficients
-//    seg.segment (*inliers, coeff);
-
-//    PointT p1,p2;
-
-//    if( inliers->indices.size()>(_min_points*_num_of_points) ){
-//        ROS_INFO("Number of Strong Line inliers : %d",inliers->indices.size());
-//        ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
-
-//        _get_line_points(inliers,coeff, p1, p2);
-//        cyl->p1 = p1;
-//        cyl->p2 = p2;
-//        cyl->isStrong = true;
-//        cyl->radius = _r;
-//        cyl->coefficients.header = coeff.header;
-//        cyl->coefficients.values.resize(7);
-//        cyl->coefficients.values[0] = p1.x;
-//        cyl->coefficients.values[1] = p1.y;
-//        cyl->coefficients.values[2] = p1.z;
-//        cyl->coefficients.values[3] = p2.x - p1.x;
-//        cyl->coefficients.values[4] = p2.y - p1.y;
-//        cyl->coefficients.values[5] = p2.z - p1.z;
-//        cyl->coefficients.values[6] = _r;
-//        return true;
-//    }
-//    else{
-//        ROS_INFO("Trying to find weak line...");
-//        seg.setProbability(0.97);
-//        seg.setMaxIterations (10000);
-//        seg.setDistanceThreshold (0.002);
-//        inliers->indices.clear();
-//        seg.segment (*inliers, coeff);
-//    }
-
-//    if( inliers->indices.size() > (_min_points*_num_of_points) ){ // if confidence in line
-//        ROS_INFO("Number of Weak Line inliers : %d",inliers->indices.size());
-//        ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
-
-//        _get_line_points(inliers,coeff, p1, p2);
-//        cyl->p1 = p1;
-//        cyl->p2 = p2;
-//        cyl->isStrong = false;
-//        cyl->radius = _r;
-//        cyl->coefficients.values.resize(7);
-//        cyl->coefficients.values[0] = p1.x;
-//        cyl->coefficients.values[1] = p1.y;
-//        cyl->coefficients.values[2] = p1.z;
-//        cyl->coefficients.values[3] = p2.x - p1.x;
-//        cyl->coefficients.values[4] = p2.y - p1.y;
-//        cyl->coefficients.values[5] = p2.z - p1.z;
-//        cyl->coefficients.values[6] = _r;
-//        return true;
-//    }
-//    return false;
 }
 
 void CloudProcessing::_get_line_points(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2)
@@ -1122,6 +1029,7 @@ void CloudProcessing::_remove_inliers(pcl::PointCloud<PointT>::Ptr points, pcl::
     extract.filter(*points);
 }
 
+// gives
 void CloudProcessing::_cylinder_filter(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers){
     PointT p1, p2;
     p1 = cyl.p1;

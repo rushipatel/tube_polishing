@@ -20,12 +20,31 @@ namespace TubeGrasp
     class Grasp
     {
     public:
-        Grasp(){}
-        geometry_msgs::Pose wristPose;
+        Grasp(){
+            _wrist_offset = 0.0;
+        }
+
         unsigned int group; //circular group. it helps reduce pairs to test
         unsigned int cylinderIdx;
-        geometry_msgs::Pose getGlobalPose(geometry_msgs::Pose objectPose);
-        geometry_msgs::Pose getGlobalPose(tf::Transform objectTf);
+        geometry_msgs::Pose getWristGlobalPose(const geometry_msgs::Pose &objectPose);
+        tf::Transform getWristGlobalPose(const tf::Transform &objectTf);
+
+        geometry_msgs::Pose getWristPose(); // computes wrist pose using _wrist_offset
+        tf::Transform getWristTransform();
+        geometry_msgs::Pose getWristPose(double offset); //uses given offset instead _wrist_offset
+        tf::Transform getWristTransform(double offset);
+        //geometry_msgs::Pose getPose(); // raw grasp pose. coinsident to cylinder axis
+        void setWristOffset(const double offset);
+        void setPose(const geometry_msgs::Pose &pose);
+        void setPose(const tf::Transform &tf);
+        tf::Transform getTransform(void);
+        geometry_msgs::Pose getPose(void);
+        double getWristOffset(void);
+    private:
+        double _wrist_offset; //offset from cylinder axis to wrist origin
+        geometry_msgs::Pose _pose;
+
+        tf::Transform _get_wrist_pose(double offset);
     };
 
     class GraspPair
@@ -66,19 +85,20 @@ namespace TubeGrasp
     class GraspAnalysis
     {
     public:
-        GraspAnalysis(TubePerception::Tube::Ptr tube, ros::NodeHandlePtr nh);
+        GraspAnalysis(ros::NodeHandlePtr nh);
+        void setTubePtr(TubePerception::Tube::Ptr tube);
         void setWorkPose(geometry_msgs::Pose &p);
         int getWorkPose(geometry_msgs::Pose &p);
         void setWorkTrajIdx(int trajIdx);
         //void genGrasps();
         //void genGraspPairs();
-        void analyze(); //temp. dev purpose
-        void getGraspMarker(visualization_msgs::MarkerArray &markerArray);
+        void compute(); //temp. dev purpose
+        void getGraspMarker(TubePerception::Tube::Ptr tube, double wrist_offset, visualization_msgs::MarkerArray &markerArray);
         //returns grasp somewhere closer to center of object. very rough approximation.
-        void pickUpTube(geometry_msgs::Pose &pickPose);
+        //void pickUpTube(geometry_msgs::Pose &pickPose);
         bool getComputedGraspPair(GraspPair &graspPair);
         void getTubeWorkTrajectory(geometry_msgs::PoseArray &tube_traj);
-        geometry_msgs::Pose getPickUpPose(std::vector<tf::Vector3> &pointsToAvoid, double min_dist);
+        Grasp getPickPose(std::vector<tf::Vector3> &pointsToAvoid, double min_dist);
 
         geometry_msgs::PoseArray _work_traj; //put this back in private after dbg/dev
         geometry_msgs::PoseArray _tube_traj;

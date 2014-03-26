@@ -66,12 +66,13 @@ void ControlSequence::start()
 {
     visualization_msgs::MarkerArray tube_mrkr;
 
-    ros::Publisher cylinder_pub = _nh->advertise<visualization_msgs::MarkerArray>("Disk",5);
+    /*ros::Publisher cylinder_pub = _nh->advertise<visualization_msgs::MarkerArray>("Disk",5);
     ros::Publisher pose_pub = _nh->advertise<geometry_msgs::PoseStamped>("Pose_of_disk",5);
     ros::Publisher work_pose_pub = _nh->advertise<geometry_msgs::PoseStamped>("Work_pose",5);
     visualization_msgs::MarkerArray marker_array;
     TubePerception::Cylinder disk;
     geometry_msgs::Pose work_point;
+    _cloud_process.reset(new TubePerception::CloudProcessing);
     if(_cloud_process->findDisk(_clusters[_clusters.size()-1],0.01,0.1,disk,work_point)){
         ROS_WARN("Works!!!");
         disk.getMarkers(marker_array);
@@ -96,74 +97,74 @@ void ControlSequence::start()
             ("/head_mount_kinect/depth_registered/points", *_nh, ros::Duration(4));
     sensor_msgs::PointCloud2 scene_cloud = *scene_cloud_ptr;
 
-    _cloud_process->segmentizeCloud(scene_cloud);
-//    if(!_clusters.empty())
-//    {
-//        _generate_tube_model(0);
-//        _tube->getCylinderMarker(tube_mrkr);
-//        _tube_mrkr_pub.publish(tube_mrkr);
+    _cloud_process->segmentizeCloud(scene_cloud);*/
+    if(!_clusters.empty())
+    {
+        _generate_tube_model(0);
+        _tube->getCylinderMarker(tube_mrkr);
+        _tube_mrkr_pub.publish(tube_mrkr);
 
-//        ROS_INFO("Getting Grasps");
-//        if(!_get_grasps()){
-//            ROS_ERROR("ControlSequence - Error in computing grasp");
-//            return;
-//        }
+        ROS_INFO("Getting Grasps");
+        if(!_get_grasps()){
+            ROS_ERROR("ControlSequence - Error in computing grasp");
+            return;
+        }
 
-//        if(_pick_up_tube("right_arm")){
-//            _get_attached_object();
-//            if(!_repos_tube_and_regrasp()){
-//                ROS_ERROR("ControlSequence - Error in regrasping");
-//                return;
-//            }
-//            else{
-//                bool r = _attached_to_right_arm, l = _attached_to_left_arm;
-//                /*_attached_to_right_arm = true;
-//                _attached_to_left_arm = true;*/
-//                _get_attached_object();
-//                _set_planning_scene();
-//                /*_attached_to_right_arm = r;
-//                _attached_to_left_arm = l;*/
-//                _move_arm_to_home_position("right_arm");
-//            }
-//            _get_trajectory();
-//            _move_to_staging_point();
-//        }
-//        else if( !_attached_to_right_arm )
-//        {
-//            geometry_msgs::Pose pose;
-//            pose.position.x = 0.1;
-//            pose.position.y = -0.6;
-//            pose.position.z = 0.8;
-//            pose.orientation.x = 0.0;
-//            pose.orientation.y = 0.0;
-//            pose.orientation.z = 0.0;
-//            pose.orientation.w = 1.0;
-//            if(!_arms->moveRightArmWithMPlanning(pose)){
-//                return;
-//            }
-//            if(_pick_up_tube("left_arm")){
-//                ROS_WARN("ControlSequence - Pick up failed with right arm. trying with left arm...");
+        if(_pick_up_tube("right_arm")){
+            _get_attached_object();
+            if(!_repos_tube_and_regrasp()){
+                ROS_ERROR("ControlSequence - Error in regrasping");
+                return;
+            }
+            else{
+                bool r = _attached_to_right_arm, l = _attached_to_left_arm;
+                /*_attached_to_right_arm = true;
+                _attached_to_left_arm = true;*/
+                _get_attached_object();
+                _set_planning_scene();
+                /*_attached_to_right_arm = r;
+                _attached_to_left_arm = l;*/
+                _move_arm_to_home_position("right_arm");
+            }
+            _get_trajectory();
+            _move_to_staging_point();
+        }
+        else if( !_attached_to_right_arm )
+        {
+            geometry_msgs::Pose pose;
+            pose.position.x = 0.1;
+            pose.position.y = -0.6;
+            pose.position.z = 0.8;
+            pose.orientation.x = 0.0;
+            pose.orientation.y = 0.0;
+            pose.orientation.z = 0.0;
+            pose.orientation.w = 1.0;
+            if(!_arms->moveRightArmWithMPlanning(pose)){
+                return;
+            }
+            if(_pick_up_tube("left_arm")){
+                ROS_WARN("ControlSequence - Pick up failed with right arm. trying with left arm...");
 
-//                _get_attached_object();
-//                if(!_repos_tube_and_regrasp()){
-//                    ROS_ERROR("ControlSequence - Error in regrasping");
-//                    return;
-//                }
-//            }
-//            else{
-//                ROS_ERROR("ControlSequence - Error in picking tube. couldn't reach by any arm");
-//                return;
-//            }
-//        }
-//        else{
-//            ROS_ERROR("ControlSequence - Error in picking tube");
-//            return;
-//        }
-//    }
-//    else{
-//        ROS_ERROR("ControlSequence - No cluster to generate tube model");
-//        return;
-//    }
+                _get_attached_object();
+                if(!_repos_tube_and_regrasp()){
+                    ROS_ERROR("ControlSequence - Error in regrasping");
+                    return;
+                }
+            }
+            else{
+                ROS_ERROR("ControlSequence - Error in picking tube. couldn't reach by any arm");
+                return;
+            }
+        }
+        else{
+            ROS_ERROR("ControlSequence - Error in picking tube");
+            return;
+        }
+    }
+    else{
+        ROS_ERROR("ControlSequence - No cluster to generate tube model");
+        return;
+    }
     return;
 }
 
