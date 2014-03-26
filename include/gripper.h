@@ -3,6 +3,8 @@
 
 #include <ros/ros.h>
 #include <pr2_controllers_msgs/Pr2GripperCommandAction.h>
+#include <pr2_gripper_sensor_msgs/PR2GripperEventDetectorAction.h>
+#include <pr2_gripper_sensor_msgs/PR2GripperFindContactAction.h>
 #include <actionlib/client/simple_action_client.h>
 
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction> GripperClient;

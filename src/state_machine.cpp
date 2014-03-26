@@ -123,14 +123,18 @@ void stateMachine::start()
             ROS_INFO("Picking tube...");
             if(_r_soln_avail){
                 if(_arms->moveRightArmWithMPlanning(_pick_grasp.getWristGlobalPose(_tube->getPose()))){
-                    //TODO: handle pcik sequence;
+                    if(_lift_obj_with_right_arm()){
+                        _l_soln_avail = false; //done with these variables as of now. reset them
+                        _r_soln_avail = false;
+                    }
+                    break;
                 }
                 else{
                     _r_soln_avail = false;
                     if(!_move_arm_to_home_position("right_arm")){
                         _state = ERR;
                     }
-                    break;
+                    break; //leave with the state = PICK. this will try with left arm
                 }
             }
             if(_l_soln_avail){

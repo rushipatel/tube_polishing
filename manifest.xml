@@ -31,6 +31,7 @@
   <depend package="kdl_parser"/>
   <depend package="planning_environment"/>
   <depend package="arm_kinematics_constraint_aware"/>
+  <depend package="pr2_gripper_reactive_approach"/>
   <platform os="ubuntu" version="9.04"/>
   <platform os="ubuntu" version="9.10"/>
   <platform os="ubuntu" version="10.04"/>

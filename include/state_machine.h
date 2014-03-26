@@ -79,6 +79,8 @@ private:
     void _publish_grasps(void);
     bool _get_computed_grasp_pair(void);
     bool _get_pick_grasp(void);
+    bool _lift_obj_with_right_arm(void);
+    bool _lift_obj_with_left_arm(void);
 };
 
 
