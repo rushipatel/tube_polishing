@@ -62,8 +62,9 @@ private:
     std::vector<sensor_msgs::PointCloud2> _clusters;
 
     TubeGrasp::GraspPair _crnt_grasp_pair;
-    arm_navigation_msgs::AttachedCollisionObject _att_obj;
+    arm_navigation_msgs::AttachedCollisionObject::Ptr _att_obj;
     arm_navigation_msgs::CollisionObject _table;
+    arm_navigation_msgs::CollisionObject _tube_collision_obj;
     std::vector<double> _right_arm_home_jnts;
     std::vector<double> _left_arm_home_jnts;
     geometry_msgs::Pose _work_pose1, _work_pose2;
@@ -81,6 +82,8 @@ private:
     bool _get_pick_grasp(void);
     bool _lift_obj_with_right_arm(void);
     bool _lift_obj_with_left_arm(void);
+    void _add_tube_to_collision_space(void);
+    void _remove_tube_from_collision_space(void);
 };
 
 

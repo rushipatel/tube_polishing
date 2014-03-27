@@ -495,6 +495,7 @@ void GraspAnalysis::_test_pairs_for_ik()
     unsigned long it=MAX_ITERATION;
     _valid_pairs->graspPairs.reserve(MAX_TEST_GRASPS);
     std::string ss;
+    TubeManipulation::CollisionCheck::Ptr collision_check(new TubeManipulation::CollisionCheck(_nh));
     while(it>0)
     {
         it--;
@@ -502,7 +503,10 @@ void GraspAnalysis::_test_pairs_for_ik()
         gp = _test_pairs->graspPairs[idx];
         geometry_msgs::Pose right_wrist_pose = gp.rightGrasp.getWristPose(), left_wrist_pose=gp.leftGrasp.getWristPose();
         arm_navigation_msgs::AttachedCollisionObject att_obj = _tube->getAttachedObjForBothGrasps(right_wrist_pose);
-        if(manip.genTrajectory(att_obj, _tube_traj,right_wrist_pose, left_wrist_pose, gp.qRight, gp.qLeft)){
+        arm_navigation_msgs::AttachedCollisionObject::Ptr att_obj_ptr =
+                boost::make_shared<arm_navigation_msgs::AttachedCollisionObject>(att_obj);
+        collision_check->setAttachedObjPtr(att_obj_ptr);
+        if(manip.genTrajectory(collision_check, _tube_traj,right_wrist_pose, left_wrist_pose, gp.qRight, gp.qLeft)){
             gp.isValid = true;
             _valid_pairs->graspPairs.push_back(gp);
             test_grasps++;

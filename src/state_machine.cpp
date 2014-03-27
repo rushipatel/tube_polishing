@@ -13,13 +13,17 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _work_traj_idx = 0;
     _r_soln_avail = false;
     _l_soln_avail = false;
-    _WRIST_OFFSET = 0.182;
-    _PICK_WRIST_OFFSET = 0.3;
+    _WRIST_OFFSET = 0.15;
+    _PICK_WRIST_OFFSET = 0.185;
+
+    _att_obj.reset(new arm_navigation_msgs::AttachedCollisionObject);
 
     _arms.reset(new TubeManipulation::Arms(_nh));
+    _arms->setAttachedObjPtr(_att_obj);
     _cloud_process.reset(new TubePerception::CloudProcessing);
     _grasp_analysis.reset(new TubeGrasp::GraspAnalysis(_nh));
     _collision_check.reset(new TubeManipulation::CollisionCheck(_nh));
+    _collision_check->setAttachedObjPtr(_att_obj);
     _tube.reset(new TubePerception::Tube);
     _seg_srv_client = _nh->serviceClient
             <tabletop_object_detector::TabletopSegmentation>
@@ -81,6 +85,7 @@ void stateMachine::start()
             }
             _head.lookAt(0.75,0.0,0.5);
             _state = PERCIEVE;
+            //_state = DONE;
             ROS_INFO_NAMED(LGRNM,"*Initialized");
             break;
         }
@@ -97,6 +102,7 @@ void stateMachine::start()
                 break;
             }
             _publish_tube();
+            _add_tube_to_collision_space();
             //TODO: get_attached_obj;
             _state = GRASP_ANLYS;
             ROS_INFO_NAMED(LGRNM,"*Generated tube and published table");
@@ -120,13 +126,13 @@ void stateMachine::start()
         }
         case PICK:
         {
-            ROS_INFO("Picking tube...");
+            ROS_INFO("*Picking tube...");
             if(_r_soln_avail){
-                if(_arms->moveRightArmWithMPlanning(_pick_grasp.getWristGlobalPose(_tube->getPose()))){
+                //if(_arms->moveRightArmWithMPlanning(_pick_grasp.getWristGlobalPose(_tube->getPose()))){
                     if(_lift_obj_with_right_arm()){
                         _l_soln_avail = false; //done with these variables as of now. reset them
                         _r_soln_avail = false;
-                    }
+                 //   }
                     break;
                 }
                 else{
@@ -154,31 +160,31 @@ void stateMachine::start()
         }
         case REGRASP:
         {
-            ROS_INFO("Regrasping...");
-
+            ROS_INFO("*Regrasping...");
+            _remove_tube_from_collision_space();
             _state = DONE;
             break;
         }
         case TRAJ_GEN:
         {
-            ROS_INFO("Generating trajectory...");
+            ROS_INFO("*Generating trajectory...");
             break;
         }
         case TRAJ_EXE:
         {
-            ROS_INFO("executing trajectory...");
+            ROS_INFO("*executing trajectory...");
             break;
         }
         case ERR:
         {
             _print_state();
-            ROS_ERROR("Error! Shutting down...");
+            ROS_ERROR("*Error! Shutting down...");
             ros::shutdown();
             break;
         }
         case DONE:
         {
-            ROS_INFO("Done! Shutting down...");
+            ROS_INFO("*Done! Shutting down...");
             _print_state();
             ros::shutdown();
             break;
@@ -196,8 +202,8 @@ void stateMachine::start()
 void stateMachine::_set_planning_scn(void){
     arm_navigation_msgs::SetPlanningSceneDiff::Request req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response res;
-    if(!_att_obj.object.shapes.empty()){
-        req.planning_scene_diff.attached_collision_objects.push_back(_att_obj);
+    if(!_att_obj->object.shapes.empty()){
+        req.planning_scene_diff.attached_collision_objects.push_back(*_att_obj);
     }
     if(!_set_pln_scn.call(req,res)){
         ROS_WARN_NAMED(LGRNM,"Couldn't set planning scene");
@@ -283,6 +289,11 @@ bool stateMachine::_gen_tube_model(void){
     return true;
 }
 
+/*void stateMachine::_get_attached_obj(void){
+
+    _att_obj
+}*/
+
 
 //get table parameter from response and publish it
 void stateMachine::_extract_table_from_msg(tabletop_object_detector::TabletopSegmentation &seg_srv)
@@ -295,7 +306,7 @@ void stateMachine::_extract_table_from_msg(tabletop_object_detector::TabletopSeg
     y_max = std::max(std::abs(y_min), std::abs(y_max));
     y_min = y_max * (-1);
 
-    _table.header.frame_id = "base_link";
+    _table.header.frame_id = "/base_link";
     _table.header.stamp = ros::Time::now();
     _table.id = "Table";
     _table.operation.operation = _table.operation.ADD;
@@ -317,6 +328,21 @@ void stateMachine::_extract_table_from_msg(tabletop_object_detector::TabletopSeg
     _table.shapes.push_back(box);
 
     _collision_obj_pub.publish(_table);
+}
+
+void stateMachine::_add_tube_to_collision_space(){
+    if(!_tube->cylinders.empty()){
+        _tube->getCollisionObject(_tube_collision_obj);
+    }
+    _collision_obj_pub.publish(_tube_collision_obj);
+}
+
+void stateMachine::_remove_tube_from_collision_space(){
+    if(!_tube->cylinders.empty()){
+        _tube->getCollisionObject(_tube_collision_obj);
+    }
+    _tube_collision_obj.operation.operation = _tube_collision_obj.operation.REMOVE;
+    _collision_obj_pub.publish(_tube_collision_obj);
 }
 
 void stateMachine::_publish_tube(void){
@@ -362,12 +388,12 @@ bool stateMachine::_get_pick_grasp(void)
     //TODO:needs to be converted in to global frame
 
     _pick_grasp = _grasp_analysis->getPickPose(points,0.0);
-    _collision_check->setAttachedObj(_att_obj);
+    _collision_check->setAttachedObjPtr(_att_obj);
     _collision_check->enableVisualization();
     _collision_check->setMarkerLifeTime(60);
     std::vector<double> right_jnts, left_jnts;
 
-    _r_soln_avail = _l_soln_avail = false;
+    /*_r_soln_avail = _l_soln_avail = false;
     _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET);
     geometry_msgs::Pose pick_pose = _pick_grasp.getWristGlobalPose(_tube->getPose());
     _set_planning_scn();
@@ -393,7 +419,32 @@ bool stateMachine::_get_pick_grasp(void)
     _collision_check->clearAttachedObj();
     _collision_check->disableVisualization();
     if(_r_soln_avail || _l_soln_avail)
-        return true;
+        return true;*/
+
+    _r_soln_avail = true;
+    return true;
+    return false;
+}
+
+bool stateMachine::_lift_obj_with_right_arm(void)
+{
+    _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET);
+    geometry_msgs::Pose pick_pose = _pick_grasp.getWristGlobalPose(_tube->getPose());
+    _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET); //clearance is 3 times of radius
+    geometry_msgs::Pose approach_pose = _pick_grasp.getWristGlobalPose(_tube->getPose());
+    std::vector<double> ik_soln;
+    if(!_arms->getRightArmIK(approach_pose, ik_soln)){
+        ROS_INFO("no IK solution for appraoch pose");
+        return false;
+    }
+    if(!_arms->moveRightArmWithMPlanning(ik_soln)){
+        return false;
+    }
+    return true;
+}
+
+bool stateMachine::_lift_obj_with_left_arm(void)
+{
     return false;
 }
 
@@ -404,7 +455,8 @@ void stateMachine::_print_state(){
     std::cout<<"\n   state = "<<_get_state_str(_state);
     std::cout<<"\n   number of cylinders in tube = "<<_tube->cylinders.size();
     std::cout<<"\n   number of work point clusters = "<<_tube->workPointsCluster.size();
-    std::cout<<"\n   attached obj is has "<<_att_obj.object.shapes.size()<<" shapes";
+    std::cout<<"\n   attached obj has "<<_att_obj->object.shapes.size()<<" shapes";
+    std::cout<<"\n   att_obj_ptr use_count :" <<_att_obj.use_count();
     std::cout<<"\n   table as collision object has "<<_table.shapes.size()<<" shapes";
     std::cout<<"\n   number of clusters = "<<_clusters.size();
     std::cout<<"\n**********************************************************\n";

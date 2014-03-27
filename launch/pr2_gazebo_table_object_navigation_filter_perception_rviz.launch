@@ -19,5 +19,7 @@
   <!-- pr2_interactive_manipulation for rviz -->
   <!--include file="$(find pr2_interactive_manipulation)/launch/pr2_interactive_manipulation_desktop.launch"/-->
 
+  <!--include file="$(find pr2_gripper_sensor_action)/launch/pr2_gripper_sensor_actions.launch"/-->
+
 </launch>
 

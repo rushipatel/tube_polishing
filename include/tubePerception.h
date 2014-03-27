@@ -117,6 +117,8 @@ namespace TubePerception
         arm_navigation_msgs::AttachedCollisionObject
         getAttachedObjForBothGrasps(geometry_msgs::Pose &right_grasp_pose);
 
+        void getCollisionObject(arm_navigation_msgs::CollisionObject &obj);
+
     protected:
         geometry_msgs::Pose _pose;  //in global(base_link) frame.
         geometry_msgs::Pose _actual_pose; //in global(base_link)

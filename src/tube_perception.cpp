@@ -327,6 +327,33 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
     }
 }
 
+void Tube::getCollisionObject(arm_navigation_msgs::CollisionObject &obj)
+{
+    obj.header.frame_id = "/base_link";
+    obj.header.stamp = ros::Time::now();
+    obj.id = "static_tube";
+    obj.operation.operation = obj.operation.ADD;
+    //obj.padding = 1.0;
+    arm_navigation_msgs::Shape cyl_shape;
+    cyl_shape.type = arm_navigation_msgs::Shape::CYLINDER;
+    cyl_shape.dimensions.resize(2);
+    cyl_shape.dimensions[0] = 0; // radius
+    cyl_shape.dimensions[1] = 0; // length
+
+    geometry_msgs::Pose pose;
+    tf::Transform tube2cyl, tube = getTransform(), cyl;
+    for(size_t i=0; i<cylinders.size(); i++){
+        pose = cylinders[i].getPose();
+        tube2cyl = pose2tf(pose);
+        cyl = tube * tube2cyl;
+        pose = tf2pose(cyl);
+        cyl_shape.dimensions[0] = cylinders[i].radius;
+        cyl_shape.dimensions[1] = cylinders[i].getAxisLength();
+        obj.shapes.push_back(cyl_shape);
+        obj.poses.push_back(pose);
+    }
+}
+
 void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
 {
     markerArray.markers.clear();
