@@ -486,25 +486,42 @@ void GraspAnalysis::_test_pairs_for_ik()
 {
     TubeManipulation::Arms manip(_nh);
 
-    int idx;
+    unsigned int idx;
     unsigned long test_grasps=0;
 
-    ROS_INFO_STREAM("Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
+
     GraspPair gp;
 
-    unsigned long it=MAX_ITERATION;
-    _valid_pairs->graspPairs.reserve(MAX_TEST_GRASPS);
+    std::vector<unsigned int> indices(_test_pairs->graspPairs.size()), rand_indices;
+
+    for(unsigned int i=0; i<_test_pairs->graspPairs.size(); i++){
+        indices[i] = i;
+    }
+    unsigned int idx_of_indices;
+    for(unsigned int i=0; i<MAX_ITERATION; i++){
+        idx_of_indices = rand()%(indices.size());
+        rand_indices.push_back(indices[idx_of_indices]);
+        indices.erase(indices.begin() + idx_of_indices);
+        ROS_INFO("Size of indices : %d",indices.size());
+    }
+
+    //unsigned long it=MAX_ITERATION;
+    _valid_pairs->graspPairs.reserve(rand_indices.size());
     std::string ss;
     TubeManipulation::CollisionCheck::Ptr collision_check(new TubeManipulation::CollisionCheck(_nh));
-    while(it>0)
+    collision_check->enableVisualization();
+    arm_navigation_msgs::AttachedCollisionObject::Ptr att_obj_ptr(new arm_navigation_msgs::AttachedCollisionObject);
+
+    ROS_INFO_STREAM("Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
+    ROS_INFO_STREAM("Press 'q' to interrupt computation and continue with available valid pair(s)");
+    for(unsigned int i=0; i<rand_indices.size(); i++)
     {
-        it--;
-        idx = rand()%(_test_pairs->graspPairs.size()+1);
+        //it--;
+        //idx = rand()%(_test_pairs->graspPairs.size()+1);
+        idx = rand_indices[i];
         gp = _test_pairs->graspPairs[idx];
         geometry_msgs::Pose right_wrist_pose = gp.rightGrasp.getWristPose(), left_wrist_pose=gp.leftGrasp.getWristPose();
-        arm_navigation_msgs::AttachedCollisionObject att_obj = _tube->getAttachedObjForBothGrasps(right_wrist_pose);
-        arm_navigation_msgs::AttachedCollisionObject::Ptr att_obj_ptr =
-                boost::make_shared<arm_navigation_msgs::AttachedCollisionObject>(att_obj);
+        _tube->getAttachedObjForBothGrasps(right_wrist_pose,att_obj_ptr);
         collision_check->setAttachedObjPtr(att_obj_ptr);
         if(manip.genTrajectory(collision_check, _tube_traj,right_wrist_pose, left_wrist_pose, gp.qRight, gp.qLeft)){
             gp.isValid = true;
@@ -516,13 +533,15 @@ void GraspAnalysis::_test_pairs_for_ik()
         else{
             //fail_cnt++;
         }
-        std::cout<<"\r["<<MAX_ITERATION-it<<'\t'<<test_grasps<<']'<<std::flush;
+        std::cout<<"\r"<<MAX_ITERATION-i<<" -> "<<test_grasps<<std::flush;
+        if(kbhit()){
+            ss.clear();
+            std::cin>>ss;
+            if(ss.compare("q")==0){
+                break;
+            }
+        }
         //std::cout<<"\rpres 'q' to continue  ["<<MAX_ITERATION-it<<'\t'<<test_grasps<<']'<<std::flush;
-        /*ss.clear();
-        std::cin>>ss;
-        if(ss.compare("q")==0){
-            break;
-        }*/
     }
     std::cout<<'\n';
     if(!_valid_pairs->graspPairs.empty()){

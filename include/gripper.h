@@ -3,132 +3,91 @@
 
 #include <ros/ros.h>
 #include <pr2_controllers_msgs/Pr2GripperCommandAction.h>
+#include <pr2_controllers_msgs/Pr2GripperCommandActionResult.h>
+#include <pr2_gripper_sensor_msgs/PR2GripperGrabAction.h>
 #include <actionlib/client/simple_action_client.h>
+#include <pr2_controllers_msgs/JointControllerState.h>
+
+#define GRPR_LGRNM "Gripper"
 
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction> GripperClient;
 
 class Gripper
 {
 public:
-    Gripper();
+    Gripper(ros::NodeHandlePtr nh);
+    ~Gripper();
     bool openRightGripper(void);
     bool openLeftGripper(void);
     bool closeRightGripper(void);
     bool closeLeftGripper(void);
-    bool setRightGripperPosition(double position, double effort=50);
-    bool setLeftGripperPosition(double position, double effort=50);
-
+    bool setRightGripperPosition(double position, double effort);
+    bool setLeftGripperPosition(double position, double effort);
+    void setTimeoutValue(int sec);
+    void setMinimumError(double err);
+    typedef boost::shared_ptr<Gripper> Ptr;
 private:
+    ros::NodeHandlePtr _nh;
     GripperClient* _grpr_clnt_r;
     GripperClient* _grpr_clnt_l;
+    int _timeout;
+    double _joint_state_err;
 };
 
 
-Gripper::Gripper()
+Gripper::Gripper(ros::NodeHandlePtr nh)
 {
+    _nh = nh;
     _grpr_clnt_r = new GripperClient("r_gripper_controller/gripper_action",true);
     while(!_grpr_clnt_r->waitForServer(ros::Duration(5.0)))
-        ROS_INFO("Waiting for r_gripper_controller/gripper_action action server");
+        ROS_INFO_NAMED(GRPR_LGRNM,"Waiting for r_gripper_controller/gripper_action action server");
 
     _grpr_clnt_l = new GripperClient("l_gripper_controller/gripper_action",true);
     while(!_grpr_clnt_l->waitForServer(ros::Duration(5.0)))
-        ROS_INFO("Waiting for l_gripper_controller/gripper_action action server");
+        ROS_INFO_NAMED(GRPR_LGRNM,"Waiting for l_gripper_controller/gripper_action action server");
+    _timeout = 15;
+    _joint_state_err = 0.005;
+}
+
+Gripper::~Gripper(){
+    delete _grpr_clnt_r;
+    delete _grpr_clnt_l;
+}
+
+void Gripper::setTimeoutValue(int sec){
+    _timeout = sec;
+}
+
+void Gripper::setMinimumError(double err){
+    _joint_state_err = err;
 }
 
 bool Gripper::openRightGripper()
 {
-    pr2_controllers_msgs::Pr2GripperCommandGoal goal;
-    goal.command.max_effort = -1;
-    goal.command.position = 0.07;
-    _grpr_clnt_r->sendGoal(goal);
-    //_grpr_clnt_r->waitForResult(ros::Duration(30));
-
-    //ros::Time start = ros::Time::now();
-    ros::Time stop_time = ros::Time::now() + ros::Duration(10);
-    while(ros::Time::now()<stop_time && ros::ok()){
-        actionlib::SimpleClientGoalState goal_state(_grpr_clnt_r->getState());
-        if(goal_state == goal_state.SUCCEEDED)
-            break;
-        ROS_DEBUG_STREAM("right gripper state is "<<goal_state.toString()<<" waiting..");
-        ros::Duration(0.2).sleep();
-    }
-    if(!(_grpr_clnt_r->getState() == actionlib::SimpleClientGoalState::SUCCEEDED))
-    {
-        ROS_INFO("Gripper - Right gripper failed to open!");
-        return false;
-    }
-    return true;
+    double effort = -1;
+    double position = 0.7;
+    return setRightGripperPosition(position, effort);
 }
 
 bool Gripper::openLeftGripper()
 {
-    pr2_controllers_msgs::Pr2GripperCommandGoal goal;
-    goal.command.max_effort = -1;
-    goal.command.position = 0.07;
-    _grpr_clnt_l->sendGoal(goal);
-    //_grpr_clnt_l->waitForResult(ros::Duration(30));
-
-    ros::Time stop_time = ros::Time::now() + ros::Duration(10);
-    while(ros::Time::now()<stop_time && ros::ok()){
-        actionlib::SimpleClientGoalState goal_state(_grpr_clnt_l->getState());
-        if(goal_state == goal_state.SUCCEEDED)
-            break;
-        ROS_DEBUG_STREAM("Left gripper state is "<<goal_state.toString()<<" waiting...");
-        ros::Duration(0.2).sleep();
-    }
-
-    if(!(_grpr_clnt_l->getState() == actionlib::SimpleClientGoalState::SUCCEEDED))
-    {
-        ROS_INFO("Gripper - Left gripper failed to open!");
-        return false;
-    }
-    return true;
+    double effort = -1;
+    double position = 0.7;
+    return setLeftGripperPosition(position, effort);
 }
 
 bool Gripper::closeRightGripper()
 {
-    pr2_controllers_msgs::Pr2GripperCommandGoal goal;
-    goal.command.max_effort = 50;
-    goal.command.position = 0.001;
-    _grpr_clnt_r->sendGoal(goal);
-    //_grpr_clnt_r->waitForResult();
-    ros::Time stop_time = ros::Time::now() + ros::Duration(10);
-    while(ros::Time::now()<stop_time && ros::ok()){
-        actionlib::SimpleClientGoalState goal_state(_grpr_clnt_r->getState());
-        if(goal_state == goal_state.SUCCEEDED)
-            break;
-        ROS_DEBUG_STREAM("Left gripper state is "<<goal_state.toString()<<" waiting..");
-        ros::Duration(0.2).sleep();
-    }
-    if(!(_grpr_clnt_r->getState() == actionlib::SimpleClientGoalState::SUCCEEDED))
-    {
-        ROS_ERROR("Gripper - Right gripper failed to close!");
-        return false;
-    }
-    return true;
+    double effort = 500;
+    double position = 0.001;
+    return setRightGripperPosition(position, effort);
 }
 
 bool Gripper::closeLeftGripper()
 {
-    pr2_controllers_msgs::Pr2GripperCommandGoal goal;
-    goal.command.max_effort = 50;
-    goal.command.position = 0.001;
-    _grpr_clnt_l->sendGoal(goal);
-    //_grpr_clnt_l->waitForResult();
-    ros::Time stop_time = ros::Time::now() + ros::Duration(10);
-    while(ros::Time::now()<stop_time && ros::ok()){
-        actionlib::SimpleClientGoalState goal_state(_grpr_clnt_l->getState());
-        if(goal_state == goal_state.SUCCEEDED)
-            break;
-        ROS_DEBUG_STREAM("Left gripper state is "<<goal_state.toString()<<" waiting..");
-        ros::Duration(0.2).sleep();
-    }
-    if(!(_grpr_clnt_l->getState() == actionlib::SimpleClientGoalState::SUCCEEDED))
-    {
-        ROS_ERROR("Gripper - Right gripper failed to close!");
-        return false;
-    }
-    return true;
+    double effort = 500;
+    double position = 0.001;
+    return setLeftGripperPosition(position, effort);
 }
 
 bool Gripper::setRightGripperPosition(double position, double effort)
@@ -136,22 +95,30 @@ bool Gripper::setRightGripperPosition(double position, double effort)
     pr2_controllers_msgs::Pr2GripperCommandGoal goal;
     goal.command.max_effort = effort;
     goal.command.position = position;
+
     _grpr_clnt_r->sendGoal(goal);
-    //_grpr_clnt_r->waitForResult();
-    ros::Time stop_time = ros::Time::now() + ros::Duration(10);
-    while(ros::Time::now()<stop_time && ros::ok()){
-        actionlib::SimpleClientGoalState goal_state(_grpr_clnt_r->getState());
-        if(goal_state == goal_state.SUCCEEDED)
-            break;
-        ROS_DEBUG_STREAM("Left gripper state is "<<goal_state.toString()<<" waiting..");
+
+    _grpr_clnt_r->waitForResult(ros::Duration(_timeout));
+
+    ros::Time stop_time = ros::Time::now() + ros::Duration(_timeout);
+    while(ros::ok() && ros::Time::now()<stop_time){
+        pr2_controllers_msgs::JointControllerStateConstPtr state =
+                ros::topic::waitForMessage<pr2_controllers_msgs::JointControllerState>
+                ("r_gripper_controller/state", *_nh);
+        if(state->error<_joint_state_err){
+            ROS_DEBUG_NAMED(GRPR_LGRNM,"Gripper set before timeout");
+            return true;
+        }
+        ROS_INFO_NAMED(GRPR_LGRNM,"Right gripper joint state error: %f",state->error);
         ros::Duration(0.2).sleep();
     }
-    if(!(_grpr_clnt_r->getState() == actionlib::SimpleClientGoalState::SUCCEEDED))
-    {
-        ROS_ERROR("Gripper - Right gripper failed to set position!");
-        return false;
-    }
-    return true;
+
+//    if(!(_grpr_clnt_r->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)){
+//        ROS_ERROR("Gripper - Right gripper failed to set position!");
+//        return false;
+//    }
+    ROS_WARN_NAMED(GRPR_LGRNM,"Right gripper action timeout (%d Seconds)",_timeout);
+    return false;
 }
 
 bool Gripper::setLeftGripperPosition(double position, double effort)
@@ -160,21 +127,29 @@ bool Gripper::setLeftGripperPosition(double position, double effort)
     goal.command.max_effort = effort;
     goal.command.position = position;
     _grpr_clnt_l->sendGoal(goal);
-    //_grpr_clnt_l->waitForResult();
-    ros::Time stop_time = ros::Time::now() + ros::Duration(10);
-    while(ros::Time::now()<stop_time && ros::ok()){
-        actionlib::SimpleClientGoalState goal_state(_grpr_clnt_l->getState());
-        if(goal_state == goal_state.SUCCEEDED)
-            break;
-        ROS_DEBUG_STREAM("Left gripper state is "<<goal_state.toString()<<" waiting..");
+
+    _grpr_clnt_l->waitForResult(ros::Duration(_timeout));
+
+    ros::Time stop_time = ros::Time::now() + ros::Duration(_timeout);
+    while(ros::ok() && ros::Time::now()<stop_time){
+        pr2_controllers_msgs::JointControllerStateConstPtr state =
+                ros::topic::waitForMessage<pr2_controllers_msgs::JointControllerState>
+                ("l_gripper_controller/state", *_nh);
+        if(state->error<_joint_state_err){
+            ROS_DEBUG_NAMED(GRPR_LGRNM,"Gripper set before timeout");
+            return true;
+        }
+        ROS_INFO_NAMED(GRPR_LGRNM,"Left gripper joint state error: %f",state->error);
         ros::Duration(0.2).sleep();
     }
-    if(!(_grpr_clnt_l->getState() == actionlib::SimpleClientGoalState::SUCCEEDED))
-    {
-        ROS_ERROR("Gripper - Left gripper failed to set position!");
-        return false;
-    }
-    return true;
+
+//    if(!(_grpr_clnt_l->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)){
+//        ROS_ERROR("Gripper - Left gripper failed to set position!");
+//        return false;
+//    }
+
+    ROS_WARN_NAMED(GRPR_LGRNM,"Left gripper action timeout (%d Seconds)",_timeout);
+    return false;
 }
 #endif // GRIPPER_H
 

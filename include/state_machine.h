@@ -47,8 +47,10 @@ private:
     TubePerception::CloudProcessing::Ptr _cloud_process;
     TubeGrasp::GraspAnalysis::Ptr _grasp_analysis;
     robotHead _head;
-    Gripper _gripper;
+    Gripper::Ptr _gripper;
     TubeGrasp::GraspPair _computed_grasp_pair;
+    TubeGrasp::Grasp _current_right_grasp;
+    TubeGrasp::Grasp _current_left_grasp;
     TubeManipulation::CollisionCheck::Ptr _collision_check;
     TubeGrasp::Grasp _pick_grasp;
 
@@ -82,8 +84,12 @@ private:
     bool _get_pick_grasp(void);
     bool _lift_obj_with_right_arm(void);
     bool _lift_obj_with_left_arm(void);
-    void _add_tube_to_collision_space(void);
-    void _remove_tube_from_collision_space(void);
+//    void _add_tube_to_collision_space(void);
+//    void _remove_tube_from_collision_space(void);
+//    void _add_table_to_collision_space(void);
+//    void _remove_table_from_collision_space(void);
+    void _get_attached_obj();
+    bool _regrasp();
 };
 
 

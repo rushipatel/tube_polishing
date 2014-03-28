@@ -4,6 +4,7 @@
 #include <geometry_msgs/Pose.h>
 #include <tf/tf.h>
 //#include <arm_navigation_msgs/ArmNavigationErrorCodes.h>
+#include <sys/select.h>
 
 geometry_msgs::Pose tf2pose(const tf::Transform &t)
 {
@@ -32,6 +33,25 @@ tf::Transform pose2tf(const geometry_msgs::Pose &p)
     t.setOrigin(tf::Vector3(p.position.x, p.position.y, p.position.z));
     t.setRotation(q);
     return t;
+}
+
+bool kbhit(void)
+{
+    struct timeval tv;
+    fd_set read_fd;
+
+    tv.tv_sec=0;
+    tv.tv_usec=0;
+    FD_ZERO(&read_fd);
+    FD_SET(0,&read_fd);
+
+    if(select(1, &read_fd, NULL, NULL, &tv) == -1)
+    return 0;
+
+    if(FD_ISSET(0,&read_fd))
+    return 1;
+
+    return 0;
 }
 
 /*std::string armNavigationErrorCodeToString(arm_navigation_msgs::ArmNavigationErrorCodes &error_code)

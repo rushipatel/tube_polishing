@@ -131,6 +131,7 @@ class Arms : public Trajectory
 {
 public:
     Arms(ros::NodeHandlePtr rh);
+    ~Arms();
     bool genTrajectory(CollisionCheck::Ptr collision_check_ptr,
                        geometry_msgs::PoseArray &objPoseArray,
                        geometry_msgs::Pose &rightArmOffset,

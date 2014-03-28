@@ -108,21 +108,21 @@ namespace TubePerception
         void getCylinderMarker(visualization_msgs::MarkerArray &markerArray);
         void getCylinderPoses(geometry_msgs::PoseArray &pose_array);
 
-        arm_navigation_msgs::AttachedCollisionObject
-        getAttachedObjForRightGrasp(geometry_msgs::Pose &right_grasp_pose);
+        void getAttachedObjForRightGrasp(geometry_msgs::Pose right_grasp_pose,
+                                    arm_navigation_msgs::AttachedCollisionObject::Ptr objPtr);
 
-        arm_navigation_msgs::AttachedCollisionObject
-        getAttachedObjForLeftGrasp(geometry_msgs::Pose &left_grasp_pose);
+        void getAttachedObjForLeftGrasp(geometry_msgs::Pose left_grasp_pose,
+                                   arm_navigation_msgs::AttachedCollisionObject::Ptr objPtr);
 
-        arm_navigation_msgs::AttachedCollisionObject
-        getAttachedObjForBothGrasps(geometry_msgs::Pose &right_grasp_pose);
+        void getAttachedObjForBothGrasps(geometry_msgs::Pose right_grasp_pose,
+                                    arm_navigation_msgs::AttachedCollisionObject::Ptr objPtr);
 
         void getCollisionObject(arm_navigation_msgs::CollisionObject &obj);
 
     protected:
         geometry_msgs::Pose _pose;  //in global(base_link) frame.
         geometry_msgs::Pose _actual_pose; //in global(base_link)
-        void _get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj,
+        void _get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject::Ptr obj_ptr,
                                             geometry_msgs::Pose &grasp_pose,
                                             std::string link_name,
                                             bool right_side, bool left_side);

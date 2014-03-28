@@ -238,80 +238,79 @@ unsigned int Tube::whichCylinder(PointT point)
     return cylinders.size();
 }
 
-//pre requisites: right and/or left grasp
-arm_navigation_msgs::AttachedCollisionObject
-Tube::getAttachedObjForRightGrasp(geometry_msgs::Pose &right_grasp_pose){
-    arm_navigation_msgs::AttachedCollisionObject obj;
-    _get_attached_collision_object(obj, right_grasp_pose, "r_wrist_roll_link", true, false);
-    return obj;
+void Tube::getAttachedObjForRightGrasp(geometry_msgs::Pose right_grasp_pose,
+                                  arm_navigation_msgs::AttachedCollisionObject::Ptr objPtr){
+    _get_attached_collision_object(objPtr, right_grasp_pose, "r_wrist_roll_link", true, false);
 }
 
-arm_navigation_msgs::AttachedCollisionObject
-Tube::getAttachedObjForLeftGrasp(geometry_msgs::Pose &left_grasp_pose){
-    arm_navigation_msgs::AttachedCollisionObject obj;
-    _get_attached_collision_object(obj, left_grasp_pose, "l_wrist_roll_link", false, true);
-    return obj;
+void Tube::getAttachedObjForLeftGrasp(geometry_msgs::Pose left_grasp_pose,
+                                 arm_navigation_msgs::AttachedCollisionObject::Ptr objPtr){
+    _get_attached_collision_object
+            (objPtr, left_grasp_pose, "l_wrist_roll_link", false, true);
 }
 
-arm_navigation_msgs::AttachedCollisionObject
-Tube::getAttachedObjForBothGrasps(geometry_msgs::Pose &right_grasp_pose){
-    arm_navigation_msgs::AttachedCollisionObject obj;
-    _get_attached_collision_object(obj, right_grasp_pose, "r_wrist_roll_link", true, true);
-    return obj;
+void Tube::getAttachedObjForBothGrasps(geometry_msgs::Pose right_grasp_pose,
+                                  arm_navigation_msgs::AttachedCollisionObject::Ptr objPtr){
+    _get_attached_collision_object
+            (objPtr, right_grasp_pose, "r_wrist_roll_link", true, true);
 }
 
 //from grasp to tube
-void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject &obj, 
+void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollisionObject::Ptr obj_ptr,
                                           geometry_msgs::Pose &grasp_pose,
                                           std::string link_name,
                                           bool right_side, bool left_side)
 {
-    obj.link_name = link_name.c_str();
-    obj.object.header.frame_id = link_name.c_str();
+    obj_ptr->link_name = link_name.c_str();
+    obj_ptr->object.header.frame_id = link_name.c_str();
 
     if(link_name.compare("r_wrist_roll_link")==0)
         right_side = true;
     if(link_name.compare("l_wrist_roll_link")==0)
         left_side = true;
 
+    obj_ptr->touch_links.clear();
     if(right_side){
-        //obj.touch_links.push_back("r_end_effector");
-        obj.touch_links.push_back("r_gripper_palm_link");
-        obj.touch_links.push_back("r_gripper_l_finger_link");
-        obj.touch_links.push_back("r_gripper_l_finger_tip_link");
-        obj.touch_links.push_back("r_gripper_motor_accelerometer_link");
-        obj.touch_links.push_back("r_gripper_led_frame");
-        obj.touch_links.push_back("r_gripper_motor_slider_link");
-        obj.touch_links.push_back("r_gripper_motor_screw_link");
-        obj.touch_links.push_back("r_gripper_r_finger_link");
-        obj.touch_links.push_back("r_gripper_r_finger_tip_link");
-        obj.touch_links.push_back("r_gripper_l_finger_tip_frame");
-        obj.touch_links.push_back("r_gripper_tool_frame");
+        //obj_ptr->touch_links.push_back("r_end_effector");
+        obj_ptr->touch_links.push_back("r_gripper_palm_link");
+        obj_ptr->touch_links.push_back("r_gripper_l_finger_link");
+        obj_ptr->touch_links.push_back("r_gripper_l_finger_tip_link");
+        obj_ptr->touch_links.push_back("r_gripper_motor_accelerometer_link");
+        obj_ptr->touch_links.push_back("r_gripper_led_frame");
+        obj_ptr->touch_links.push_back("r_gripper_motor_slider_link");
+        obj_ptr->touch_links.push_back("r_gripper_motor_screw_link");
+        obj_ptr->touch_links.push_back("r_gripper_r_finger_link");
+        obj_ptr->touch_links.push_back("r_gripper_r_finger_tip_link");
+        obj_ptr->touch_links.push_back("r_gripper_l_finger_tip_frame");
+        obj_ptr->touch_links.push_back("r_gripper_tool_frame");
     }
     if(left_side){
-        //obj.touch_links.push_back("l_end_effector");
-        obj.touch_links.push_back("l_gripper_palm_link");
-        obj.touch_links.push_back("l_gripper_l_finger_link");
-        obj.touch_links.push_back("l_gripper_l_finger_tip_link");
-        obj.touch_links.push_back("l_gripper_motor_accelerometer_link");
-        obj.touch_links.push_back("l_gripper_led_frame");
-        obj.touch_links.push_back("l_gripper_motor_slider_link");
-        obj.touch_links.push_back("l_gripper_motor_screw_link");
-        obj.touch_links.push_back("l_gripper_r_finger_link");
-        obj.touch_links.push_back("l_gripper_r_finger_tip_link");
-        obj.touch_links.push_back("l_gripper_l_finger_tip_frame");
-        obj.touch_links.push_back("l_gripper_tool_frame");
+        //obj_ptr->touch_links.push_back("l_end_effector");
+        obj_ptr->touch_links.push_back("l_gripper_palm_link");
+        obj_ptr->touch_links.push_back("l_gripper_l_finger_link");
+        obj_ptr->touch_links.push_back("l_gripper_l_finger_tip_link");
+        obj_ptr->touch_links.push_back("l_gripper_motor_accelerometer_link");
+        obj_ptr->touch_links.push_back("l_gripper_led_frame");
+        obj_ptr->touch_links.push_back("l_gripper_motor_slider_link");
+        obj_ptr->touch_links.push_back("l_gripper_motor_screw_link");
+        obj_ptr->touch_links.push_back("l_gripper_r_finger_link");
+        obj_ptr->touch_links.push_back("l_gripper_r_finger_tip_link");
+        obj_ptr->touch_links.push_back("l_gripper_l_finger_tip_frame");
+        obj_ptr->touch_links.push_back("l_gripper_tool_frame");
     }
 
-    obj.object.id = "tube";
-    obj.object.header.stamp = ros::Time::now();
-    obj.object.operation.operation = arm_navigation_msgs::CollisionObjectOperation::ADD;
+    obj_ptr->object.id = "tube";
+    obj_ptr->object.header.stamp = ros::Time::now();
+    obj_ptr->object.operation.operation = arm_navigation_msgs::CollisionObjectOperation::ADD;
+
     arm_navigation_msgs::Shape cyl_shape;
     cyl_shape.type = arm_navigation_msgs::Shape::CYLINDER;
     cyl_shape.dimensions.resize(2);
     cyl_shape.dimensions[0] = 0; // radius
     cyl_shape.dimensions[1] = 0; // length
 
+    obj_ptr->object.shapes.clear();
+    obj_ptr->object.poses.clear();
     geometry_msgs::Pose pose;
     tf::Transform tube2cyl, wrist2cyl, tube2wrist = pose2tf(grasp_pose);
     for(size_t i=0; i<cylinders.size(); i++){
@@ -322,8 +321,8 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
         pose = tf2pose(wrist2cyl);
         cyl_shape.dimensions[0] = cylinders[i].radius;
         cyl_shape.dimensions[1] = cylinders[i].getAxisLength();
-        obj.object.shapes.push_back(cyl_shape);
-        obj.object.poses.push_back(pose);
+        obj_ptr->object.shapes.push_back(cyl_shape);
+        obj_ptr->object.poses.push_back(pose);
     }
 }
 
@@ -667,7 +666,7 @@ void CloudProcessing::_generate_work_vectors()
     double l = (double)rand()/(double)RAND_MAX; // Not working. Always generates 0.840188
     l = 0.5;
     
-    int cyl_idx = rand()%(_tube->cylinders.size()+1);
+    int cyl_idx = 0;//rand()%(_tube->cylinders.size()+1);
     //cyl_idx = 1;
 
     tf::Vector3 axis = _tube->cylinders[cyl_idx].getAxisVector();

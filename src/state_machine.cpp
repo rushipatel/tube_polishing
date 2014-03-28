@@ -18,6 +18,7 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
 
     _att_obj.reset(new arm_navigation_msgs::AttachedCollisionObject);
 
+    _gripper.reset(new Gripper(_nh));
     _arms.reset(new TubeManipulation::Arms(_nh));
     _arms->setAttachedObjPtr(_att_obj);
     _cloud_process.reset(new TubePerception::CloudProcessing);
@@ -78,10 +79,11 @@ void stateMachine::start()
         {
             ROS_INFO_NAMED(LGRNM,"*Initializing...");
             _set_planning_scn();
-            _gripper.openRightGripper();
-            _gripper.openLeftGripper();
+            _gripper->openRightGripper();
+            _gripper->openLeftGripper();
             if(!_move_arm_to_home_position("both_arms")){
                 _state = ERR;
+                break;
             }
             _head.lookAt(0.75,0.0,0.5);
             _state = PERCIEVE;
@@ -102,7 +104,8 @@ void stateMachine::start()
                 break;
             }
             _publish_tube();
-            _add_tube_to_collision_space();
+            //_add_tube_to_collision_space();
+            _set_planning_scn();
             //TODO: get_attached_obj;
             _state = GRASP_ANLYS;
             ROS_INFO_NAMED(LGRNM,"*Generated tube and published table");
@@ -144,8 +147,8 @@ void stateMachine::start()
                 }
             }
             if(_l_soln_avail){
-                if(_arms->moveLeftArmWithMPlanning(_pick_grasp.getWristGlobalPose(_tube->getPose()))){
-                    //TODO: handle pcik sequence;
+                /*if(_arms->moveLeftArmWithMPlanning(_pick_grasp.getWristGlobalPose(_tube->getPose()))){
+                    //TODO: handle lift sequence;
                 }
                 else{
                     _l_soln_avail = false;
@@ -153,7 +156,7 @@ void stateMachine::start()
                         _state = ERR;
                     }
                     break;
-                }
+                }*/
             }
             _state = REGRASP;
             break;
@@ -161,7 +164,11 @@ void stateMachine::start()
         case REGRASP:
         {
             ROS_INFO("*Regrasping...");
-            _remove_tube_from_collision_space();
+            _current_left_grasp = _computed_grasp_pair.leftGrasp;
+            if(!_regrasp()){
+                _state = ERR;
+                break;
+            }
             _state = DONE;
             break;
         }
@@ -200,10 +207,19 @@ void stateMachine::start()
 }
 
 void stateMachine::_set_planning_scn(void){
+    _get_attached_obj();
     arm_navigation_msgs::SetPlanningSceneDiff::Request req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response res;
     if(!_att_obj->object.shapes.empty()){
         req.planning_scene_diff.attached_collision_objects.push_back(*_att_obj);
+    }
+    if(!_table.shapes.empty()){
+        req.planning_scene_diff.collision_objects.push_back(_table);
+    }
+    if(!(_tube->cylinders.empty() || _att2right || _att2left)){
+        arm_navigation_msgs::CollisionObject tube;
+        _tube->getCollisionObject(tube);;
+        req.planning_scene_diff.collision_objects.push_back(tube);
     }
     if(!_set_pln_scn.call(req,res)){
         ROS_WARN_NAMED(LGRNM,"Couldn't set planning scene");
@@ -261,7 +277,6 @@ bool stateMachine::_get_clusters(void){
                         _clusters.push_back(pc2);
                     }
                     _extract_table_from_msg(seg_srv);
-                    _collision_obj_pub.publish(_table);
                 }
                 else{
                     ROS_ERROR_NAMED(LGRNM,"Segmentation service returned error %d", seg_srv.response.result);
@@ -326,8 +341,21 @@ void stateMachine::_extract_table_from_msg(tabletop_object_detector::TabletopSeg
     box.dimensions[2] = 0.025;
 
     _table.shapes.push_back(box);
+}
 
+/*void stateMachine::_remove_table_from_collision_space(){
+    _table.id = "Table";
+    _table.operation.operation = _table.operation.REMOVE;
     _collision_obj_pub.publish(_table);
+}
+
+void stateMachine::_add_table_to_collision_space(){
+    if(_table.shapes.empty()){
+        return;
+    }
+    else{
+        _collision_obj_pub.publish(_table);
+    }
 }
 
 void stateMachine::_add_tube_to_collision_space(){
@@ -343,7 +371,7 @@ void stateMachine::_remove_tube_from_collision_space(){
     }
     _tube_collision_obj.operation.operation = _tube_collision_obj.operation.REMOVE;
     _collision_obj_pub.publish(_tube_collision_obj);
-}
+}*/
 
 void stateMachine::_publish_tube(void){
     visualization_msgs::MarkerArray marker_array;
@@ -426,26 +454,110 @@ bool stateMachine::_get_pick_grasp(void)
     return false;
 }
 
+void stateMachine::_get_attached_obj(){
+    if(_att2right && _att2left){
+       _tube->getAttachedObjForBothGrasps(_current_right_grasp.getWristPose(), _att_obj);
+    }
+    else if(_att2right){
+       _tube->getAttachedObjForRightGrasp(_current_right_grasp.getWristPose(), _att_obj);
+    }
+    else if(_att2left){
+       _tube->getAttachedObjForLeftGrasp(_current_left_grasp.getWristPose(), _att_obj);
+    }
+    else{
+        _att_obj->object.shapes.clear();
+    }
+}
+
 bool stateMachine::_lift_obj_with_right_arm(void)
 {
-    _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET);
-    geometry_msgs::Pose pick_pose = _pick_grasp.getWristGlobalPose(_tube->getPose());
-    _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET); //clearance is 3 times of radius
+    _set_planning_scn();
+    ROS_INFO_NAMED(LGRNM,"Lifting object with right arm...");
+    _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET+
+                               (_tube->cylinders[_pick_grasp.cylinderIdx].radius*4)); //clearance is 3 times of radius
     geometry_msgs::Pose approach_pose = _pick_grasp.getWristGlobalPose(_tube->getPose());
     std::vector<double> ik_soln;
     if(!_arms->getRightArmIK(approach_pose, ik_soln)){
-        ROS_INFO("no IK solution for appraoch pose");
+        ROS_INFO_NAMED(LGRNM,"no IK solution for appraoch pose");
         return false;
     }
     if(!_arms->moveRightArmWithMPlanning(ik_soln)){
         return false;
     }
+    _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET);
+    geometry_msgs::Pose pick_pose = _pick_grasp.getWristGlobalPose(_tube->getPose());
+    if(!_arms->simpleMoveRightArm(pick_pose)){
+        return false;
+    }
+    if(!_gripper->setRightGripperPosition(_tube->cylinders[_pick_grasp.cylinderIdx].radius*1.85, -1)){
+        return false;
+    }
+    _att2right = true;
+    _current_right_grasp = _pick_grasp;
+    if(!_arms->simpleMoveRightArm(approach_pose)){
+        return false;
+    }
+    tf::Transform tube, wrist=pose2tf(approach_pose), grasp = pose2tf(_pick_grasp.getWristPose());
+    tube = wrist * grasp.inverse();
+    geometry_msgs::Pose new_tube_pose = tf2pose(tube);
+    _tube->setPose(new_tube_pose);
+    _tube->setPoseAsActualPose();
+    _set_planning_scn();
+    ROS_INFO_NAMED(LGRNM,"Lifted object with right arm");
     return true;
 }
 
 bool stateMachine::_lift_obj_with_left_arm(void)
 {
     return false;
+}
+
+// requires att2* only one bit set
+// _current_right_grasp
+// _current_left_grasp
+bool stateMachine::_regrasp(){
+    if(_att2right&&_att2left){
+        ROS_WARN_NAMED(LGRNM,"Can not regrasp. Attached to both hands!");
+        return false;
+    }
+
+    if(_att2right){
+        geometry_msgs::Pose new_pose;  //tube's new pose
+        std::vector<double> ik_soln;
+        if(!_arms->getRegraspPoseRight(_att_obj,
+                                       _current_right_grasp.getWristPose(),
+                                       _arms->getRightArmFK(),
+                                       _computed_grasp_pair.leftGrasp.getWristPose(),
+                                       new_pose, ik_soln)){
+            return false;
+        }
+        _tube->setPose(new_pose);
+        _tube->setPoseAsActualPose();
+        new_pose = _current_right_grasp.getWristGlobalPose(new_pose);//new pose of wrist
+        if(!_arms->moveRightArmWithMPlanning(new_pose)){
+            return false;
+        }
+        ROS_INFO_NAMED(LGRNM,"Moved to new pose for regrasping");
+
+        //move left arm to _computed_grasp_pair.leftGrasp.wristPose
+        if(!_arms->moveLeftArmWithMPlanning(ik_soln)){
+            return false;
+        }
+        ROS_INFO_NAMED(LGRNM,"Moved left are to new grasp pose");
+        //close left gripper
+        if(!_gripper->setLeftGripperPosition(_tube->cylinders[_pick_grasp.cylinderIdx].radius*1.9, -1)){
+            return false;
+        }
+        if(!_gripper->openRightGripper()){
+            return false;
+        }
+        _att2left = true;
+        _att2right = false;
+        _current_left_grasp =  _computed_grasp_pair.leftGrasp;
+        _get_attached_obj();
+        _set_planning_scn();
+        _move_arm_to_home_position("right_arm");
+    }
 }
 
 void stateMachine::_print_state(){
