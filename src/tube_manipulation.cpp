@@ -668,7 +668,7 @@ void TubeManipulation::Arms::_set_planning_scene(void){
     else{
         ROS_WARN_NAMED(ARMS_LGRNM,"Attached Object Pointer is NULL!");
     }
-    if(_set_pln_scn_client.call(req,res)){
+    if(!_set_pln_scn_client.call(req,res)){
         ROS_ERROR_NAMED(ARMS_LGRNM,"Couldn't set planning scene");
     }
 }
@@ -1544,7 +1544,7 @@ bool TubeManipulation::Arms::getRegraspPoseRight(arm_navigation_msgs::AttachedCo
         q.setRPY(r,p,y);
 
         // bounding box to move around
-        double x_min = 0,
+        double x_min = -0.25,
                 x_max = 0,
                 y_min = -0.25,
                 y_max = 0.25,
@@ -1565,10 +1565,19 @@ bool TubeManipulation::Arms::getRegraspPoseRight(arm_navigation_msgs::AttachedCo
         z_pos = z_min + (len * z_pos);
 
         pos.setValue(x_pos, y_pos, z_pos);
-        std::cout<<"["<<x_pos<<"  "<<y_pos<<"  "<<z_pos<<"]"<<std::endl;
+
+        rand_tf.setOrigin(tf::Vector3(0,0,0));
         rand_tf.setRotation(q);
-        rand_tf.setOrigin(pos);
+        //rand_tf.setOrigin(pos);
+
+        // move around in box. remember pos is in global frame orientation
         obj = obj_orig * rand_tf;
+        tf::Vector3 obj_pose = obj.getOrigin();
+        obj_pose += pos;
+        obj.setOrigin(obj_pose);
+
+        /*tf::Vector3 vec = obj.getOrigin();
+        std::cout<<"["<<vec.getX()<<"  "<<vec.getY()<<"  "<<vec.getZ()<<"]";*/
         std::cout<<'\r'<<cnt<<' '<<std::flush;
         cnt--;
         }while(cnt>1);

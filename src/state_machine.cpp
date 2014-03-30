@@ -14,7 +14,9 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _r_soln_avail = false;
     _l_soln_avail = false;
     _WRIST_OFFSET = 0.15;
-    _PICK_WRIST_OFFSET = 0.185;
+    _PICK_WRIST_OFFSET = 0.19;
+    _TABLE_HEIGHT = 0.5; //in meters
+    _z_error = 0.0;
 
     _att_obj.reset(new arm_navigation_msgs::AttachedCollisionObject);
 
@@ -33,6 +35,7 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _tube_mrkr_pub = _nh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/tube_marker", 2);
     _collision_obj_pub = _nh->advertise<arm_navigation_msgs::CollisionObject>("collision_object", 2);
     _grasp_mrkr_pub = _nh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
+    _work_point_pub = _nh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/work_points_marker",2);
 
     if(!ros::service::waitForService(SET_PLANNING_SCENE_DIFF_NAME,5))
         ROS_WARN_STREAM("Can not find "<<SET_PLANNING_SCENE_DIFF_NAME<<" service");
@@ -104,6 +107,10 @@ void stateMachine::start()
                 break;
             }
             _publish_tube();
+            visualization_msgs::MarkerArray marker_array;
+            _tube->getWorkPointsMarker(marker_array);
+            marker_array.markers.clear();
+            _work_point_pub.publish(marker_array);
             //_add_tube_to_collision_space();
             _set_planning_scn();
             //TODO: get_attached_obj;
@@ -169,12 +176,14 @@ void stateMachine::start()
                 _state = ERR;
                 break;
             }
-            _state = DONE;
+            _state = TRAJ_GEN;
             break;
         }
         case TRAJ_GEN:
         {
             ROS_INFO("*Generating trajectory...");
+
+            _state = DONE;
             break;
         }
         case TRAJ_EXE:
@@ -297,6 +306,7 @@ bool stateMachine::_get_clusters(void){
 //uses cloudProcessing class to generate model
 bool stateMachine::_gen_tube_model(void){
     _tube->reset();
+    _cloud_process->setZerror(_z_error);
     if(!_cloud_process->genTubeModel(_clusters.at(_cluster_idx),_tube)){
         return false;
     }
@@ -331,6 +341,12 @@ void stateMachine::_extract_table_from_msg(tabletop_object_detector::TabletopSeg
     pose.position.x = (x_min + x_max)/2;
     pose.position.y = (y_min + y_max)/2;
     pose.position.z = seg_srv.response.table.pose.pose.position.z;
+    _z_error = _TABLE_HEIGHT - pose.position.z;
+    ROS_INFO_NAMED(LGRNM,"Table height is %f. Z error = %f", pose.position.z, _z_error);
+    double box_height = 0.025;
+    pose.position.z = _TABLE_HEIGHT;
+    pose.position.z -= (box_height/2);
+
     _table.poses.push_back(pose);
 
     arm_navigation_msgs::Shape box;
@@ -338,7 +354,7 @@ void stateMachine::_extract_table_from_msg(tabletop_object_detector::TabletopSeg
     box.dimensions.resize(3);
     box.dimensions[0] = (x_max - x_min);
     box.dimensions[1] = (y_max - y_min);
-    box.dimensions[2] = 0.025;
+    box.dimensions[2] = box_height;
 
     _table.shapes.push_back(box);
 }
@@ -481,15 +497,17 @@ bool stateMachine::_lift_obj_with_right_arm(void)
         ROS_INFO_NAMED(LGRNM,"no IK solution for appraoch pose");
         return false;
     }
+
     if(!_arms->moveRightArmWithMPlanning(ik_soln)){
         return false;
     }
     _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET);
     geometry_msgs::Pose pick_pose = _pick_grasp.getWristGlobalPose(_tube->getPose());
+    ROS_INFO_NAMED(LGRNM,"Pick pose Z value, table height, pick wrist offset = %f  ,  %f  ,  %f", pick_pose.position.z, _TABLE_HEIGHT, _PICK_WRIST_OFFSET);
     if(!_arms->simpleMoveRightArm(pick_pose)){
         return false;
     }
-    if(!_gripper->setRightGripperPosition(_tube->cylinders[_pick_grasp.cylinderIdx].radius*1.85, -1)){
+    if(!_gripper->setRightGripperPosition(_tube->cylinders[_pick_grasp.cylinderIdx].radius*1.5, -1)){
         return false;
     }
     _att2right = true;

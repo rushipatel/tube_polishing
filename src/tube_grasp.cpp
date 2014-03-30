@@ -83,7 +83,7 @@ GraspAnalysis::GraspAnalysis(ros::NodeHandlePtr nh)
     _grasp_pair_found = false;
     _traj_idx = 0;
     MAX_TEST_GRASPS = 30;
-    MAX_ITERATION = 400;
+    MAX_ITERATION = 800;
 }
 
 void GraspAnalysis::setTubePtr(TubePerception::Tube::Ptr tube){
@@ -291,7 +291,7 @@ void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, Grasp
     for(size_t i=0; i<_tube->cylinders.size(); i++)
     {
         //floor value
-        float axis_len = _tube->cylinders[i].getAxisLength();
+        double axis_len = _tube->cylinders[i].getAxisLength();
         int axis_steps = axis_len/axis_step_size;
 
         for(int j=1; j<=axis_steps; j++)
@@ -361,7 +361,6 @@ void GraspAnalysis::_normalize_worktrajectory()
 
 void GraspAnalysis::_xform_in_tubeframe()
 {
-
     geometry_msgs::Pose p;
     tf::Transform point, tube, xform;
     tube = _tube->getTransform();
@@ -379,7 +378,7 @@ bool GraspAnalysis::_gen_work_trajectory()
     pcl::PointCloud<PointT>::Ptr cloud;
     tf::Vector3 cyl_axis,ux,uz,uy;  // right hand rule -> x, z, y
     geometry_msgs::Pose pose;
-    _work_traj.header.frame_id = "base_link";
+    _work_traj.header.frame_id = "/base_link";
     _work_traj.header.stamp= ros::Time::now();
 
     for(size_t i=0; i<_tube->workPointsCluster.size(); i++)
@@ -391,8 +390,10 @@ bool GraspAnalysis::_gen_work_trajectory()
             PointT point;
             point = cloud->points[j];
             unsigned int cyl_idx = _tube->whichCylinder(point);
-            if(cyl_idx != _tube->cylinders.size())
-                cyl_axis =_tube->cylinders[cyl_idx].getAxisVector();
+            if(cyl_idx != _tube->cylinders.size()){
+                tf::Transform tube_tf = _tube->getTransform();
+                cyl_axis =_tube->cylinders[cyl_idx].getAxisVector(tube_tf);
+            }
             else
             {
                 ROS_ERROR("GraspAnalysis - Couldn't get cylinder index");
@@ -419,7 +420,8 @@ bool GraspAnalysis::_gen_work_trajectory()
             tf::Quaternion q,q2,q3;
             mat.getRotation(q);
             tf::Vector3 vec(1, 0, 0);
-            q2.setRotation(vec, (M_PI/2));
+            //q2.setRotation(vec, (M_PI/2));
+            q2.setValue(0,0,0,1);
             q3 = q*q2;
             //Rotate +/- 90 degrees around X to align Y to Axis.
             //Weird but only work around as of now.
@@ -450,7 +452,7 @@ void GraspAnalysis::_work2tube_trajectory()
         ROS_ERROR("GraspAnalysis - WorkPose is not set yet.");
         return;
     }
-    _tube_traj.header.frame_id = "base_link";
+    _tube_traj.header.frame_id = "/base_link";
     _tube_traj.header.stamp = ros::Time::now();
     _tube_traj.poses.resize(_work_traj.poses.size());
     for(size_t i=0; i<_work_traj.poses.size(); i++)
@@ -502,7 +504,7 @@ void GraspAnalysis::_test_pairs_for_ik()
         idx_of_indices = rand()%(indices.size());
         rand_indices.push_back(indices[idx_of_indices]);
         indices.erase(indices.begin() + idx_of_indices);
-        ROS_INFO("Size of indices : %d",indices.size());
+        //ROS_INFO("Size of indices : %d",indices.size());
     }
 
     //unsigned long it=MAX_ITERATION;

@@ -54,6 +54,20 @@ bool kbhit(void)
     return 0;
 }
 
+bool isInCylinder(const tf::Vector3 &p1, const tf::Vector3 &p2, double length_sq, double radius_sq, const tf::Vector3 &test_point){
+    tf::Vector3 d = p2-p1;
+    tf::Vector3 pd = test_point - p1;
+    float dot = pd.dot(d);
+    if(dot < 0.0f || dot>length_sq){
+        return false;
+    }
+    double d_sq = pd.length2() - dot*dot/length_sq;
+    if(d_sq>radius_sq){
+        return false;
+    }
+    return true;
+}
+
 /*std::string armNavigationErrorCodeToString(arm_navigation_msgs::ArmNavigationErrorCodes &error_code)
 {
     std::string result;

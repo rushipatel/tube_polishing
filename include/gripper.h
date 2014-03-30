@@ -46,7 +46,7 @@ Gripper::Gripper(ros::NodeHandlePtr nh)
     while(!_grpr_clnt_l->waitForServer(ros::Duration(5.0)))
         ROS_INFO_NAMED(GRPR_LGRNM,"Waiting for l_gripper_controller/gripper_action action server");
     _timeout = 15;
-    _joint_state_err = 0.005;
+    _joint_state_err = 0.003;
 }
 
 Gripper::~Gripper(){
@@ -101,6 +101,11 @@ bool Gripper::setRightGripperPosition(double position, double effort)
     _grpr_clnt_r->waitForResult(ros::Duration(_timeout));
 
     ros::Time stop_time = ros::Time::now() + ros::Duration(_timeout);
+    std::vector<double> err_dot(10);
+    for(unsigned int i=0; i<err_dot.size(); i++){
+        err_dot[i] = 0;
+    }
+    double prev_err = 0;
     while(ros::ok() && ros::Time::now()<stop_time){
         pr2_controllers_msgs::JointControllerStateConstPtr state =
                 ros::topic::waitForMessage<pr2_controllers_msgs::JointControllerState>
@@ -109,7 +114,21 @@ bool Gripper::setRightGripperPosition(double position, double effort)
             ROS_DEBUG_NAMED(GRPR_LGRNM,"Gripper set before timeout");
             return true;
         }
-        ROS_INFO_NAMED(GRPR_LGRNM,"Right gripper joint state error: %f",state->error);
+        err_dot[err_dot.size()-1] = state->error - prev_err;
+        prev_err = state->error;
+        std::rotate(err_dot.rbegin(), err_dot.rbegin()+1, err_dot.rend());
+        double sum=0;
+        for(unsigned int i=0; i<err_dot.size(); i++){
+            sum += err_dot[i];
+        }
+
+        //ROS_INFO("right SUM : %f",sum);
+
+        //if in stall condition and error is somewhat acceptable
+        if(sum<0.002 && (state->error < (_joint_state_err*4))){
+            return true;
+        }
+        ROS_DEBUG_NAMED(GRPR_LGRNM,"Right gripper joint state error: %f",state->error);
         ros::Duration(0.2).sleep();
     }
 
@@ -118,7 +137,8 @@ bool Gripper::setRightGripperPosition(double position, double effort)
 //        return false;
 //    }
     ROS_WARN_NAMED(GRPR_LGRNM,"Right gripper action timeout (%d Seconds)",_timeout);
-    return false;
+//    return false;
+    return true;
 }
 
 bool Gripper::setLeftGripperPosition(double position, double effort)
@@ -131,6 +151,10 @@ bool Gripper::setLeftGripperPosition(double position, double effort)
     _grpr_clnt_l->waitForResult(ros::Duration(_timeout));
 
     ros::Time stop_time = ros::Time::now() + ros::Duration(_timeout);
+    std::vector<double> err_dot(10);
+    for(unsigned int i=0; i<err_dot.size(); i++){
+        err_dot[i] = 0;
+    }
     while(ros::ok() && ros::Time::now()<stop_time){
         pr2_controllers_msgs::JointControllerStateConstPtr state =
                 ros::topic::waitForMessage<pr2_controllers_msgs::JointControllerState>
@@ -139,7 +163,18 @@ bool Gripper::setLeftGripperPosition(double position, double effort)
             ROS_DEBUG_NAMED(GRPR_LGRNM,"Gripper set before timeout");
             return true;
         }
-        ROS_INFO_NAMED(GRPR_LGRNM,"Left gripper joint state error: %f",state->error);
+        err_dot[err_dot.size()-1] = state->error - err_dot[0];
+        std::rotate(err_dot.rbegin(), err_dot.rbegin()+1, err_dot.rend());
+        double sum=0;
+        for(unsigned int i=0; i<err_dot.size(); i++){
+            sum += err_dot[i];
+        }
+        //ROS_INFO("SUM : %f",sum);
+        //if in stall condition and error is somewhat acceptable
+        if(sum<0.002 && (state->error < (_joint_state_err*4))){
+            return true;
+        }
+        ROS_DEBUG_NAMED(GRPR_LGRNM,"Left gripper joint state error: %f",state->error);
         ros::Duration(0.2).sleep();
     }
 
@@ -149,7 +184,8 @@ bool Gripper::setLeftGripperPosition(double position, double effort)
 //    }
 
     ROS_WARN_NAMED(GRPR_LGRNM,"Left gripper action timeout (%d Seconds)",_timeout);
-    return false;
+    //return false;
+    return true;
 }
 #endif // GRIPPER_H
 

@@ -2,61 +2,6 @@
 namespace TubePerception
 {
 
-float isInCylinder( const PointT & pt1, const PointT & pt2, float length_sq, float radius_sq, const PointT & testpt )
-{
-    float dx, dy, dz;	// vector d  from line segment point 1 to point 2
-    float pdx, pdy, pdz;	// vector pd from point 1 to test point
-    float dot, dsq;
-
-    dx = pt2.x - pt1.x;	// translate so pt1 is origin.  Make vector from
-    dy = pt2.y - pt1.y;     // pt1 to pt2.  Need for this is easily eliminated
-    dz = pt2.z - pt1.z;
-
-    pdx = testpt.x - pt1.x;		// vector from pt1 to test point.
-    pdy = testpt.y - pt1.y;
-    pdz = testpt.z - pt1.z;
-
-    // Dot the d and pd vectors to see if point lies behind the
-    // cylinder cap at pt1.x, pt1.y, pt1.z
-
-    dot = pdx * dx + pdy * dy + pdz * dz;
-
-    // If dot is less than zero the point is behind the pt1 cap.
-    // If greater than the cylinder axis line segment length squared
-    // then the point is outside the other end cap at pt2.
-
-    if( dot < 0.0f || dot > length_sq )
-    {
-        return( -1.0f );
-    }
-    else
-    {
-        // Point lies within the parallel caps, so find
-        // distance squared from point to line, using the fact that sin^2 + cos^2 = 1
-        // the dot = cos() * |d||pd|, and cross*cross = sin^2 * |d|^2 * |pd|^2
-        // Carefull: '*' means mult for scalars and dotproduct for vectors
-        // In short, where dist is pt distance to cyl axis:
-        // dist = sin( pd to d ) * |pd|
-        // distsq = dsq = (1 - cos^2( pd to d)) * |pd|^2
-        // dsq = ( 1 - (pd * d)^2 / (|pd|^2 * |d|^2) ) * |pd|^2
-        // dsq = pd * pd - dot * dot / lengthsq
-        //  where lengthsq is d*d or |d|^2 that is passed into this function
-
-        // distance squared to the cylinder axis:
-
-        dsq = (pdx*pdx + pdy*pdy + pdz*pdz) - dot*dot/length_sq;
-
-        if( dsq > radius_sq )
-        {
-            return( -1.0f );
-        }
-        else
-        {
-            return( dsq );		// return distance squared to axis
-        }
-    }
-}
-
 /********************************Cylinder CLASS********************************/
 geometry_msgs::Pose Cylinder::getPose(void){
     return _local_pose;
@@ -74,28 +19,59 @@ void Cylinder::setPose(const tf::Transform &t){
     _local_pose = tf2pose(t);
 }
 
-tf::Vector3 Cylinder::getAxisVector(){
-    tf::Vector3 vec;
-    vec.setX(p2.x-p1.x);
-    vec.setY(p2.y-p1.y);
-    vec.setZ(p2.z-p1.z);
+geometry_msgs::Pose Cylinder::getGlobalPose(geometry_msgs::Pose &tubePose){
+    tf::Transform tubeTf = pose2tf(tubePose);
+     return (tf2pose(getGlobalTf(tubeTf)));
+}
 
+tf::Transform Cylinder::getGlobalTf(tf::Transform &tubeTF){
+    tf::Transform local_tf = pose2tf(_local_pose);
+    return (tubeTF * local_tf);
+}
+
+tf::Vector3 Cylinder::getAxisVector(tf::Transform &tubeTf){
+    tf::Vector3 new_p1, new_p2;
+    _convert_points_in_global(tubeTf, new_p1,new_p2);
+    tf::Vector3 vec = new_p2 - new_p1;
     return vec;
 }
 
-float Cylinder::getAxisLength(){
-    tf::Vector3 vec = getAxisVector();
+double Cylinder::getAxisLength(){
+    tf::Vector3 vec = p2-p1;
     return vec.length();
 }
 
-tf::Vector3 Cylinder::getMidPoint(void){
-    tf::Vector3 point;
-    point.setX((p2.x+p1.x)/2);
-    point.setY((p2.y+p1.y)/2);
-    point.setZ((p2.z+p1.z)/2);
+tf::Vector3 Cylinder::getMidPoint(tf::Transform &tubeTf){
+    tf::Vector3 new_p1, new_p2;
+    _convert_points_in_global(tubeTf, new_p1, new_p2);
+    tf::Vector3 point = new_p1 + new_p2;
+    point /= 2;
     return point;
 }
 
+void Cylinder::_convert_points_in_global(tf::Transform &tf, tf::Vector3 &p1_out, tf::Vector3 &p2_out){
+    tf::Transform point_tf;
+    point_tf.setIdentity();
+    point_tf.setOrigin(p1);
+    point_tf = tf * point_tf;
+    p1_out = point_tf.getOrigin();
+    point_tf.setOrigin(p2);
+    point_tf = tf * point_tf;
+    p2_out = point_tf.getOrigin();
+}
+
+
+// inflates cylinder by adding 1mm in radius
+// uses global p1 and p2
+bool Cylinder::isInlier(tf::Vector3 &testPoint, tf::Transform &tubeTf){
+    tf::Vector3 p1_new, p2_new;
+    _convert_points_in_global(tubeTf, p1_new, p2_new);
+    tf::Vector3 vec = p2_new - p1_new;
+    double r = radius + 0.001;
+    return (isInCylinder(p1_new, p2_new, vec.length2(), r*r, testPoint));
+}
+
+/*
 void Cylinder::getMarkers(visualization_msgs::MarkerArray &markerArray)
 {
     visualization_msgs::Marker marker;
@@ -156,7 +132,7 @@ void Cylinder::getMarkers(visualization_msgs::MarkerArray &markerArray)
     marker.pose.position.y = vec2.getY();
     marker.pose.position.z = vec2.getZ();
     markerArray.markers.push_back(marker);
-}
+}*/
 
 /******************************************************************************/
 
@@ -174,15 +150,7 @@ geometry_msgs::Pose Tube::getPose(void){
 }
 
 tf::Transform Tube::getTransform(void){
-    tf::Transform tf;
-    tf.setOrigin(tf::Vector3(_pose.position.x, _pose.position.y, _pose.position.z));
-    tf::Quaternion q;
-    q.setX(_pose.orientation.x);
-    q.setY(_pose.orientation.y);
-    q.setZ(_pose.orientation.z);
-    q.setW(_pose.orientation.w);
-    tf.setRotation(q);
-    return tf;
+    return pose2tf(_pose);
 }
 
 geometry_msgs::Pose Tube::getCylinderGlobalPose(unsigned int cylIdx){
@@ -198,42 +166,39 @@ geometry_msgs::Pose Tube::getCylinderGlobalPose(unsigned int cylIdx){
 void Tube::setPoseAsActualPose(){
     _actual_pose = _pose;
 }
-geometry_msgs::Pose Tube::getActualPose(){
-    return _actual_pose;
+void Tube::resetPoseToActual(){
+    _pose = _actual_pose;
 }
 
 // graspPose is in local to tube frame, wristPose is in global. pose of arm holding tube.
-void Tube::resetActualPose(geometry_msgs::Pose &graspPose, geometry_msgs::Pose &wristPose){
+/*void Tube::resetActualPose(geometry_msgs::Pose &graspPose, geometry_msgs::Pose &wristPose){
     tf::Transform g = pose2tf(graspPose), w = pose2tf(wristPose), tube;
     tube = w * g.inverse();
     _pose = tf2pose(tube);
     setPoseAsActualPose();
-}
+}*/
+
 
 //point with normal
-unsigned int Tube::whichCylinder(PointT point)
+// tests only local points
+unsigned int Tube::whichCylinder(PointT localPoint)
 {
-    //tf::Vector3 normal;
-    tf::Vector3 p;
-    /*normal.setValue(point.normal_x, point.normal_y, point.normal_z);
-    normal.normalize();
-    normal *= -0.005; // travel in reverse by 5 mm so it can lie inside some cylinder
-    point.x = point.x + normal.x();
-    point.y = point.y + normal.y();
-    point.z = point.z + normal.z();*/
-    for(size_t i=0; i<cylinders.size(); i++)
-    {
-        PointT p1 = cylinders[i].p1;
-        PointT p2 = cylinders[i].p2;
+    ROS_INFO_STREAM("Test point : \n"<<localPoint);
 
-        float l_sqr = ((p1.x - p2.x) * (p1.x - p2.x)) +
-                      ((p1.y - p2.y) * (p1.y - p2.y)) +
-                      ((p1.z - p2.z) * (p1.z - p2.z)) ;
-        //inflate cylinder so that point can lie inside in case of outlier.
-        //in other words, 3mm tollerance.
-        double r_sqr = (cylinders[i].radius+0.003)*(cylinders[i].radius+0.003);
-        if(isInCylinder(p1,p2,l_sqr,r_sqr,point)>0)
+    //convert in to vector3
+    tf::Vector3 p;
+    p.setValue(localPoint.x, localPoint.y, localPoint.z);
+
+    //identity
+    tf::Vector3 vec;
+    double r;
+    for(size_t i=0; i<cylinders.size(); i++){
+        vec = cylinders[i].p2 - cylinders[i].p1;
+        r = cylinders[i].radius;
+        r += 0.003;
+        if(isInCylinder(cylinders[i].p1, cylinders[i].p2, vec.length2(), r*r, p)){
             return i;
+        }
     }
     return cylinders.size();
 }
@@ -339,13 +304,11 @@ void Tube::getCollisionObject(arm_navigation_msgs::CollisionObject &obj)
     cyl_shape.dimensions[0] = 0; // radius
     cyl_shape.dimensions[1] = 0; // length
 
+    obj.shapes.clear();
+    obj.poses.clear();
     geometry_msgs::Pose pose;
-    tf::Transform tube2cyl, tube = getTransform(), cyl;
     for(size_t i=0; i<cylinders.size(); i++){
-        pose = cylinders[i].getPose();
-        tube2cyl = pose2tf(pose);
-        cyl = tube * tube2cyl;
-        pose = tf2pose(cyl);
+        pose = cylinders[i].getGlobalPose(_pose);
         cyl_shape.dimensions[0] = cylinders[i].radius;
         cyl_shape.dimensions[1] = cylinders[i].getAxisLength();
         obj.shapes.push_back(cyl_shape);
@@ -376,10 +339,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
         marker.scale.z = cylinders[i].getAxisLength();
         marker.id = i+1;
         //Assuming Z is cylindrical axis
-        //marker.pose = cylinders[i].getGlobalPose();
-        t = cylinders[i].getTransform();
-        t = tube_tf * t;
-        marker.pose = tf2pose(t);
+        marker.pose = cylinders[i].getGlobalPose(_pose);
         markerArray.markers.push_back(marker);
     }
 
@@ -401,9 +361,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
         //Assuming Z is cylindrical axis
         //marker.pose = cylinders[i].getGlobalPose();
         //marker.pose = cylinders[i].getPose();
-        t = cylinders[i].getTransform();
-        t = tube_tf * t;
-        marker.pose = tf2pose(t);
+        marker.pose = cylinders[i].getGlobalPose(_pose);
         markerArray.markers.push_back(marker);
     }
 
@@ -421,9 +379,10 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.scale.x = marker.scale.y = marker.scale.z = 0.005;
     marker.lifetime = ros::Duration(20);
     for(size_t i=0; i<cylinders.size(); i++){
+
         tf::Transform p;
         p.setIdentity();
-        p.setOrigin(tf::Vector3(cylinders[i].p1.x, cylinders[i].p1.y, cylinders[i].p1.z));
+        p.setOrigin(cylinders[i].p1);
         p = tube_tf * p;
         tf::Vector3 vec = p.getOrigin();
 
@@ -433,9 +392,10 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
         markerArray.markers.push_back(marker);
 
         p.setIdentity();
-        p.setOrigin(tf::Vector3(cylinders[i].p2.x, cylinders[i].p2.y, cylinders[i].p2.z));
+        p.setOrigin(cylinders[i].p2);
         p = tube_tf * p;
         vec = p.getOrigin();
+
         marker.id++;
         marker.pose.position.x = vec.getX();
         marker.pose.position.y = vec.getY();
@@ -448,16 +408,68 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
 void Tube::getCylinderPoses(geometry_msgs::PoseArray &pose_array){
     pose_array.poses.clear();
     geometry_msgs::Pose pose;
-
     pose_array.header.frame_id = "base_link";
     pose_array.header.stamp = ros::Time::now();
 
-    tf::Transform t,tube = getTransform();
     for(size_t i=0; i<cylinders.size(); i++){
-        t = cylinders[i].getTransform();
-        t = tube * t;
-        pose = tf2pose(t);
+        pose = cylinders[i].getGlobalPose(_pose);
         pose_array.poses.push_back(pose);
+    }
+}
+
+void Tube::getWorkPointsMarker(visualization_msgs::MarkerArray &markerArray){
+    pcl::PointCloud<PointT>::Ptr cloud;
+    visualization_msgs::Marker marker;
+    marker.action = marker.ADD;
+    marker.id = 0;
+    marker.header.frame_id = "/base_link";
+    marker.header.stamp = ros::Time::now();
+    marker.type = marker.ARROW;
+    marker.color.a = 0.5;
+    marker.color.r = 1;
+    geometry_msgs::Point point, p_global;
+    tf::Vector3 norm;
+    marker.scale.x = 0.001;
+    marker.scale.y = 0.0015;
+    marker.scale.z = 0.003;
+    tf::Transform tube_tf = pose2tf(_pose), point_tf;
+    tf::Vector3 vec;
+    point_tf.setIdentity();
+    for(unsigned int i=0; i<workPointsCluster.size(); i++){
+        cloud = workPointsCluster[i];
+        for(unsigned int j=0; j<cloud->points.size(); j++){
+            marker.id++;
+            point.x = cloud->points[j].x;
+            point.y = cloud->points[j].y;
+            point.z = cloud->points[j].z;
+            norm.setValue(cloud->points[j].normal_x,
+                          cloud->points[j].normal_y,
+                          cloud->points[j].normal_z);
+            norm *= 0.02; // 20mm long
+            //
+            point_tf.setOrigin(tf::Vector3(point.x, point.y, point.z));
+            point_tf = tube_tf * point_tf;
+            vec = point_tf.getOrigin();
+            p_global.x = vec.getX();
+            p_global.y = vec.getY();
+            p_global.z = vec.getZ();
+            marker.points.push_back(p_global);
+
+            point.x += norm.getX();
+            point.y += norm.getY();
+            point.z += norm.getZ();
+            //
+            point_tf.setOrigin(tf::Vector3(point.x, point.y, point.z));
+            point_tf = tube_tf * point_tf;
+            vec = point_tf.getOrigin();
+            p_global.x = vec.getX();
+            p_global.y = vec.getY();
+            p_global.z = vec.getZ();
+            marker.points.push_back(p_global);
+
+            markerArray.markers.push_back(marker);
+            marker.points.clear();
+        }
     }
 }
 
@@ -476,9 +488,10 @@ CloudProcessing::CloudProcessing()
     _r = 0;
     _r_min = 0.01;
     _r_max = 0.1;
-    _strong_line_thr = 0.2;
-    _weak_line_thr = 0.1;
-    _min_points = 0.05; //in fraction 1/20 time total points
+    _strong_line_thr = 0.2; // strong cylinder formed by at least 20% of points in cloud
+    _weak_line_thr = 0.05;  // cylinder is weak if there are only 5% of points to define line
+                            // if less than 5% inliers of line do not define cylinder
+    _min_points = 0.05; //in fraction ex. 1/20 times total points
     _z_error = 0;
 }
 
@@ -505,7 +518,7 @@ bool CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
         ROS_WARN("No cylinder found in cluster!");
         return false;
     }
-    _generate_work_vectors();
+    _generate_work_vectors();  // could be plugin for rgb processing
     return true;
 }
 
@@ -519,6 +532,7 @@ bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
     //displayCloud(disk_cloud);
     pcl::ModelCoefficients coeff;
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+    // if any cylinder present
     if(!_get_cylinder(disk_cloud, minRadius, maxRadius, coeff, inliers)){
         ROS_WARN("Couldn't find disk in given cloud cluster");
         return false;
@@ -532,14 +546,38 @@ bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
 
     _axis_points.reset(new pcl::PointCloud<PointT>);
     _r = coeff.values[6];
-    _collaps_normals(); //resets _raw_axis_points pointer uses _r and _tube_cloud
+    _collaps_normals(); //resets _raw_axis_points pointer. uses _r and _tube_cloud
     _num_of_points = _raw_axis_points->points.size();
     inliers->indices.clear();
     TubePerception::Cylinder cyl;
-    _find_line(inliers, &cyl);
+    pcl::PointIndices::Ptr line_inliers(new pcl::PointIndices);
+    pcl::ModelCoefficients line_coeff;
+    int is_strong;
+    _find_line(_raw_axis_points, line_inliers, line_coeff, is_strong);
+    pcl::PointCloud<PointT>::Ptr axis_points(new pcl::PointCloud<PointT>);
+    _project_points_on_line(_raw_axis_points, line_inliers, line_coeff, axis_points);
+    PointT p1, p2;
+    pcl::getMaxSegment(*axis_points, p1, p2);
+    if(is_strong>0){
+        cyl.isStrong = true;// should
+    }
+    else{
+        cyl.isStrong = false;
+    }
+    cyl.p1.setX(p1.x);
+    cyl.p1.setY(p1.y);
+    cyl.p1.setZ(p1.z);
 
+    cyl.p2.setX(p2.x);
+    cyl.p2.setY(p2.y);
+    cyl.p2.setZ(p2.z);
+
+    cyl.radius = _r;
+
+    // compute pose and copy cylinder object
     //had to use following from _define_poses. behaviour of setValue is not fully known
-    tf::Vector3 ux, uy, uz = cyl.getAxisVector();
+    tf::Transform iden = tf::Transform::getIdentity();
+    tf::Vector3 ux, uy, uz = cyl.getAxisVector(iden);
     uz.normalize();
     ux = _get_perp_vec3(uz);
     ux.normalize();
@@ -549,7 +587,7 @@ bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
     mat.setValue(ux.getX(), uy.getX(), uz.getX(),
                  ux.getY(), uy.getY(), uz.getY(),
                  ux.getZ(), uy.getZ(), uz.getZ() );
-    tf::Vector3 mid_point = cyl.getMidPoint();
+    tf::Vector3 mid_point = cyl.getMidPoint(iden);
 
     tf::Transform disk_tf(mat, mid_point);
     disk.setPose(tf2pose(disk_tf));
@@ -669,15 +707,15 @@ void CloudProcessing::_generate_work_vectors()
     int cyl_idx = 0;//rand()%(_tube->cylinders.size()+1);
     //cyl_idx = 1;
 
-    tf::Vector3 axis = _tube->cylinders[cyl_idx].getAxisVector();
+    //tf::Transform tube_tf = _tube->getTransform();
+    tf::Transform tube_tf = tf::Transform::getIdentity();
+    tf::Vector3 axis = _tube->cylinders[cyl_idx].getAxisVector(tube_tf);
     axis.normalize();
 
     //in global frame
-    tf::Vector3 at_point = _tube->cylinders[cyl_idx].getAxisVector();
+    tf::Vector3 at_point = _tube->cylinders[cyl_idx].getAxisVector(tube_tf);
     at_point *= l;
-    at_point.setX(_tube->cylinders[cyl_idx].p1.x+at_point.x());
-    at_point.setY(_tube->cylinders[cyl_idx].p1.y+at_point.y());
-    at_point.setZ(_tube->cylinders[cyl_idx].p1.z+at_point.z());
+    at_point += _tube->cylinders[cyl_idx].p1;
 
     tf::Vector3 perp_vec = _get_perp_vec3(axis);
     tf::Vector3 point, vec1,vec2;
@@ -740,10 +778,12 @@ tf::Vector3 CloudProcessing::_get_perp_vec3(tf::Vector3 v3){
 //Also converts points in local frame (tube frame)
 void CloudProcessing::_define_pose(void)
 {
+    tf::Transform identity_tf = tf::Transform::getIdentity();
+    // compute cylinder's global pose
     for(size_t i=0; i<_tube->cylinders.size(); i++)
     {
         geometry_msgs::Pose pose;
-        tf::Vector3 mid_point = _tube->cylinders[i].getMidPoint();
+        tf::Vector3 mid_point = _tube->cylinders[i].getMidPoint(identity_tf);
         pose.position.x = mid_point.getX();
         pose.position.y = mid_point.getY();
         pose.position.z = mid_point.getZ();
@@ -751,7 +791,7 @@ void CloudProcessing::_define_pose(void)
         //pose.position.y = (_tube->cylinders[i].p1.y + _tube->cylinders[i].p2.y) / 2;
         //pose.position.z = (_tube->cylinders[i].p1.z + _tube->cylinders[i].p2.z) / 2;
 
-        tf::Vector3 ux, uy, uz = _tube->cylinders[i].getAxisVector();
+        tf::Vector3 ux, uy, uz = _tube->cylinders[i].getAxisVector(identity_tf);
         uz.normalize();
         ux = _get_perp_vec3(uz);
         ux.normalize();
@@ -769,7 +809,7 @@ void CloudProcessing::_define_pose(void)
         pose.orientation.y = q.getY();
         pose.orientation.z = q.getZ();
         pose.orientation.w = q.getW();
-        //For temporary use only. Will get converted local to tube
+        //For temporary use only. Will get converted in local to tube frame
         _tube->cylinders[i].setPose(pose);
     }
 
@@ -781,35 +821,26 @@ void CloudProcessing::_define_pose(void)
     }
 
     // Convert cylinder from global to local
-    for(size_t i=0; i<(_tube->cylinders.size()); i++)
+    for(size_t i=0; i<_tube->cylinders.size(); i++)
     {
         tf::Transform tube_tf, cyl_tf, tube_cyl_tf;
         cyl_tf = _tube->cylinders[i].getTransform();
         tube_tf = _tube->getTransform();
         tube_cyl_tf = tube_tf.inverseTimes(cyl_tf);
         _tube->cylinders[i].setPose(tube_cyl_tf);
-        tf::Transform p1, p2;
+        tf::Transform p1_tf, p2_tf;
 
-        p1.setIdentity();
-        p2.setIdentity();
-        p1.setOrigin(tf::Vector3( _tube->cylinders[i].p1.x,
-                                  _tube->cylinders[i].p1.y,
-                                  _tube->cylinders[i].p1.z ) );
-        p2.setOrigin(tf::Vector3( _tube->cylinders[i].p2.x,
-                                  _tube->cylinders[i].p2.y,
-                                  _tube->cylinders[i].p2.z ) );
+        // convert points in to local frame
+        p1_tf.setIdentity();
+        p2_tf.setIdentity();
+        p1_tf.setOrigin(_tube->cylinders[i].p1);
+        p2_tf.setOrigin(_tube->cylinders[i].p2 );
 
-        p1 = tube_tf.inverseTimes(p1);
-        p2 = tube_tf.inverseTimes(p2);
+        p1_tf = tube_tf.inverseTimes(p1_tf);
+        p2_tf = tube_tf.inverseTimes(p2_tf);
 
-        tf::Vector3 vec = p1.getOrigin();
-        _tube->cylinders[i].p1.x = vec.getX();
-        _tube->cylinders[i].p1.y = vec.getY();
-        _tube->cylinders[i].p1.z = vec.getZ();
-        vec = p2.getOrigin();
-        _tube->cylinders[i].p2.x = vec.getX();
-        _tube->cylinders[i].p2.y = vec.getY();
-        _tube->cylinders[i].p2.z = vec.getZ();
+        _tube->cylinders[i].p1 = p1_tf.getOrigin();
+        _tube->cylinders[i].p2 = p2_tf.getOrigin();
     }
 }
 
@@ -863,7 +894,7 @@ bool CloudProcessing::_get_cylinder(pcl::PointCloud<PointT>::Ptr cloud,
     pcl::SACSegmentationFromNormals<PointT, PointT> seg;
     //pcl::ModelCoefficients coeff;
     //pcl::PointIndices inliers;
-
+    coeff.values.clear();
     // Create the segmentation object for cylinder segmentation and set all the parameters
     seg.setOptimizeCoefficients (true);
     seg.setModelType (pcl::SACMODEL_CYLINDER);
@@ -916,19 +947,66 @@ void CloudProcessing::_collaps_normals(void)
     //get_largest_cluster(raw_axis_points, axis_points);
 }
 
+
+// gets segments of line and stores them as cylinder object in given tube
 void CloudProcessing::_segmentize_axis(void)
 {
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
     Cylinder cyl;
     PointT p1, p2;
+    int is_strong; // 1 is true. -1 is false
+    pcl::ModelCoefficients coeff;
+    while(_find_line(_raw_axis_points, inliers, coeff, is_strong)){
+        pcl::PointCloud<PointT>::Ptr axis_points(new pcl::PointCloud<PointT>);
+        _project_points_on_line(_raw_axis_points, inliers, coeff, axis_points);
+        pcl::getMaxSegment(*axis_points, p1, p2);
 
-    while(_find_line(inliers,&cyl)){
+        // set cylinder variables
+        // haven't defined poses yet
+        if(is_strong>0){
+            cyl.isStrong = true;
+        }
+        else{
+            cyl.isStrong = false;
+        }
+        cyl.p1.setX(p1.x);
+        cyl.p1.setY(p1.y);
+        cyl.p1.setZ(p1.z);
+
+        cyl.p2.setX(p2.x);
+        cyl.p2.setY(p2.y);
+        cyl.p2.setZ(p2.z);
+
+        cyl.radius = _r;
+
+        // add axis points in to _axis_points cloud which is collection of all axis points
+        for(unsigned int i=0; i<axis_points->points.size(); i++){
+            _axis_points->points.push_back(axis_points->points[i]);
+        }
+        // add cylinder in to tube
         _tube->cylinders.push_back(cyl);
+
+        // remove current inliers from _raw_axis_points;
         _remove_inliers(_raw_axis_points,inliers);
+
+        // reuse of indices
         inliers->indices.clear();
-        _cylinder_filter(cyl, _raw_axis_points, inliers);
-        _get_line_points(inliers,cyl.coefficients, p1, p2); // no use for p1 & p2
+
+        // extract all points resting inside cylinder.
+        _cylinder_filter(p1,p2,_r, _raw_axis_points, inliers);
+
+        axis_points->points.clear();
+        // project these points who weren't part of line inliers but are still inside cylinder
+        // and store them in _axis_points cloud so we do not loos information if we need to use rgb processing on axis_points
+        _project_points_on_line(_raw_axis_points, inliers, coeff, axis_points);
+        for(unsigned int i=0; i<axis_points->points.size(); i++){
+            _axis_points->points.push_back(axis_points->points[i]);
+        }
+
+        // remove those points from _raw_axis_points if already hasn't been removed as a line inliers
         _remove_inliers(_raw_axis_points,inliers);
+
+        // and get ready for next run
         inliers->indices.clear();
     }
     _axis_points->header = _tube_cloud->header;
@@ -938,15 +1016,19 @@ void CloudProcessing::_segmentize_axis(void)
     ROS_INFO("%d Cylinder found", _tube->cylinders.size());
 }
 
-bool CloudProcessing::_find_line(pcl::PointIndices::Ptr inliers, Cylinder *cyl)
+
+// runs Line RANSAC on to _raw_axis_points cloud and fills up inliers
+// if number of inliers meets threshold return true, false otherwise
+bool CloudProcessing::_find_line(pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients &coeff, int &is_strong)
 {
     if(_raw_axis_points->points.size()< (_min_points*_num_of_points) ) //check if there are enough points to generate model
         return false;
     pcl::SACSegmentation<PointT> seg;
-    pcl::ModelCoefficients coeff;
+    //pcl::ModelCoefficients coeff;
     //pcl::PointIndices inliers;
 
-    // Create the segmentation object for cylinder segmentation and set all the parameters
+    // Create the segmentation object for line and set all the parameters
+    // get inliers and coefficients with harder parameters
     seg.setOptimizeCoefficients (true);
     seg.setModelType (pcl::SACMODEL_LINE);
     seg.setMethodType (pcl::SAC_RANSAC);
@@ -954,89 +1036,109 @@ bool CloudProcessing::_find_line(pcl::PointIndices::Ptr inliers, Cylinder *cyl)
     seg.setProbability(0.99);
     seg.setMaxIterations (20000);
     seg.setDistanceThreshold (0.001);
-    seg.setInputCloud (_raw_axis_points);
-    // Obtain the cylinder inliers and coefficients
+    seg.setInputCloud (cloud_in);
+
+    // Obtain the Line inliers and coefficients
     seg.segment (*inliers, coeff);
 
-    PointT p1,p2;
-
-    if( inliers->indices.size()>(_min_points*_num_of_points) ){
-        ROS_INFO("Number of Strong Line inliers : %d",inliers->indices.size());
-        //ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
-
-        _get_line_points(inliers,coeff, p1, p2);
-        cyl->p1 = p1;
-        cyl->p2 = p2;
-        cyl->isStrong = true;
-        cyl->radius = _r;
-        cyl->coefficients.header = coeff.header; //need for cylinder filter
-        cyl->coefficients.values.resize(7);
-        cyl->coefficients.values[0] = p1.x;
-        cyl->coefficients.values[1] = p1.y;
-        cyl->coefficients.values[2] = p1.z;
-        cyl->coefficients.values[3] = p2.x - p1.x;
-        cyl->coefficients.values[4] = p2.y - p1.y;
-        cyl->coefficients.values[5] = p2.z - p1.z;
-        cyl->coefficients.values[6] = _r;
+    is_strong = -1;
+    ROS_INFO("Number of Line inliers : %d",inliers->indices.size());
+    // if there are enough points to go forward with
+    if(inliers->indices.size()>=(_strong_line_thr*_num_of_points)){
+        is_strong = 1;
+        ROS_INFO("Enough numbers of points to consider strong line");
         return true;
     }
     else{
-        ROS_INFO("Trying to find weak line...");
+        ROS_INFO("Not enough points. Re-running Line RANSAC.");
         seg.setProbability(0.96);
         seg.setMaxIterations (20000);
         seg.setDistanceThreshold (0.003);
         inliers->indices.clear();
         seg.segment (*inliers, coeff);
-    }
-
-    if( inliers->indices.size() > (_min_points*_num_of_points) ){ // if confidence in line
-        ROS_INFO("Number of Weak Line inliers : %d",inliers->indices.size());
-        //ROS_INFO("Line coefficients are: [X= %f Y=%f Z=%f] [N_X=%f N_Y=%f N_Z=%f]", coeff.values[0],coeff.values[1],coeff.values[2],coeff.values[3],coeff.values[4],coeff.values[5]);
-
-        _get_line_points(inliers,coeff, p1, p2);
-        cyl->p1 = p1;
-        cyl->p2 = p2;
-        cyl->isStrong = false;
-        cyl->radius = _r;
-        cyl->coefficients.values.resize(7);
-        cyl->coefficients.values[0] = p1.x;
-        cyl->coefficients.values[1] = p1.y;
-        cyl->coefficients.values[2] = p1.z;
-        cyl->coefficients.values[3] = p2.x - p1.x;
-        cyl->coefficients.values[4] = p2.y - p1.y;
-        cyl->coefficients.values[5] = p2.z - p1.z;
-        cyl->coefficients.values[6] = _r;
-        return true;
+        // if there is still any valid line exists in _raw_axis_points set found_line but it would be weak
+        if(inliers->indices.size()>=_weak_line_thr){
+            return true;
+        }
     }
     return false;
 }
 
-void CloudProcessing::_get_line_points(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2)
-{
-    pcl::PointCloud<PointT>::Ptr line_points(new pcl::PointCloud<PointT>);
-    pcl::PointCloud<PointT>::Ptr line_inliers(new pcl::PointCloud<PointT>);
+// finds two end points, p1 and p2, after projecting on to axis
+/*void CloudProcessing::_get_end_points(pcl::PointCloud<PointT>::Ptr cloud_in,
+                                      pcl::PointIndices::Ptr inliers,
+                                      pcl::ModelCoefficients line_coeff,
+                                      PointT &p1, PointT &p2){
+    pcl::PointCloud<PointT>::Ptr projected_points(new pcl::PointCloud<PointT>);
+    _project_points_on_line(cloud_in, inliers, line_coeff, projected_points);
+    // get two endpoints of the line (from the set of projected points)
+    pcl::getMaxSegment(*projected_points,p1,p2);
+}*/
+
+
+// extracts inliers from _raw_axis_points
+// projects inliers on to line defined by line_coeff
+void CloudProcessing::_project_points_on_line(pcl::PointCloud<PointT>::Ptr cloud_in,
+                                              pcl::PointIndices::Ptr inliers,
+                                              pcl::ModelCoefficients line_coeff,
+                                              pcl::PointCloud<PointT>::Ptr points_out){
     pcl::ExtractIndices<PointT> extract;
+    pcl::PointCloud<PointT>::Ptr inlier_points(new pcl::PointCloud<PointT>);
+    // extract inlier points (part of line definition) from _raw_axis_points
+    extract.setInputCloud(cloud_in);
+    extract.setIndices(inliers);
+    extract.setNegative(false);
+    extract.filter(*inlier_points);
+
+    // make copy of coefficients into new pointer object to use that in setModelCoefficient function
+    pcl::ModelCoefficients::Ptr coeff(new pcl::ModelCoefficients);
+    coeff->header = line_coeff.header;
+    coeff->values.resize(line_coeff.values.size()); //size should be 6
+    for(int i=0; i<line_coeff.values.size(); i++)
+        coeff->values[i] = line_coeff.values[i];
+
+    // project line in_ points (part of line definition) on to axis defined in coeff
+    pcl::ProjectInliers<PointT> proj;
+    proj.setModelType (pcl::SACMODEL_LINE);
+    proj.setInputCloud (inlier_points);
+    proj.setModelCoefficients (coeff);
+    proj.filter(*points_out);
+}
+
+// saves projected points in _axis_points
+/*void CloudProcessing::_get_line_points(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2)
+{
+    pcl::PointCloud<PointT>::Ptr out_points(new pcl::PointCloud<PointT>);
+    pcl::PointCloud<PointT>::Ptr in_points(new pcl::PointCloud<PointT>);
+    pcl::ExtractIndices<PointT> extract;
+
+    // extract inlier points (part of line definition) from _raw_axis_points
     extract.setInputCloud(_raw_axis_points);
     extract.setIndices(inliers);
     extract.setNegative(false);
-    extract.filter(*line_inliers);
+    extract.filter(*in_points);
+
+    // make copy of coefficients into new pointer object to use that in setModelCoefficient function
     pcl::ModelCoefficients::Ptr coeff(new pcl::ModelCoefficients);
     coeff->header = line_coeff.header;
-    coeff->values.resize(6);
-    for(int i=0; i<6; i++)
+    coeff->values.resize(line_coeff.values.size()); //size should be 6
+    for(int i=0; i<line_coeff.values.size(); i++)
         coeff->values[i] = line_coeff.values[i];
 
+    // project line in_ points (part of line definition) on to axis defined in coeff
     pcl::ProjectInliers<PointT> proj;
     proj.setModelType (pcl::SACMODEL_LINE);
-    proj.setInputCloud (line_inliers);
+    proj.setInputCloud (in_points);
     proj.setModelCoefficients (coeff);
-    proj.filter(*line_points);
-    //PointT p1, p2;
-    pcl::getMaxSegment(*line_points,p1,p2);
+    proj.filter(*out_points);
 
+    // get two endpoints of the line (from the set of projected points)
+    pcl::getMaxSegment(*out_points,p1,p2);
+
+    //save line inliers in to _axis_points cloud
     for(size_t i=0; i<line_points->points.size(); i++)
         _axis_points->points.push_back(line_points->points[i]);
-}
+}*/
 
 
 void CloudProcessing::_remove_inliers(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices){
@@ -1055,26 +1157,36 @@ void CloudProcessing::_remove_inliers(pcl::PointCloud<PointT>::Ptr points, pcl::
     extract.filter(*points);
 }
 
-// gives
-void CloudProcessing::_cylinder_filter(Cylinder cyl, pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointIndices::Ptr inliers){
-    PointT p1, p2;
-    p1 = cyl.p1;
-    p2 = cyl.p2;
+// returns indices of points resting inside of given cylinder pareameters
+void CloudProcessing::_cylinder_filter(PointT p1, PointT p2, double radius,
+                                       pcl::PointCloud<PointT>::Ptr cloud_in,
+                                       pcl::PointIndices::Ptr inliers){
     int pts_cnt = 0;
+    tf::Vector3 p1_vec, p2_vec;
+    p1_vec.setX(p1.x);
+    p1_vec.setY(p1.y);
+    p1_vec.setZ(p1.z);
+
+    p2_vec.setX(p2.x);
+    p2_vec.setY(p2.y);
+    p2_vec.setZ(p2.z);
+
     float dx = p1.x - p2.x;
     float dy = p1.y - p2.y;
     float dz = p1.z - p2.z;
 
     float l_sq = (dx*dx) + (dy*dy) + (dz*dz);
-    float r_sq = _r*_r;
+    float r_sq = radius*radius;
 
-    for(size_t i=0; i<cloud_in->points.size(); i++)    {
-        if(isInCylinder(p1, p2, l_sq, r_sq, cloud_in->points[i])>0)        {
+    tf::Vector3 test_point;
+    for(size_t i=0; i<cloud_in->points.size(); i++){
+        test_point.setValue(cloud_in->points[i].x, cloud_in->points[i].y, cloud_in->points[i].z);
+        if(isInCylinder(p1_vec, p2_vec, l_sq, r_sq, test_point)){
             inliers->indices.push_back(i);
             pts_cnt++;
         }
     }
-    ROS_INFO("%d Points found in cylinder filter",pts_cnt);
+    ROS_INFO("%d points found using cylinder filter",pts_cnt);
 }
 
 void CloudProcessing::setZerror(float error){

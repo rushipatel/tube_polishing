@@ -2,7 +2,6 @@
 //#include "controlSequence.h"
 #include "state_machine.h"
 
-
 #define SEGMENTATION_SRV "/tabletop_segmentation"
 
 int main(int argc, char **argv)

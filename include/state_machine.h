@@ -39,6 +39,8 @@ private:
     int _work_traj_idx;
     double _WRIST_OFFSET;
     double _PICK_WRIST_OFFSET;
+    double _TABLE_HEIGHT;
+    double _z_error;
 
     ros::NodeHandlePtr _nh;
 
@@ -60,6 +62,7 @@ private:
     ros::Publisher _tube_mrkr_pub;
     ros::Publisher _collision_obj_pub;
     ros::Publisher _grasp_mrkr_pub;
+    ros::Publisher _work_point_pub;
 
     std::vector<sensor_msgs::PointCloud2> _clusters;
 
