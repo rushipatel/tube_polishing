@@ -20,7 +20,7 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #uncomment if you have defined services
 #rosbuild_gensrv()
 #common commands for building c++ executables and libraries
-rosbuild_add_library(tube_manipulation src/tube_manipulation.cpp src/robot_head.cpp)
+rosbuild_add_library(tube_manipulation src/tube_manipulation.cpp src/robot_head.cpp src/collision_objects.cpp)
 #rosbuild_add_library(tube_manipulation_lib src/collision_check.cpp)
 rosbuild_add_library(tube_perception src/tube_perception.cpp)
 rosbuild_add_library(tube_grasp src/tube_grasp.cpp)

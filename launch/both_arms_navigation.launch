@@ -8,7 +8,7 @@
   <include file="$(find pr2_arm_navigation_actions)/launch/move_right_arm.launch"/>
 
   <!-- load planning_environment -->
-  <include file="$(find planning_environment)/launch/environment_server.launch"/>
+  <include file="$(find tube_polishing)/launch/environment_server.launch"/>
 
   <!-- load planning -->
   <include file="$(find pr2_arm_navigation_planning)/launch/ompl_planning.launch"/>

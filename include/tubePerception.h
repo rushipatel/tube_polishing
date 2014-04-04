@@ -38,9 +38,7 @@
 
 #include <pcl/visualization/pcl_visualizer.h>
 
-#include <pcl/surface/mls.h>
 #include <pcl/segmentation/extract_clusters.h>
-#include <pcl/pcl_base.h>
 
 #include <sstream>
 #include "utility.h"
@@ -163,6 +161,7 @@ namespace TubePerception
                       double minRadius, double maxRadius,
                       TubePerception::Cylinder &disk,
                       geometry_msgs::Pose &workPose);
+        bool extractTubePoints(TubePerception::Tube::Ptr tube, sensor_msgs::PointCloud2ConstPtr cloudIn, sensor_msgs::PointCloud2::Ptr cloudOut);
 
     private:
         bool _convert_cloud_to(std::string target_frame,
@@ -191,9 +190,9 @@ namespace TubePerception
         void _cylinder_filter(PointT p1, PointT p2, double radius,
                               pcl::PointCloud<PointT>::Ptr cloud_in,
                               pcl::PointIndices::Ptr inliers);
-        float _is_in_cylinder( const PointT & pt1, const PointT & pt2,
+        /*float _is_in_cylinder( const PointT & pt1, const PointT & pt2,
                                float length_sq, float radius_sq,
-                               const PointT & testpt );
+                               const PointT & testpt );*/
         tf::Vector3 _get_perp_vec3(tf::Vector3 v3);
         void _define_pose(void);
         void _generate_work_vectors();

@@ -69,16 +69,17 @@ void Grasp::setPose(const tf::Transform &tf){
     _pose = tf2pose(tf);
 }
 
-GraspAnalysis::GraspAnalysis(ros::NodeHandlePtr nh)
+GraspAnalysis::GraspAnalysis(ros::NodeHandlePtr nh, collisionObjects::Ptr collisionObjs)
 {
     _nh = nh;
+    _collision_objects = collisionObjs;
     //_grasp_array = grasp_array;
     //_tube = tube;
     _grasp_array.reset(new (TubeGrasp::GraspArray));
     _test_pairs.reset(new (TubeGrasp::GraspPairArray));
     _valid_pairs.reset(new (TubeGrasp::GraspPairArray));
-    _axis_step_size = 0.05;
-    _circular_steps = 8;
+    _axis_step_size = 0.1; //in meteres
+    _circular_steps = 8; //(2pi)/this number of steps
     _wrist_axis_offset = 0.17; //72 mm from axis of cylinder to wrist origin
     _grasp_pair_found = false;
     _traj_idx = 0;
@@ -152,7 +153,7 @@ TubeGrasp::Grasp GraspAnalysis::getPickPose(std::vector<tf::Vector3> &pointsToAv
     GraspArray::Ptr grasp_array;
     grasp_array.reset(new (GraspArray));
     //offset is 0.185 for picking so that fingers don't hit table.
-    _gen_grasps(_axis_step_size, 180, grasp_array, 0.185);
+    _gen_grasps(0.05, 180, grasp_array, 0.185); // every 50 mm and 2 degree
 
 //    tf::Transform g;
     const tf::Transform t = _tube->getTransform();
@@ -181,12 +182,12 @@ TubeGrasp::Grasp GraspAnalysis::getPickPose(std::vector<tf::Vector3> &pointsToAv
 
     for(size_t i=0; i<grasp_array->grasps.size(); i++)
     {
+        //store the index of most vertical grasp within group( negative z)
         if(grasp_array->grasps[i].group==prev_grp){
-
             TubeGrasp::Grasp grasp = grasp_array->grasps[i];
             // compute x vector of grasp pose
             double offset = grasp.getWristOffset();
-            grasp.setWristOffset(0.01); //0.01 so it doesn't complain
+            grasp.setWristOffset(0.001); //0.001, so function doesn't complain
             tf::Transform step0 = grasp.getWristGlobalPose(t);
             grasp.setWristOffset(1.0); //remember that next function interpolates in negative x
             tf::Transform step1 = grasp.getWristGlobalPose(t);
@@ -206,16 +207,17 @@ TubeGrasp::Grasp GraspAnalysis::getPickPose(std::vector<tf::Vector3> &pointsToAv
                 idx = i;
             }
         }
-        else
+        else //when group changes
         {
             max_angle = M_PI*2;
             double dist;
             tf::Transform grasp_tf = grasp_array->grasps[idx].getWristGlobalPose(t);
-            tf::Vector3 pick_grasp_pos = grasp_tf.getOrigin();
+            tf::Vector3 pick_grasp_pos = grasp_tf.getOrigin(); //get origin of grasp pose in global frame
 //            pick_grasp_pos.setValue(grasp_array->grasps[idx].wristPose.position.x,
 //                                    grasp_array->grasps[idx].wristPose.position.y,
 //                                    grasp_array->grasps[idx].wristPose.position.z);
             bool violeted_dist = false;
+            //and compare with given vector of points if it is closer to any
             for(unsigned int i=0; i<pointsToAvoid.size(); i++){
                 dist = pick_grasp_pos.distance(pointsToAvoid[i]);
                 if(dist<min_dist){
@@ -229,7 +231,7 @@ TubeGrasp::Grasp GraspAnalysis::getPickPose(std::vector<tf::Vector3> &pointsToAv
         prev_grp = grasp_array->grasps[i].group;
     }
 
-    //get very rough estimation of CG (reference point) to figure out nearest grasp
+    //get very rough estimation of center of tube (reference point) to figure out nearest grasp
     //tf::Vector3 ref_point;
     geometry_msgs::Point ref_point;
     ref_point.x = 0;
@@ -486,11 +488,8 @@ void GraspAnalysis::_gen_test_pairs()
 
 void GraspAnalysis::_test_pairs_for_ik()
 {
-    TubeManipulation::Arms manip(_nh);
-
     unsigned int idx;
     unsigned long test_grasps=0;
-
 
     GraspPair gp;
 
@@ -500,6 +499,19 @@ void GraspAnalysis::_test_pairs_for_ik()
         indices[i] = i;
     }
     unsigned int idx_of_indices;
+    //get indeces of MAX_ITERATION number of non repetative random pairs
+    if(MAX_ITERATION>=indices.size()){
+        ROS_WARN("MAX_ITERATION is set to %d, however total number of test pairs is %d. Updating MAX_ITERATION to %d.",
+                 MAX_ITERATION, indices.size(), indices.size());
+        MAX_ITERATION = indices.size();
+    }
+
+    if(MAX_TEST_GRASPS>MAX_ITERATION){
+        ROS_WARN("MAX_TEST_GRASP is set to %d, however it exceeds MAX_ITERATION. Updating MAX_TEXT_GRASP to %d",
+                 MAX_TEST_GRASPS, MAX_ITERATION);
+        MAX_TEST_GRASPS = MAX_ITERATION;
+    }
+
     for(unsigned int i=0; i<MAX_ITERATION; i++){
         idx_of_indices = rand()%(indices.size());
         rand_indices.push_back(indices[idx_of_indices]);
@@ -510,10 +522,16 @@ void GraspAnalysis::_test_pairs_for_ik()
     //unsigned long it=MAX_ITERATION;
     _valid_pairs->graspPairs.reserve(rand_indices.size());
     std::string ss;
-    TubeManipulation::CollisionCheck::Ptr collision_check(new TubeManipulation::CollisionCheck(_nh));
-    collision_check->enableVisualization();
-    arm_navigation_msgs::AttachedCollisionObject::Ptr att_obj_ptr(new arm_navigation_msgs::AttachedCollisionObject);
+    collisionObjects::Ptr collision_objects(new collisionObjects(_nh));
+    _collision_objects->copyAllObjectsTo(collision_objects);
+    arm_navigation_msgs::CollisionObject co;
+    _tube->getCollisionObject(co);
+    collision_objects->removeCollisionObject(co.id.c_str());
+    collision_objects->printListOfObjects();
+    //collision_objects->setAllowedContactCube(_work_pose, 0.02);
 
+    arm_navigation_msgs::AttachedCollisionObject::Ptr att_obj_ptr(new arm_navigation_msgs::AttachedCollisionObject);
+    TubeManipulation::Arms manip(_nh, collision_objects); //arms use collision_objects
     ROS_INFO_STREAM("Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
     ROS_INFO_STREAM("Press 'q' to interrupt computation and continue with available valid pair(s)");
     for(unsigned int i=0; i<rand_indices.size(); i++)
@@ -524,8 +542,9 @@ void GraspAnalysis::_test_pairs_for_ik()
         gp = _test_pairs->graspPairs[idx];
         geometry_msgs::Pose right_wrist_pose = gp.rightGrasp.getWristPose(), left_wrist_pose=gp.leftGrasp.getWristPose();
         _tube->getAttachedObjForBothGrasps(right_wrist_pose,att_obj_ptr);
-        collision_check->setAttachedObjPtr(att_obj_ptr);
-        if(manip.genTrajectory(collision_check, _tube_traj,right_wrist_pose, left_wrist_pose, gp.qRight, gp.qLeft)){
+        collision_objects->addAttachedCollisionObject(*att_obj_ptr);
+        //collision_objects->setPlanningScene();
+        if(manip.genTrajectory(_tube_traj,right_wrist_pose, left_wrist_pose, gp.qRight, gp.qLeft)){
             gp.isValid = true;
             _valid_pairs->graspPairs.push_back(gp);
             test_grasps++;
@@ -538,10 +557,10 @@ void GraspAnalysis::_test_pairs_for_ik()
         std::cout<<"\r"<<MAX_ITERATION-i<<" -> "<<test_grasps<<std::flush;
         if(kbhit()){
             ss.clear();
-            std::cin>>ss;
-            if(ss.compare("q")==0){
+//            std::cin>>ss;
+//            if(ss.compare("q")==0){
                 break;
-            }
+//            }
         }
         //std::cout<<"\rpres 'q' to continue  ["<<MAX_ITERATION-it<<'\t'<<test_grasps<<']'<<std::flush;
     }

@@ -4,7 +4,7 @@
 #include <ros/ros.h>
 #include <pr2_controllers_msgs/Pr2GripperCommandAction.h>
 #include <pr2_controllers_msgs/Pr2GripperCommandActionResult.h>
-#include <pr2_gripper_sensor_msgs/PR2GripperGrabAction.h>
+//#include <pr2_gripper_sensor_msgs/PR2GripperGrabAction.h>
 #include <actionlib/client/simple_action_client.h>
 #include <pr2_controllers_msgs/JointControllerState.h>
 

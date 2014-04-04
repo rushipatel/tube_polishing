@@ -85,7 +85,7 @@ namespace TubeGrasp
     class GraspAnalysis
     {
     public:
-        GraspAnalysis(ros::NodeHandlePtr nh);
+        GraspAnalysis(ros::NodeHandlePtr nh, collisionObjects::Ptr collisionObjs);
         void setTubePtr(TubePerception::Tube::Ptr tube);
         void setWorkPose(geometry_msgs::Pose &p);
         int getWorkPose(geometry_msgs::Pose &p);
@@ -116,6 +116,7 @@ namespace TubeGrasp
         TubeGrasp::GraspPairArray::Ptr _valid_pairs;
         TubeGrasp::GraspPair _computed_pair;
         bool _grasp_pair_found;
+        collisionObjects::Ptr _collision_objects;
 
         geometry_msgs::Pose _work_pose;
         int _traj_idx;

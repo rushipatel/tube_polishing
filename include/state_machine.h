@@ -9,8 +9,7 @@
 #include "tubePerception.h"
 #include "tubeManipulation.h"
 #include "tubeGrasp.h"
-
-#define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
+#include "collisionObjects.h"
 
 class stateMachine
 {
@@ -41,7 +40,9 @@ private:
     double _PICK_WRIST_OFFSET;
     double _TABLE_HEIGHT;
     double _z_error;
-
+    std::string _table_obj_id;
+    std::string _att_obj_id;
+    std::string _tube_obj_id;
     ros::NodeHandlePtr _nh;
 
     TubeManipulation::Arms::Ptr _arms;
@@ -54,15 +55,17 @@ private:
     TubeGrasp::Grasp _current_right_grasp;
     TubeGrasp::Grasp _current_left_grasp;
     TubeManipulation::CollisionCheck::Ptr _collision_check;
+    collisionObjects::Ptr _collision_objects;
     TubeGrasp::Grasp _pick_grasp;
 
     ros::ServiceClient _seg_srv_client;
-    ros::ServiceClient _set_pln_scn;
+    //ros::ServiceClient _set_pln_scn;
 
     ros::Publisher _tube_mrkr_pub;
     ros::Publisher _collision_obj_pub;
     ros::Publisher _grasp_mrkr_pub;
     ros::Publisher _work_point_pub;
+    ros::Publisher _pick_grasp_pub;
 
     std::vector<sensor_msgs::PointCloud2> _clusters;
 
@@ -77,12 +80,13 @@ private:
     void _print_state();
     std::string _get_state_str(int state);
     bool _move_arm_to_home_position(std::string which_arm);
-    void _set_planning_scn(void);
+    void _update_scene(void);
     bool _get_clusters(void);
     bool _gen_tube_model(void);
     void _extract_table_from_msg(tabletop_object_detector::TabletopSegmentation &seg_srv);
     void _publish_tube(void);
     void _publish_grasps(void);
+    void _publish_pick_pose(void);
     bool _get_computed_grasp_pair(void);
     bool _get_pick_grasp(void);
     bool _lift_obj_with_right_arm(void);

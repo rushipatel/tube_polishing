@@ -183,7 +183,7 @@ void Tube::resetPoseToActual(){
 // tests only local points
 unsigned int Tube::whichCylinder(PointT localPoint)
 {
-    ROS_INFO_STREAM("Test point : \n"<<localPoint);
+    //ROS_INFO_STREAM("Test point : \n"<<localPoint);
 
     //convert in to vector3
     tf::Vector3 p;
@@ -312,6 +312,7 @@ void Tube::getCollisionObject(arm_navigation_msgs::CollisionObject &obj)
         cyl_shape.dimensions[0] = cylinders[i].radius;
         cyl_shape.dimensions[1] = cylinders[i].getAxisLength();
         obj.shapes.push_back(cyl_shape);
+        //ROS_WARN("***Pose.position = %f   %f   %f",pose.position.x, pose.position.y,pose.position.z);
         obj.poses.push_back(pose);
     }
 }
@@ -522,6 +523,77 @@ bool CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
     return true;
 }
 
+bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2ConstPtr cloudIn, sensor_msgs::PointCloud2::Ptr cloudOut)
+{
+    if(tube->cylinders.empty()){
+        ROS_WARN("no cylinder in tube model!");
+        return false;
+    }
+    double r_inflate_coeff = 1.5; // inflate radius by 1.5 times
+    double l_inflate_coeff = 1.2; // 20% longer axis
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZRGB>);
+    sensor_msgs::PointCloud2 cloudIn_converted;
+    _convert_cloud_to("/base_link",*cloudIn,cloudIn_converted);
+    //_convert_to_pcl(cloudIn_converted, cloud_in);
+    pcl::fromROSMsg(cloudIn_converted, *cloud_in);
+
+    std::vector<double> r_sq(tube->cylinders.size());
+    std::vector<double> l_sq(tube->cylinders.size());
+    std::vector<tf::Vector3> p1(tube->cylinders.size());
+    std::vector<tf::Vector3> p2(tube->cylinders.size());
+    tf::Vector3 point1,point2,mid_point, axis;
+    double len;
+    tf::Transform tube_tf = tube->getTransform();
+    for(unsigned int i=0; i<tube->cylinders.size(); i++){
+        r_sq[i] = tube->cylinders[i].radius * r_inflate_coeff;
+        r_sq[i] = r_sq[i] * r_sq[i];
+        len = tube->cylinders[i].getAxisLength() * l_inflate_coeff;
+        l_sq[i] = len * len;
+        mid_point = tube->cylinders[i].getMidPoint(tube_tf);
+        axis = tube->cylinders[i].getAxisVector(tube_tf);
+        axis.normalize();
+        axis *= len/2;
+        point2 = mid_point + axis;
+        axis *= (-1);
+        point1 = mid_point + axis;
+
+        p1[i] = point1;
+        p2[i] = point2;
+
+        /*std::cout<<"\nr_sq["<<i<<"] = "<<r_sq[i];
+        std::cout<<"\nl_sq["<<i<<"] = "<<l_sq[i];
+        PointT p;
+        p.x = p1[i].getX();
+        p.y = p1[i].getY();
+        p.z = p1[i].getZ();
+        cloud_out->points.push_back(p);
+        p.x = p2[i].getX();
+        p.y = p2[i].getY();
+        p.z = p2[i].getZ();
+        cloud_out->points.push_back(p);*/
+    }
+    cloud_out->points.clear();
+    tf::Vector3 test_point;
+    for(unsigned int i=0; i<cloud_in->points.size(); i++){
+        test_point.setX(cloud_in->points[i].x);
+        test_point.setY(cloud_in->points[i].y);
+        test_point.setZ(cloud_in->points[i].z);
+        //for each cylinder check if land inside cylinder
+        for(unsigned int j=0; j<tube->cylinders.size(); j++){
+            //if lands inside cylinder add point to cloud
+            if(isInCylinder(p1[j], p2[j], l_sq[j], r_sq[j], test_point)){
+                cloud_out->points.push_back(cloud_in->points[i]);
+            }
+        }
+    }
+    pcl::toROSMsg(*cloud_out,*cloudOut);
+    ROS_INFO("Total %d points found", cloud_out->points.size());
+    //displayCloud(cloud_in);
+    //displayCloud(cloud_out);
+    return true;
+}
+
 bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
                                double minRadius, double maxRadius,
                                TubePerception::Cylinder &disk,
@@ -623,6 +695,11 @@ void CloudProcessing::_convert_to_pcl(const sensor_msgs::PointCloud2 &rosTubeClo
         pcl_cloud->points[i].rgb = cloud->points[i].rgb;
     }
 }
+
+/*void CloudProcessing::_convert_to_ros(pcl::PointCloud<PointT>::Ptr pcl_cloud, const sensor_msgs::PointCloud2 &ros_cloud)
+{
+    pcl::toROSMsg(*pcl_cloud, ros_cloud);
+}*/
 
 void CloudProcessing::segmentizeCloud(const sensor_msgs::PointCloud2 &cloudIn)
 {

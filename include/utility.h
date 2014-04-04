@@ -68,6 +68,7 @@ bool isInCylinder(const tf::Vector3 &p1, const tf::Vector3 &p2, double length_sq
     return true;
 }
 
+
 /*std::string armNavigationErrorCodeToString(arm_navigation_msgs::ArmNavigationErrorCodes &error_code)
 {
     std::string result;

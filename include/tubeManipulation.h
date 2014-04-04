@@ -13,34 +13,21 @@
 #include <tf/tf.h>
 #include <arm_navigation_msgs/FilterJointTrajectory.h>
 #include <arm_navigation_msgs/FilterJointTrajectoryWithConstraints.h>
-#include <arm_navigation_msgs/AllowedCollisionEntry.h>
-#include <arm_navigation_msgs/PlanningScene.h>
-#include <arm_navigation_msgs/SetPlanningSceneDiff.h>
-#include <arm_navigation_msgs/GetPlanningScene.h>
-#include <arm_navigation_msgs/MoveArmAction.h>
 #include <arm_navigation_msgs/utils.h>
 #include <planning_environment/models/collision_models.h>
 #include <vector>
 
+#include "collisionObjects.h"
 #include "utility.h"
 
 #define MAX_JOINT_VEL 0.2
 
-#ifndef SET_PLANNING_SCENE_DIFF_NAME
-    #define SET_PLANNING_SCENE_DIFF_NAME "/environment_server/set_planning_scene_diff"
-#endif
-
-#ifndef GET_PLANNING_SCENE_NAME
-    #define GET_PLANNING_SCENE_NAME "/environment_server/get_planning_scene"
-#endif
-
 /*! \brief  Simple action server client definition for JointTrajectoryAction */
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryAction> TrajClient;
-typedef actionlib::SimpleActionClient<arm_navigation_msgs::MoveArmAction> MoveArmClient;
+//typedef actionlib::SimpleActionClient<arm_navigation_msgs::MoveArmAction> MoveArmClient;
 
 namespace TubeManipulation
 {
-
 
 class Trajectory
 {
@@ -59,11 +46,11 @@ private:
 class CollisionCheck
 {
 public:
-    CollisionCheck(ros::NodeHandlePtr nh);
+    CollisionCheck(ros::NodeHandlePtr nh, collisionObjects::Ptr objPtr);
     ~CollisionCheck();
     void refreshState(void);
-    void setAttachedObjPtr(arm_navigation_msgs::AttachedCollisionObject::Ptr attObjPtr);
-    void clearAttachedObj();
+    //void setAttachedObjPtr(arm_navigation_msgs::AttachedCollisionObject::Ptr attObjPtr);
+    //void clearAttachedObj();
     void printState(void);
     bool isStateValid(std::vector<double> &right_joints,
                       std::vector<double> &left_joints);
@@ -88,10 +75,10 @@ public:
 
 private:
     ros::NodeHandlePtr _nh;
-    ros::ServiceClient _set_scn_client; /*!< get planning scene diff */
+    ros::ServiceClient _set_scn_client; /*!< set planning scene diff */
     arm_navigation_msgs::PlanningScene _scn;
     planning_environment::CollisionModels *_collision_models;
-    arm_navigation_msgs::AttachedCollisionObject::Ptr _att_obj_ptr;
+    collisionObjects::Ptr _collision_obj_ptr;
     std::map<std::string, double> _r_jnt_values;
     std::map<std::string, double> _l_jnt_values;
     std::vector<double> _r_jnts;
@@ -130,13 +117,13 @@ private:
 class Arms : public Trajectory
 {
 public:
-    Arms(ros::NodeHandlePtr rh);
+    Arms(ros::NodeHandlePtr nh, collisionObjects::Ptr colObjPtr);
     ~Arms();
-    bool genTrajectory(CollisionCheck::Ptr collision_check_ptr,
-                       geometry_msgs::PoseArray &objPoseArray,
+    bool genTrajectory(geometry_msgs::PoseArray &objPoseArray,
                        geometry_msgs::Pose &rightArmOffset,
                        geometry_msgs::Pose &leftArmOffset,
-                       std::vector<double> &rightJointTraj, std::vector<double> &leftJointTraj);
+                       std::vector<double> &rightJointTraj,
+                       std::vector<double> &leftJointTraj);
     bool genLeftTrajectory(std::vector<double> &jointTrajectory,
                            geometry_msgs::Pose &leftArmOffset);
     bool genRightTrajectory(std::vector<double> &jointTrajectory,
@@ -165,16 +152,17 @@ public:
     bool getSimpleLeftArmIK(geometry_msgs::Pose pose,
                                  std::vector<double> &jointsOut);
     bool getRegraspPoseRight(arm_navigation_msgs::AttachedCollisionObject::Ptr attObjPtr,
-                                 geometry_msgs::Pose crnt_grasp,
-                                 geometry_msgs::Pose wrist_pose,
-                                 geometry_msgs::Pose other_hand_grasp,
-                                 geometry_msgs::Pose &obj_pose_out, std::vector<double> &ik_soln);
+                             geometry_msgs::Pose crnt_grasp,
+                             geometry_msgs::Pose wrist_pose,
+                             geometry_msgs::Pose other_hand_grasp,
+                             geometry_msgs::Pose &obj_pose_out,
+                             std::vector<double> &ik_soln);
     bool getRegraspPoseLeft(arm_navigation_msgs::AttachedCollisionObject::Ptr attObjPtr,
                             geometry_msgs::Pose crnt_grasp,
-                                 geometry_msgs::Pose wrist_pose,
-                                 geometry_msgs::Pose other_hand_grasp,
-                                 geometry_msgs::Pose &obj_pose_out,
-                                 std::vector<double> &ik_soln);
+                             geometry_msgs::Pose wrist_pose,
+                             geometry_msgs::Pose other_hand_grasp,
+                             geometry_msgs::Pose &obj_pose_out,
+                             std::vector<double> &ik_soln);
     bool moveRightArmWithMPlanning(std::vector<double> &ik_soln);
     bool moveRightArmWithMPlanning(geometry_msgs::Pose pose);
     bool moveLeftArmWithMPlanning(std::vector<double> &ik_soln);
@@ -185,8 +173,10 @@ public:
     geometry_msgs::Pose getLeftArmFK(std::vector<double> &left_joints);
     void getRightJoints(std::vector<double> &joints);
     void getLeftJoints(std::vector<double> &joints);
-    void setAttachedObjPtr(arm_navigation_msgs::AttachedCollisionObject::Ptr attObjPtr);
-    // For testing of KDL. should go back in private afterwards
+    bool moveRightArmToCloudCapturePose(const tf::Vector3 &sensorOrig,
+                                        const tf::Vector3 &startOrig,
+                                        const double minSensorDistance,
+                                        std::vector<double> &ikSoln);
 
     typedef boost::shared_ptr<TubeManipulation::Arms> Ptr;
 
@@ -194,7 +184,7 @@ private:
     ros::NodeHandlePtr _rh;
     TrajClient* _traj_client_r; /*!< Right arm trajectory action client. */
     TrajClient* _traj_client_l; /*!< Left arm trajectory action client. */
-    ros::ServiceClient _set_pln_scn_client; /*!< get planning scene diff */
+    //ros::ServiceClient _set_pln_scn_client; /*!< get planning scene diff */
     ros::ServiceClient _ik_client_r; /*!< Right arm IK client. */
     ros::ServiceClient _ik_client_l; /*!< Left arm IK client. */
     ros::ServiceClient _fk_client_r;
@@ -206,6 +196,7 @@ private:
     ros::ServiceClient _traj_unnormalizer_client; /*!< Joint trajectory unnormalizer filter client. */
     ros::ServiceClient _traj_filter_client;
     ros::Publisher _att_obj_pub;
+    ros::Publisher _test_pose_pub;
     pr2_controllers_msgs::JointTrajectoryGoal _right_goal, _left_goal; /*!< Joint trajectory goal to execute joint trajectory. */
     std::vector<double> _right_joint_traj,_left_joint_traj; /*!< Double linear array to store joint trajectory. */
     tf::Transform _left_wrist_offset; /*!< Offset of left arm wrist_roll link from object. */
@@ -215,11 +206,11 @@ private:
     std::vector<std::string> _l_jnt_nms;
     CollisionCheck::Ptr _collision_check;
     std::map<std::string, std::pair<double, double> > _joint_bounds;
-    arm_navigation_msgs::AttachedCollisionObject::Ptr _att_obj_ptr;
+    //arm_navigation_msgs::AttachedCollisionObject::Ptr _att_obj_ptr;
+    collisionObjects::Ptr _collision_objects;
 
     void _get_right_joints(std::vector<double> &joint_state);
     void _get_left_joints(std::vector<double> &joint_state);
-    void _set_planning_scene(void);
 
     void _get_right_goal();
     void _get_left_goal();
@@ -254,20 +245,25 @@ private:
     bool _get_simple_left_arm_ik(geometry_msgs::Pose &pose,
                                   std::vector<double> &joints,
                                   std::vector<double> &seed_state);
-    bool _gen_trajectory(CollisionCheck::Ptr collision_check_ptr,
-                           std::vector<double> &right_joint_traj,
-                         std::vector<double> &left_joint_traj);
+    bool _gen_trajectory(std::vector<double> &right_joint_traj,
+                           std::vector<double> &left_joint_traj);
     bool _move_right_arm_with_mplning(std::vector<double> &ik_joints);
     bool _move_left_arm_with_mplning(std::vector<double> &ik_joints);
-    bool _get_motion_plan(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
+    bool _get_motion_plan(arm_navigation_msgs::GetMotionPlan::Request &req,
+                          arm_navigation_msgs::GetMotionPlan::Response &res);
     bool _filter_trajectory(trajectory_msgs::JointTrajectory &trajectory_in,
-                            trajectory_msgs::JointTrajectory &trajectory_out, arm_navigation_msgs::GetMotionPlan::Request mplan_req);
+                            trajectory_msgs::JointTrajectory &trajectory_out,
+                            arm_navigation_msgs::GetMotionPlan::Request mplan_req);
     void _fill_trajectory_msg(trajectory_msgs::JointTrajectory &trajectory_in,
                               trajectory_msgs::JointTrajectory &trajectory_out);
-    void _execute_joint_trajectory(trajectory_msgs::JointTrajectory &right_traj, trajectory_msgs::JointTrajectory &left_traj);
-    bool _handle_planning_error(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
+    void _execute_joint_trajectory(trajectory_msgs::JointTrajectory &right_traj,
+                                   trajectory_msgs::JointTrajectory &left_traj);
+    bool _handle_planning_error(arm_navigation_msgs::GetMotionPlan::Request &req,
+                                arm_navigation_msgs::GetMotionPlan::Response &res);
     void _get_bounds_from_description();
-    bool _start_is_goal(arm_navigation_msgs::GetMotionPlan::Request &req, arm_navigation_msgs::GetMotionPlan::Response &res);
+    bool _start_is_goal(arm_navigation_msgs::GetMotionPlan::Request &req,
+                        arm_navigation_msgs::GetMotionPlan::Response &res);
+    void _publish_pose(const geometry_msgs::Pose &pose);
 
     geometry_msgs::Pose _get_right_fk(std::vector<double> &joints);
     geometry_msgs::Pose _get_left_fk(std::vector<double> &joints);
