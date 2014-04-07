@@ -231,23 +231,27 @@ TubeGrasp::Grasp GraspAnalysis::getPickPose(std::vector<tf::Vector3> &pointsToAv
         prev_grp = grasp_array->grasps[i].group;
     }
 
-    //get very rough estimation of center of tube (reference point) to figure out nearest grasp
+    //get very rough estimation of center of tube (reference point) to figure out lift grasp that is near to CG
     //tf::Vector3 ref_point;
     geometry_msgs::Point ref_point;
     ref_point.x = 0;
     ref_point.y = 0;
     ref_point.z = 0;
     geometry_msgs::Pose pose;
+    //length is weight
+    double total_weight = 0, weight;
     for(size_t i=0; i<_tube->cylinders.size(); i++)
     {
+        weight = _tube->cylinders[i].getAxisLength();
+        total_weight += weight;
         pose = _tube->getCylinderGlobalPose(i);
-        ref_point.x += pose.position.x;
-        ref_point.y += pose.position.y;
-        ref_point.z += pose.position.z;
+        ref_point.x += pose.position.x * weight;
+        ref_point.y += pose.position.y * weight;
+        ref_point.z += pose.position.z * weight;
     }
-    ref_point.x /= _tube->cylinders.size();
-    ref_point.y /= _tube->cylinders.size();
-    ref_point.z /= _tube->cylinders.size();
+    ref_point.x /= total_weight;
+    ref_point.y /= total_weight;
+    ref_point.z /= total_weight;
 
     //check all sorted grasps for distance between ref point and it's origin. select closest
     std::vector<double> dist(grasp_sorted->grasps.size());

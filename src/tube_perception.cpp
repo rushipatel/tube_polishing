@@ -49,6 +49,22 @@ tf::Vector3 Cylinder::getMidPoint(tf::Transform &tubeTf){
     return point;
 }
 
+tf::Vector3 Cylinder::getGlobalP1(tf::Transform &tubeTf){
+    tf::Transform point_tf;
+    point_tf.setIdentity();
+    point_tf.setOrigin(p1);
+    point_tf = tubeTf * point_tf;
+    return point_tf.getOrigin();
+}
+
+tf::Vector3 Cylinder::getGlobalP2(tf::Transform &tubeTf){
+    tf::Transform point_tf;
+    point_tf.setIdentity();
+    point_tf.setOrigin(p2);
+    point_tf = tubeTf * point_tf;
+    return point_tf.getOrigin();
+}
+
 void Cylinder::_convert_points_in_global(tf::Transform &tf, tf::Vector3 &p1_out, tf::Vector3 &p2_out){
     tf::Transform point_tf;
     point_tf.setIdentity();
@@ -150,7 +166,8 @@ geometry_msgs::Pose Tube::getPose(void){
 }
 
 tf::Transform Tube::getTransform(void){
-    return pose2tf(_pose);
+    tf::Transform tf = pose2tf(_pose);
+    return tf;
 }
 
 geometry_msgs::Pose Tube::getCylinderGlobalPose(unsigned int cylIdx){
@@ -273,6 +290,7 @@ void Tube::_get_attached_collision_object(arm_navigation_msgs::AttachedCollision
     cyl_shape.dimensions.resize(2);
     cyl_shape.dimensions[0] = 0; // radius
     cyl_shape.dimensions[1] = 0; // length
+    obj_ptr->object.padding = 1.1;
 
     obj_ptr->object.shapes.clear();
     obj_ptr->object.poses.clear();
@@ -523,6 +541,169 @@ bool CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
     return true;
 }
 
+bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, TubePerception::Tube::Ptr tube_ptr){
+    //copy cloud in pcl type and initialize pointers
+    _tube_cloud.reset(new pcl::PointCloud<PointT>);
+    _axis_points.reset(new pcl::PointCloud<PointT>);
+    //_convert_cloud_to("/base_link",)
+    _convert_to_pcl(cluster, _tube_cloud);
+    _tube.reset(new TubePerception::Tube);
+    _num_of_points = _tube_cloud->points.size();
+
+    //_compensate_error();
+    _estimate_normals(_tube_cloud);
+    _r = _get_radius();
+    _collaps_normals();
+    _segmentize_axis();
+    _define_pose(); // <<< Cylinders gets converted in local frame including p1 and p2
+    if(_tube->cylinders.empty()){
+        _tube->reset();
+        ROS_WARN("No cylinder found in cluster!");
+        return false;
+    }
+    std::vector<unsigned int> corres_ind;
+    _compare_models(tube_ptr, _tube, corres_ind);
+    //since the pose of any tube model is first cylinder
+    // find fisrt cylinder
+    std::cout<<"\nOriginal Tube -> New tube";
+    int corresp_cyl_cnt = 0;
+    for(unsigned int i=0; i<corres_ind.size(); i++){
+        if(corres_ind[i]<corres_ind.size()){
+            corresp_cyl_cnt++;
+        }
+        std::cout<<"\n"<<i<<" -> "<<corres_ind[i];
+    }
+    std::cout<<"\n";
+
+    if(corresp_cyl_cnt<2){
+        ROS_WARN("Couldn't find enough corresponding cylinders");
+        return false;
+    }
+    if(corres_ind[0]<_tube->cylinders.size()){
+        tf::Transform temp_tf;
+        tf::Vector3 orig_first, orig_second;
+        temp_tf = tube_ptr->getTransform();
+        orig_first = tube_ptr->cylinders[0].getMidPoint(temp_tf);
+        temp_tf = _tube->getTransform();
+        orig_second = _tube->cylinders[corres_ind[0]].getMidPoint(temp_tf);
+        tf::Transform err_tf1;
+        err_tf1.setIdentity();
+        err_tf1.setOrigin(orig_second - orig_first);
+        temp_tf = tube_ptr->getTransform();
+        tf::Vector3 axis_first = tube_ptr->cylinders[0].getAxisVector(temp_tf);
+        temp_tf = _tube->getTransform();
+        tf::Vector3 axis_second = _tube->cylinders[corres_ind[0]].getAxisVector(temp_tf);
+        double angle = axis_first.angle(axis_second);
+        tf::Vector3 perp_vec = axis_first.cross(axis_second);
+        //err_tf1.setRotation(tf::Quaternion(perp_vec, angle));
+
+        tf::Transform err_tf2;
+        err_tf2.setIdentity();
+
+        // at this point z axis of both tube and origin is aligned
+
+        // now align y and x by minimizing error by rotating around z axis
+        unsigned int cnt = 1000;
+        tf::Transform tube_tf = tube_ptr->getTransform(), new_tube_tf = _tube->getTransform();
+        tf::Transform tube_plus_err;
+        tf::Vector3 vec;
+        std::string s;
+        std::cin>>s;
+
+        double theta_step = (2*M_PI)/cnt;
+        double theta = 0;
+        double prev_err = 0;
+        double err = 0;
+        //start with theta = 0
+        while(cnt>0){
+            err = 0;
+            err_tf2.setIdentity();
+            err_tf2.setRotation(tf::Quaternion(tf::Vector3(0, 0, 1), theta));
+            tube_plus_err = tube_tf * err_tf1 * err_tf2;
+            for(unsigned int i=0; i<tube_ptr->cylinders.size(); i++){
+                if(corres_ind[i]<corres_ind.size()){
+                    vec = tube_ptr->cylinders[i].getGlobalP1(tube_plus_err) -
+                            _tube->cylinders[corres_ind[i]].getGlobalP1(new_tube_tf);
+                    err += vec.length();
+                    vec = tube_ptr->cylinders[i].getGlobalP2(tube_plus_err) -
+                            _tube->cylinders[corres_ind[i]].getGlobalP2(new_tube_tf);
+                    err += vec.length();
+                }
+            }
+            if(err>prev_err){
+                theta -= theta_step;
+            }
+            else{
+                theta += theta_step;
+            }
+            //rotation bounds
+            if(theta>2*M_PI){
+                theta -= (2*M_PI);
+            }
+            if(theta<0){
+                theta += (2*M_PI);
+            }
+            std::cout<<"\ntheta : "<<theta<<"err : "<<err;
+            prev_err = err;
+            cnt--;
+        }
+        err_tf2.setIdentity();
+        err_tf2.setRotation(tf::Quaternion(tf::Vector3(0, 0, 1), theta));
+        temp_tf = tube_ptr->getTransform();
+        temp_tf = temp_tf * err_tf1 * err_tf2;
+        tf::Vector3 pos_err = err_tf1.getOrigin();
+        ROS_INFO_STREAM("Position Error(x,y,z) : ("<<pos_err.getX()<<", "<<pos_err.getY()<<", "<<pos_err.getZ()<<")");
+        geometry_msgs::Pose pose = tf2pose(temp_tf);
+        //tube_ptr->setPose(pose);
+        //tube_ptr->setPoseAsActualPose();
+    }
+    else{
+        ROS_WARN("Couldn't find first cylinder in new model!");
+        return false;
+    }
+    return true;
+}
+
+// could be extended to pose inverient feature comparision
+// currently error between poses of both tubes has to be within certain limit
+void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
+                                      TubePerception::Tube::Ptr second,
+                                      std::vector<unsigned int> & corresponding_indices){
+    corresponding_indices.resize(first->cylinders.size());
+    unsigned int idx;
+    tf::Transform temp_tf;
+    // compare distance between  two mid points and store the index of closest one
+    for(unsigned int i=0; i<first->cylinders.size(); i++){
+        temp_tf = first->getTransform();
+        tf::Vector3 first_mid_point = first->cylinders[i].getMidPoint(temp_tf);
+        tf::Vector3 second_mid_point;
+        double min_dist = std::numeric_limits<double>::max(), dist, first_len, second_len, len_err;
+        // initialize with unreal index value
+        idx = std::numeric_limits<unsigned int>::max();
+        first_len = first->cylinders[i].getAxisLength();
+        //compare mid points of the cylinders in second tube and store index id distance is less than certain value (radius)
+        for(unsigned int j=0; j<second->cylinders.size(); j++){
+            temp_tf = second->getTransform();
+            second_mid_point = second->cylinders[j].getMidPoint(temp_tf);
+            second_len = second->cylinders[j].getAxisLength();
+            dist = first_mid_point.distance(second_mid_point);
+            len_err = std::abs(first_len - second_len);
+            std::cout<<"\ndist : "<<dist;
+            if(dist<min_dist){
+                min_dist = dist;
+                // after finding closest corresponding cylinder, test if it fits maximum allowable distance
+                // currently radius (to make it little adeptive)
+                // position error between two corresponding cylinders has to be less than the radius of the cylinder
+                if(dist < second->cylinders[j].radius*2 && len_err<0.005){
+                    idx = j;
+                }
+            }
+        }
+        std::cout<<"\n";
+        corresponding_indices[i] = idx;
+    }
+}
+
 bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2ConstPtr cloudIn, sensor_msgs::PointCloud2::Ptr cloudOut)
 {
     if(tube->cylinders.empty()){
@@ -589,8 +770,8 @@ bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2
     }
     pcl::toROSMsg(*cloud_out,*cloudOut);
     ROS_INFO("Total %d points found", cloud_out->points.size());
-    //displayCloud(cloud_in);
-    //displayCloud(cloud_out);
+    displayCloud(cloud_in);
+    displayCloud(cloud_out);
     return true;
 }
 
@@ -853,6 +1034,8 @@ tf::Vector3 CloudProcessing::_get_perp_vec3(tf::Vector3 v3){
 }
 
 //Also converts points in local frame (tube frame)
+//Assumes that all cylinders are in global frame at this point
+//Z is axis vector
 void CloudProcessing::_define_pose(void)
 {
     tf::Transform identity_tf = tf::Transform::getIdentity();
@@ -894,10 +1077,10 @@ void CloudProcessing::_define_pose(void)
         int idx = 0;
         geometry_msgs::Pose pose;
         pose = _tube->cylinders[idx].getPose();
-        _tube->setPose(pose);  //Tube's pose = first (strong) cylinder's global pose
+        _tube->setPose(pose);  //Tube's pose = first (assuming to be strong) cylinder's global pose
     }
 
-    // Convert cylinder from global to local
+    // Convert cylinder from global to local to tube
     for(size_t i=0; i<_tube->cylinders.size(); i++)
     {
         tf::Transform tube_tf, cyl_tf, tube_cyl_tf;
@@ -1275,6 +1458,17 @@ void CloudProcessing::displayCloud(pcl::PointCloud<PointT>::Ptr cloud)
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
     viewer->addPointCloud<PointT> (cloud,"cloud");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "cloud");
+    viewer->addCoordinateSystem (1.0);
+    viewer->initCameraParameters ();
+    viewer->spin();
+}
+
+void CloudProcessing::displayCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
+{
+    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    viewer->setBackgroundColor (0, 0, 0);
+    viewer->addPointCloud<pcl::PointXYZRGB> (cloud,"cloud");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "cloud");
     viewer->addCoordinateSystem (1.0);
     viewer->initCameraParameters ();

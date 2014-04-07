@@ -128,8 +128,8 @@ public:
                            geometry_msgs::Pose &leftArmOffset);
     bool genRightTrajectory(std::vector<double> &jointTrajectory,
                             geometry_msgs::Pose &rightArmOffset);
-    bool executeJointTrajectory();
-    bool executeJointTrajectory(std::vector<double> &qRight,
+    //bool executeJointTrajectory();
+    bool executeJointTrajectoryWithSync(std::vector<double> &qRight,
                                 std::vector<double> &qLeft);
     bool moveRightArm(geometry_msgs::Pose pose);
     bool simpleMoveRightArm(geometry_msgs::Pose pose);

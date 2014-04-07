@@ -24,7 +24,8 @@ public:
         TRAJ_GEN,
         TRAJ_EXE,
         DONE,
-        ERR
+        ERR,
+        RECAPTURE
     };
     void start();
 

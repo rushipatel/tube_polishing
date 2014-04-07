@@ -125,7 +125,8 @@ bool Gripper::setRightGripperPosition(double position, double effort)
         //ROS_INFO("right SUM : %f",sum);
 
         //if in stall condition and error is somewhat acceptable
-        if(sum<0.002 && (state->error < (_joint_state_err*4))){
+        if(sum<0.01 /*&& (state->error < (_joint_state_err*4))*/){
+            ROS_WARN_NAMED(GRPR_LGRNM,"Right gripper stalled!");
             return true;
         }
         ROS_DEBUG_NAMED(GRPR_LGRNM,"Right gripper joint state error: %f",state->error);
@@ -171,7 +172,8 @@ bool Gripper::setLeftGripperPosition(double position, double effort)
         }
         //ROS_INFO("SUM : %f",sum);
         //if in stall condition and error is somewhat acceptable
-        if(sum<0.002 && (state->error < (_joint_state_err*4))){
+        if(sum<0.01 /*&& (state->error < (_joint_state_err*4))*/){
+            ROS_WARN_NAMED(GRPR_LGRNM,"Left gripper stalled!");
             return true;
         }
         ROS_DEBUG_NAMED(GRPR_LGRNM,"Left gripper joint state error: %f",state->error);

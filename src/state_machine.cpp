@@ -14,7 +14,7 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _r_soln_avail = false;
     _l_soln_avail = false;
     _WRIST_OFFSET = 0.15;
-    _PICK_WRIST_OFFSET = 0.19;
+    _PICK_WRIST_OFFSET = 0.2;
     _TABLE_HEIGHT = 0.5; //in meters
     _z_error = 0.0;
 
@@ -69,7 +69,7 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
 
     _work_pose1.position.x = 0.7;
     _work_pose1.position.y = 0.0;
-    _work_pose1.position.z = 0.8;
+    _work_pose1.position.z = 0.9;
     _work_pose1.orientation.x = 0.0;
     _work_pose1.orientation.y = 0.0;
     _work_pose1.orientation.z = 0.0;
@@ -96,6 +96,7 @@ void stateMachine::start()
                 break;
             }
             _head.lookAt(0.75,0.0,0.5);
+            ros::Duration(3).sleep(); //give time to head to settle
             _state = PERCIEVE;
             //_state = DONE;
             ROS_INFO_NAMED(LGRNM,"*Initialized");
@@ -128,7 +129,7 @@ void stateMachine::start()
             //_add_tube_to_collision_space();
             _update_scene();
             //TODO: get_attached_obj;
-            _state = GRASP_ANLYS;
+            _state = PICK;
             ROS_INFO_NAMED(LGRNM,"*Generated tube and published table");
             break;
         }
@@ -141,53 +142,104 @@ void stateMachine::start()
                 break;
             }
             _publish_grasps();
+            _state = REGRASP;
+            break;
+        }
+        case PICK:
+        {
+            ROS_INFO_NAMED(LGRNM,"*Picking tube...");
             if(!_get_pick_grasp()){
                 ROS_ERROR_NAMED(LGRNM,"No solution of lift grasp found for any arm");
                 _state = ERR;
                 break;
             }
-            _state = PICK;
-            break;
-        }
-        case PICK:
-        {
-            ROS_INFO("*Picking tube...");
-            _print_state();
             if(_r_soln_avail){
-                ROS_INFO("Lifting with right arm");
-                //if(_arms->moveRightArmWithMPlanning(_pick_grasp.getWristGlobalPose(_tube->getPose()))){
-                    if(_lift_obj_with_right_arm()){
-                        _l_soln_avail = false; //done with these variables as of now. reset them
-                        _r_soln_avail = false;
-                 //   }
+                ROS_INFO_NAMED(LGRNM, "Lifting object with right arm...");
+                if(_lift_obj_with_right_arm()){
+                    _l_soln_avail = false; //done with these variables as of now. reset them
+                    _r_soln_avail = false;
+                    _state = RECAPTURE;
                     break;
                 }
                 else{
-                    //_r_soln_avail = false;
-                    if(!_move_arm_to_home_position("right_arm")){
-                        _state = ERR;
-                    }
-                    break; //leave with the state = PICK. this will try with left arm
+                    _r_soln_avail = false;
+                    break;
                 }
             }
             if(_l_soln_avail){
-                /*if(_arms->moveLeftArmWithMPlanning(_pick_grasp.getWristGlobalPose(_tube->getPose()))){
-                    //TODO: handle lift sequence;
+                _state = ERR;
+                break;
+            }
+            _state = ERR;
+            break;
+        }
+        case RECAPTURE:
+        {
+            /*ROS_INFO_NAMED(LGRNM, "*Recapturing point cloud...");
+            tf::Transform tube_tf = _tube->getTransform();
+            std::vector<double> ik_soln2(7);
+            if(_att2right & !_att2left){
+                if(_arms->moveRightArmToCloudCapturePose(tf::Vector3(0,0,1.5),tube_tf.getOrigin(),0.9, ik_soln2)){
+                    if(_arms->moveRightArmWithMPlanning(ik_soln2)){
+                        ros::Duration(3).sleep();
+                        tf::Transform tube_tf,
+                                grsp = _current_right_grasp.getWristTransform(),
+                                fk = pose2tf(_arms->getRightArmFK(ik_soln2));
+                        tube_tf = fk*grsp.inverse();
+                        geometry_msgs::Pose tube_pose = tf2pose(tube_tf);
+                        _tube->setPose(tube_pose);
+                        _tube->setPoseAsActualPose();
+//                        _publish_tube();
+                        _update_scene();
+                        //sensor_msgs::PointCloud2ConstPtr cloud_ptr = ros::topic::waitForMessage<sensor_msgs::PointCloud2>
+                        //                ("/wide_stereo/points2");
+                        geometry_msgs::Pose fk_pose = tf2pose(fk);
+                        _head.lookAt(fk_pose.position.x, fk_pose.position.y, fk_pose.position.z-0.1);
+                        ros::Duration(3).sleep();
+                        sensor_msgs::PointCloud2ConstPtr cloud_ptr = ros::topic::waitForMessage<sensor_msgs::PointCloud2>
+                                ("/head_mount_kinect/depth_registered/points",ros::Duration(5));
+                        sensor_msgs::PointCloud2::Ptr cloud_filtered(new sensor_msgs::PointCloud2);
+                        _cloud_process->extractTubePoints(_tube, cloud_ptr, cloud_filtered);
+                        // Just adjust new pose. it would be easy than this
+                        _cloud_process->resetPoseOfTube(*cloud_filtered,_tube);
+                        tf::Transform tube = _tube->getTransform(),grasp;
+                        grasp = tube.inverseTimes(fk);
+                        _current_right_grasp.setPose(grasp);
+                        _current_right_grasp.setWristOffset(0.00001);
+                        std::cout<<"\nPublishing tube with new pose. Press any key + enter";
+                        std::string s;
+                        std::cin>>s;
+                        _update_scene();
+                        std::cin>>s;
+                        //_publish_tube();
+                    }
+                    else{
+                        ROS_WARN_NAMED(LGRNM,"Couldn't move to point cloud recapture pose!");
+                    }
                 }
                 else{
-                    _l_soln_avail = false;
-                    if(!_move_arm_to_home_position("left_arm")){
-                        _state = ERR;
+                    ROS_WARN_NAMED(LGRNM, "Couldn't get cloud capture pose!");
+                    ROS_INFO_NAMED(LGRNM, "Do you want to try again?\n(y/n)? :");
+                    std::string s;
+                    std::cin>> s;
+                    if(!(s.compare("y")==0)){
+                        _state = DONE;
+                        break;
                     }
-                    break;
-                }*/
-            }
-            _state = REGRASP;
+                    else{
+                        _state = RECAPTURE;
+                        break;
+                    }
+                }
+                _state = GRASP_ANLYS;
+                break;
+            }*/
+            _state = GRASP_ANLYS;
             break;
         }
         case REGRASP:
         {
-            ROS_INFO("*Regrasping...");
+            ROS_INFO_NAMED(LGRNM,"*Regrasping...");
             _current_left_grasp = _computed_grasp_pair.leftGrasp;
             if(!_regrasp()){
                 _state = ERR;
@@ -198,17 +250,24 @@ void stateMachine::start()
         }
         case TRAJ_GEN:
         {
-            ROS_INFO("*Generating trajectory...");
+            ROS_INFO_NAMED(LGRNM,"*Generating trajectory...");
             _update_scene();
             if(_att2left){
-                if(!_arms->moveLeftArmWithMPlanning(_computed_grasp_pair.qLeft)){ //first 7 values
+                std::vector<double> q_right_first(7), q_left_first(7);
+                for(unsigned int i=0; i<7; i++){
+                    q_left_first[i] = _computed_grasp_pair.qLeft[i];
+                    q_right_first[i] = _computed_grasp_pair.qRight[i];
+                }
+                if(!_arms->moveLeftArmWithMPlanning(q_left_first)){ //first 7 values
                     _state = ERR;
                 }
                 _att2right = true;
-                if(!_arms->moveRightArmWithMPlanning(_computed_grasp_pair.qRight)){
+                if(!_arms->moveRightArmWithMPlanning(q_right_first)){
+                    _gripper->setRightGripperPosition(
+                                _tube->cylinders[_computed_grasp_pair.rightGrasp.cylinderIdx].radius*/*1.5*/1, -1);
                     _state = ERR;
                 }
-                if(!_arms->executeJointTrajectory(_computed_grasp_pair.qRight, _computed_grasp_pair.qLeft)){
+                if(!_arms->executeJointTrajectoryWithSync(_computed_grasp_pair.qRight, _computed_grasp_pair.qLeft)){
                     _state = ERR;
                 }
             }
@@ -259,11 +318,11 @@ void stateMachine::_update_scene(void){
             pose = _tube_collision_obj.poses[i];
             shape = _tube_collision_obj.shapes.at(i);
             //adjust the height of object
-            if(pose.position.z<(_TABLE_HEIGHT+shape.dimensions.at(0))){
-                ROS_WARN_NAMED(LGRNM,
-                "z value of static_tube pose origin is less than height of table plus its radius. Adjusting z value");
-                //_tube_collision_obj.poses[i].position.z = _TABLE_HEIGHT+shape.dimensions.at(0);
-            }
+//            if(pose.position.z<(_TABLE_HEIGHT+shape.dimensions.at(0))){
+//                //ROS_WARN_NAMED(LGRNM,
+//                //"z value of static_tube pose origin is less than height of table plus its radius. Adjusting z value");
+//                //_tube_collision_obj.poses[i].position.z = _TABLE_HEIGHT+shape.dimensions.at(0);
+//            }
         }
         _collision_objects->addCollisionObject(_tube_collision_obj);
     }
@@ -431,6 +490,19 @@ void stateMachine::_publish_tube(void){
 void stateMachine::_publish_grasps(void){
     visualization_msgs::MarkerArray marker_array;
     _grasp_analysis->getGraspMarker(_tube, _WRIST_OFFSET, marker_array);
+    visualization_msgs::Marker marker;
+    marker.type = marker.SPHERE;
+    marker.action = marker.ADD;
+    marker.header.frame_id = "/base_link";
+    marker.header.stamp = ros::Time::now();
+    marker.color.a = 0.7;
+    marker.color.b = marker.color.g = marker.color.r = 1;
+    marker.scale.x = marker.scale.y = marker.scale.z = 0.05;
+    //marker.pose.orientation.w = 1.0;
+    marker.pose = _computed_grasp_pair.rightGrasp.getWristGlobalPose(_tube->getPose());
+    marker_array.markers.push_back(marker);
+    marker.pose = _computed_grasp_pair.leftGrasp.getWristGlobalPose(_tube->getPose());
+    marker_array.markers.push_back(marker);
     _grasp_mrkr_pub.publish(marker_array);
 }
 
@@ -461,14 +533,14 @@ bool stateMachine::_get_pick_grasp(void)
 {
     _grasp_analysis->setTubePtr(_tube);
     std::vector<tf::Vector3> points;
-    tf::Vector3 vec;
+    /*tf::Vector3 vec;
     tf::Transform tube_tf = _tube->getTransform(), wrist_tf;
     wrist_tf = _computed_grasp_pair.rightGrasp.getWristGlobalPose(tube_tf);
     vec = wrist_tf.getOrigin();
     points.push_back(vec);
     wrist_tf = _computed_grasp_pair.leftGrasp.getWristGlobalPose(tube_tf);
     vec = wrist_tf.getOrigin();
-    points.push_back(vec); //points to avoid
+    points.push_back(vec); //points to avoid*/
     _pick_grasp = _grasp_analysis->getPickPose(points,0.1);
     _collision_check->refreshState();
     _collision_check->enableVisualization();
@@ -549,15 +621,19 @@ bool stateMachine::_lift_obj_with_right_arm(void)
     if(!_arms->simpleMoveRightArm(pick_pose)){
         return false;
     }
-    if(!_gripper->setRightGripperPosition(_tube->cylinders[_pick_grasp.cylinderIdx].radius*1.5, -1)){
+    if(!_gripper->setRightGripperPosition(_tube->cylinders[_pick_grasp.cylinderIdx].radius*/*1.5*/1, -1)){
         return false;
     }
     _att2right = true;
-    _current_right_grasp = _pick_grasp;
+    geometry_msgs::Pose fk_pose = _arms->getRightArmFK();
+    tf::Transform tube_tf = _tube->getTransform(), grasp_pose;
+    grasp_pose = tube_tf.inverseTimes(pose2tf(fk_pose));
+    _current_right_grasp.setPose(grasp_pose);
+    _current_right_grasp.setWristOffset(0.00001);
     if(!_arms->simpleMoveRightArm(approach_pose)){
         return false;
     }
-    tf::Transform tube, wrist=pose2tf(approach_pose), grasp = pose2tf(_pick_grasp.getWristPose());
+    tf::Transform tube, wrist=pose2tf(approach_pose), grasp = _current_right_grasp.getWristTransform();
     tube = wrist * grasp.inverse();
     geometry_msgs::Pose new_tube_pose = tf2pose(tube);
     _tube->setPose(new_tube_pose);
@@ -591,31 +667,6 @@ bool stateMachine::_regrasp(){
                                        new_pose, ik_soln)){
             return false;
         }
-        ROS_INFO_NAMED(LGRNM,"Trying to move arm to cloud capture pose...");
-        tf::Transform tube_tf = _tube->getTransform();
-        std::vector<double> ik_soln2(7);
-        if(_arms->moveRightArmToCloudCapturePose(tf::Vector3(0,0,1.5),tube_tf.getOrigin(),1.0, ik_soln2)){
-            if(_arms->moveRightArmWithMPlanning(ik_soln2)){
-                ros::Duration(3).sleep();
-                tf::Transform tube_tf, grsp = _current_right_grasp.getWristTransform(), fk = pose2tf(_arms->getRightArmFK(ik_soln2));
-                tube_tf = fk*grsp.inverse();
-                geometry_msgs::Pose tube_pose = tf2pose(tube_tf);
-                _tube->setPose(tube_pose);
-                _tube->setPoseAsActualPose();
-                _publish_tube();
-                //sensor_msgs::PointCloud2ConstPtr cloud_ptr = ros::topic::waitForMessage<sensor_msgs::PointCloud2>
-                //                ("/wide_stereo/points2");
-                sensor_msgs::PointCloud2ConstPtr cloud_ptr = ros::topic::waitForMessage<sensor_msgs::PointCloud2>
-                        ("/head_mount_kinect/depth_registered/points",ros::Duration(5));
-                sensor_msgs::PointCloud2::Ptr cloud_filtered(new sensor_msgs::PointCloud2);
-                _cloud_process->extractTubePoints(_tube, cloud_ptr, cloud_filtered);
-                //ros::Duration(10).sleep();
-            }
-            ROS_WARN_NAMED(LGRNM,"Couldn't move to cloud capture pose!");
-        }
-        else{
-            ROS_WARN_NAMED(LGRNM, "Couldn't get cloud capture pose!");
-        }
         _tube->setPose(new_pose);
         _tube->setPoseAsActualPose();
         new_pose = _current_right_grasp.getWristGlobalPose(new_pose);//new pose of wrist
@@ -637,21 +688,19 @@ bool stateMachine::_regrasp(){
         if(!_gripper->openRightGripper()){
             return false;
         }
-        _current_right_grasp.setWristOffset(_PICK_WRIST_OFFSET+(_tube->cylinders[_current_right_grasp.cylinderIdx].radius*4));
+        /*_current_right_grasp.setWristOffset(_PICK_WRIST_OFFSET+(_tube->cylinders[_current_right_grasp.cylinderIdx].radius*4));
         geometry_msgs::Pose wrist_pose = _current_right_grasp.getWristGlobalPose(_tube->getPose());
         if(!_arms->moveRightArmWithMPlanning(wrist_pose)){
             return false;
             _att2left = true;
             _att2right = false;
-        }
+        }*/
         _att2left = true;
         _att2right = false;
         _current_left_grasp =  _computed_grasp_pair.leftGrasp;
-        _get_attached_obj();
         _update_scene();
         _move_arm_to_home_position("right_arm");
     }
-
     return true;
 }
 
