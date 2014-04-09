@@ -44,6 +44,7 @@ private:
     std::string _table_obj_id;
     std::string _att_obj_id;
     std::string _tube_obj_id;
+    std::string _wheel_id;
     ros::NodeHandlePtr _nh;
 
     TubeManipulation::Arms::Ptr _arms;
@@ -58,6 +59,7 @@ private:
     TubeManipulation::CollisionCheck::Ptr _collision_check;
     collisionObjects::Ptr _collision_objects;
     TubeGrasp::Grasp _pick_grasp;
+    TubePerception::Cylinder _wheel_cyl;
 
     ros::ServiceClient _seg_srv_client;
     //ros::ServiceClient _set_pln_scn;
@@ -67,12 +69,14 @@ private:
     ros::Publisher _grasp_mrkr_pub;
     ros::Publisher _work_point_pub;
     ros::Publisher _pick_grasp_pub;
+    ros::Publisher _work_pose_pub;
 
     std::vector<sensor_msgs::PointCloud2> _clusters;
 
-    TubeGrasp::GraspPair _crnt_grasp_pair;
+    //TubeGrasp::GraspPair _crnt_grasp_pair;
     arm_navigation_msgs::AttachedCollisionObject::Ptr _att_obj;
     arm_navigation_msgs::CollisionObject _table;
+    arm_navigation_msgs::CollisionObject _wheel;
     arm_navigation_msgs::CollisionObject _tube_collision_obj;
     std::vector<double> _right_arm_home_jnts;
     std::vector<double> _left_arm_home_jnts;
@@ -88,10 +92,13 @@ private:
     void _publish_tube(void);
     void _publish_grasps(void);
     void _publish_pick_pose(void);
+    void _publish_work_pose(void);
     bool _get_computed_grasp_pair(void);
     bool _get_pick_grasp(void);
     bool _lift_obj_with_right_arm(void);
     bool _lift_obj_with_left_arm(void);
+    void _get_disk_and_workpose(void);
+    void _get_wheel_collision_object(void);
 //    void _add_tube_to_collision_space(void);
 //    void _remove_tube_from_collision_space(void);
 //    void _add_table_to_collision_space(void);

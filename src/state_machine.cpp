@@ -21,6 +21,7 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _table_obj_id = "Table";
     _att_obj_id = "Tube";
     _tube_obj_id = "staticTube";
+    _wheel_id = "Wheel";
 
     _att_obj.reset(new arm_navigation_msgs::AttachedCollisionObject);
     _collision_objects.reset(new collisionObjects(_nh));
@@ -42,6 +43,7 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _grasp_mrkr_pub = _nh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/grasp_marker", 2);
     _pick_grasp_pub = _nh->advertise<geometry_msgs::PoseStamped>("/tube_polishing/lift_grasp_pose", 2);
     _work_point_pub = _nh->advertise<visualization_msgs::MarkerArray>("/tube_polishing/work_points_marker",2);
+    _work_pose_pub = _nh->advertise<geometry_msgs::PoseStamped>("/tube_polishing/work_pose",2);
 
     /*if(!ros::service::waitForService(SET_PLANNING_SCENE_DIFF_NAME,5))
         ROS_WARN_STREAM("Can not find "<<SET_PLANNING_SCENE_DIFF_NAME<<" service");
@@ -111,25 +113,22 @@ void stateMachine::start()
                 break;
             }
             if(!_gen_tube_model()){
-                _state = ERR;
+                _att_obj->object.shapes.clear();
+                _table.shapes.clear();
+                _table.poses.clear();
+                _tube->reset();
+                _wheel.shapes.clear();
+                _wheel.poses.clear();
+                _update_scene();
+                _cluster_idx++;
+                if(_cluster_idx>=_clusters.size()){
+                    _state = ERR;
+                }
                 break;
             }
-            /*sensor_msgs::PointCloud2ConstPtr cloud_ptr = ros::topic::waitForMessage<sensor_msgs::PointCloud2>
-                    ("/head_mount_kinect/depth_registered/points");
-            sensor_msgs::PointCloud2::Ptr cloud_filtered(new sensor_msgs::PointCloud2);
-            _cloud_process->extractTubePoints(_tube, cloud_ptr, cloud_filtered);
-            _state = DONE;
-            break;*/
-            _update_scene();
-            _publish_tube();
-            visualization_msgs::MarkerArray marker_array;
-            _tube->getWorkPointsMarker(marker_array);
-            marker_array.markers.clear();
-            _work_point_pub.publish(marker_array);
-            //_add_tube_to_collision_space();
-            _update_scene();
-            //TODO: get_attached_obj;
+            _get_disk_and_workpose();
             _state = PICK;
+            //_state = DONE;
             ROS_INFO_NAMED(LGRNM,"*Generated tube and published table");
             break;
         }
@@ -137,9 +136,13 @@ void stateMachine::start()
         {
             ROS_INFO_NAMED(LGRNM,"*Analyzing Grasps...");
             _update_scene();
+            //_get_disk_and_work_pose();
             if(!_get_computed_grasp_pair()){
-                _state = ERR;
-                break;
+                _work_traj_idx++;
+                if(_work_traj_idx>=_tube->workPointsCluster.size()){
+                    _state = ERR;
+                    break;
+                }
             }
             _publish_grasps();
             _state = REGRASP;
@@ -175,7 +178,7 @@ void stateMachine::start()
         }
         case RECAPTURE:
         {
-            /*ROS_INFO_NAMED(LGRNM, "*Recapturing point cloud...");
+            ROS_INFO_NAMED(LGRNM, "*Recapturing point cloud...");
             tf::Transform tube_tf = _tube->getTransform();
             std::vector<double> ik_soln2(7);
             if(_att2right & !_att2left){
@@ -200,17 +203,16 @@ void stateMachine::start()
                                 ("/head_mount_kinect/depth_registered/points",ros::Duration(5));
                         sensor_msgs::PointCloud2::Ptr cloud_filtered(new sensor_msgs::PointCloud2);
                         _cloud_process->extractTubePoints(_tube, cloud_ptr, cloud_filtered);
-                        // Just adjust new pose. it would be easy than this
                         _cloud_process->resetPoseOfTube(*cloud_filtered,_tube);
                         tf::Transform tube = _tube->getTransform(),grasp;
                         grasp = tube.inverseTimes(fk);
                         _current_right_grasp.setPose(grasp);
                         _current_right_grasp.setWristOffset(0.00001);
-                        std::cout<<"\nPublishing tube with new pose. Press any key + enter";
-                        std::string s;
-                        std::cin>>s;
+//                        std::cout<<"\nPublishing tube with new pose...";
+//                        std::string s;
+//                        std::cin>>s;
                         _update_scene();
-                        std::cin>>s;
+//                        std::cin>>s;
                         //_publish_tube();
                     }
                     else{
@@ -233,7 +235,7 @@ void stateMachine::start()
                 }
                 _state = GRASP_ANLYS;
                 break;
-            }*/
+            }
             _state = GRASP_ANLYS;
             break;
         }
@@ -254,6 +256,9 @@ void stateMachine::start()
             _update_scene();
             if(_att2left){
                 std::vector<double> q_right_first(7), q_left_first(7);
+                if(!(_computed_grasp_pair.qLeft.size()>7 && _computed_grasp_pair.qRight.size()>7)){
+                    ROS_ERROR_NAMED(LGRNM,"trajectories stored in computed grasp pair is less than 7");
+                }
                 for(unsigned int i=0; i<7; i++){
                     q_left_first[i] = _computed_grasp_pair.qLeft[i];
                     q_right_first[i] = _computed_grasp_pair.qRight[i];
@@ -263,10 +268,10 @@ void stateMachine::start()
                 }
                 _att2right = true;
                 if(!_arms->moveRightArmWithMPlanning(q_right_first)){
-                    _gripper->setRightGripperPosition(
-                                _tube->cylinders[_computed_grasp_pair.rightGrasp.cylinderIdx].radius*/*1.5*/1, -1);
                     _state = ERR;
                 }
+                _gripper->setRightGripperPosition(_tube->cylinders[0].radius*/*1.5*/1, -1);
+                _att2right = true;
                 if(!_arms->executeJointTrajectoryWithSync(_computed_grasp_pair.qRight, _computed_grasp_pair.qLeft)){
                     _state = ERR;
                 }
@@ -328,6 +333,12 @@ void stateMachine::_update_scene(void){
     }
     else{
         _collision_objects->removeCollisionObject(_tube_collision_obj.id.c_str());
+    }
+    if(!_wheel.shapes.empty()){
+        _collision_objects->addCollisionObject(_wheel);
+    }
+    else{
+        _collision_objects->removeCollisionObject(_wheel_id);
     }
     _collision_objects->setPlanningScene();
 }
@@ -448,7 +459,24 @@ void stateMachine::_extract_table_from_msg(tabletop_object_detector::TabletopSeg
     box.dimensions[2] = box_height;
 
     _table.shapes.push_back(box);
+}
 
+void stateMachine::_get_wheel_collision_object(){
+    _wheel.header.frame_id = "/base_link";
+    _wheel.header.stamp = ros::Time::now();
+    _wheel.id = _wheel_id;
+    _wheel.operation.operation = _wheel.operation.ADD;
+
+    geometry_msgs::Pose pose = _wheel_cyl.getPose();
+    arm_navigation_msgs::Shape shape;
+    shape.type = shape.CYLINDER;
+    shape.dimensions.resize(2);;
+    shape.dimensions[0] = _wheel_cyl.radius;
+    shape.dimensions[1] = _wheel_cyl.getAxisLength();
+    _wheel.shapes.clear();
+    _wheel.poses.clear();
+    _wheel.poses.push_back(pose);
+    _wheel.shapes.push_back(shape);
 }
 
 /*void stateMachine::_remove_table_from_collision_space(){
@@ -495,12 +523,14 @@ void stateMachine::_publish_grasps(void){
     marker.action = marker.ADD;
     marker.header.frame_id = "/base_link";
     marker.header.stamp = ros::Time::now();
-    marker.color.a = 0.7;
+    marker.color.a = 1;
     marker.color.b = marker.color.g = marker.color.r = 1;
-    marker.scale.x = marker.scale.y = marker.scale.z = 0.05;
+    marker.scale.x = marker.scale.y = marker.scale.z = 0.01;
     //marker.pose.orientation.w = 1.0;
+    marker.id++;
     marker.pose = _computed_grasp_pair.rightGrasp.getWristGlobalPose(_tube->getPose());
     marker_array.markers.push_back(marker);
+    marker.id++;
     marker.pose = _computed_grasp_pair.leftGrasp.getWristGlobalPose(_tube->getPose());
     marker_array.markers.push_back(marker);
     _grasp_mrkr_pub.publish(marker_array);
@@ -512,6 +542,14 @@ void stateMachine::_publish_pick_pose(void){
     pose_stamped.header.stamp = ros::Time::now();
     pose_stamped.pose = _pick_grasp.getWristGlobalPose(_tube->getPose());
     _pick_grasp_pub.publish(pose_stamped);
+}
+
+void stateMachine::_publish_work_pose(void){
+    geometry_msgs::PoseStamped pose_stamped;
+    pose_stamped.header.frame_id = "/base_link";
+    pose_stamped.header.stamp = ros::Time::now();
+    pose_stamped.pose = _work_pose1;
+    _work_pose_pub.publish(pose_stamped);
 }
 
 bool stateMachine::_get_computed_grasp_pair()
@@ -702,6 +740,28 @@ bool stateMachine::_regrasp(){
         _move_arm_to_home_position("right_arm");
     }
     return true;
+}
+
+void stateMachine::_get_disk_and_workpose(){
+    double MIN_R = 0.06;
+    double MAX_R = 0.07;
+    if(_clusters.empty()){
+        ROS_ERROR_NAMED(LGRNM,"No cluster to find wheel");
+    }
+    TubePerception::Cylinder wheel;
+    geometry_msgs::Pose work_pose;
+    for(unsigned int i=0; i<_clusters.size(); i++){
+        if(_cloud_process->findDisk(_clusters[i], MIN_R, MAX_R, wheel, work_pose)){
+            ROS_INFO_NAMED(LGRNM,"Wheel found at: x=%f, y=%f, z=%f", work_pose.position.x,
+                           work_pose.position.y, work_pose.position.z);
+            _work_pose1 = work_pose;
+            _wheel_cyl = wheel;
+            _publish_work_pose();
+            _get_wheel_collision_object();
+            _update_scene();
+            break;
+        }
+    }
 }
 
 void stateMachine::_print_state(){

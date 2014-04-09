@@ -20,6 +20,7 @@
 #include <pcl/features/normal_3d.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/project_inliers.h>
+#include <pcl/filters/filter.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
@@ -211,7 +212,8 @@ namespace TubePerception
                                       pcl::PointCloud<PointT>::Ptr points_out);
         void _compare_models(TubePerception::Tube::Ptr first,
                              TubePerception::Tube::Ptr second,
-                             std::vector<unsigned int> & corresponding_indices);
+                             std::vector<unsigned int> &corresponding_indices,
+                             std::vector<double> &confidence);
 //        bool _convert_cloud_to(std::string target_frame, const sensor_msgs::PointCloud2 &cloud_in, sensor_msgs::PointCloud2 &cloud_out);
         float _r;
         float _r_min, _r_max;

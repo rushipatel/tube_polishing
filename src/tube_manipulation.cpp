@@ -573,10 +573,15 @@ bool TubeManipulation::Arms::executeJointTrajectoryWithSync(std::vector<double> 
     }
     _right_joint_traj = qRight;
     _left_joint_traj = qLeft;
+    ROS_INFO_NAMED(ARMS_LGRNM,"getting right goal");
     _get_right_goal();
+    ROS_INFO_NAMED(ARMS_LGRNM,"getting left goal");
     _get_left_goal();
+    ROS_INFO_NAMED(ARMS_LGRNM,"unnormalizing right trajectory");
     _call_right_joints_unnormalizer();
+    ROS_INFO_NAMED(ARMS_LGRNM,"unnormalizing left trajectory");
     _call_left_joints_unnormalizer();
+    ROS_INFO_NAMED(ARMS_LGRNM,"syncing start times");
     _sync_start_times();
 
     ros::Time time_to_start = ros::Time::now()+ros::Duration(1.0);
@@ -592,6 +597,7 @@ bool TubeManipulation::Arms::executeJointTrajectoryWithSync(std::vector<double> 
 // pass empty joint trajectory if that arm is not being used
 void TubeManipulation::Arms::_execute_joint_trajectory(trajectory_msgs::JointTrajectory &right_traj, trajectory_msgs::JointTrajectory &left_traj)
 {
+    ROS_INFO_NAMED(ARMS_LGRNM,"Executing trajectory");
     pr2_controllers_msgs::JointTrajectoryGoal right_goal, left_goal;
 
     bool right_arm = false, left_arm =false;
@@ -650,6 +656,7 @@ void TubeManipulation::Arms::_execute_joint_trajectory(trajectory_msgs::JointTra
         }
         ros::Duration(0.25).sleep();
     }
+    ROS_INFO_NAMED(ARMS_LGRNM,"Done executing trajectory");
 }
 
 /*! \brief Simple move arm function to move individual arm for given pose.
@@ -1973,7 +1980,7 @@ bool TubeManipulation::Arms::_get_motion_plan(arm_navigation_msgs::GetMotionPlan
         ROS_ERROR_STREAM_NAMED(ARMS_LGRNM,"Call to ompl_planning/plan_kinematic_path service failed");
         return false;
     }
-    ROS_INFO_NAMED(ARMS_LGRNM,"Motion plan request returned with solution");
+    //ROS_INFO_NAMED(ARMS_LGRNM,"Motion plan request returned with solution");
     return true;
 }
 

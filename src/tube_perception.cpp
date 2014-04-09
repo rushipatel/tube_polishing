@@ -506,7 +506,7 @@ CloudProcessing::CloudProcessing()
     //default params
     _r = 0;
     _r_min = 0.01;
-    _r_max = 0.1;
+    _r_max = 0.05;
     _strong_line_thr = 0.2; // strong cylinder formed by at least 20% of points in cloud
     _weak_line_thr = 0.05;  // cylinder is weak if there are only 5% of points to define line
                             // if less than 5% inliers of line do not define cylinder
@@ -528,6 +528,9 @@ bool CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
     _compensate_error();
     _estimate_normals(_tube_cloud);
     _r = _get_radius();
+    if(_r==0){
+        return false;
+    }
     _collaps_normals();
     _segmentize_axis();
     _define_pose(); // <<< Cylinders gets converted in local frame including p1 and p2
@@ -562,7 +565,8 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
         return false;
     }
     std::vector<unsigned int> corres_ind;
-    _compare_models(tube_ptr, _tube, corres_ind);
+    std::vector<double> confidence;
+    _compare_models(tube_ptr, _tube, corres_ind, confidence );
     //since the pose of any tube model is first cylinder
     // find fisrt cylinder
     std::cout<<"\nOriginal Tube -> New tube";
@@ -579,16 +583,23 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
         ROS_WARN("Couldn't find enough corresponding cylinders");
         return false;
     }
+    //assuming there will be corresponding first cylinder in new tube
     if(corres_ind[0]<_tube->cylinders.size()){
-        tf::Transform temp_tf;
-        tf::Vector3 orig_first, orig_second;
-        temp_tf = tube_ptr->getTransform();
-        orig_first = tube_ptr->cylinders[0].getMidPoint(temp_tf);
-        temp_tf = _tube->getTransform();
-        orig_second = _tube->cylinders[corres_ind[0]].getMidPoint(temp_tf);
-        tf::Transform err_tf1;
-        err_tf1.setIdentity();
-        err_tf1.setOrigin(orig_second - orig_first);
+
+        tf::Transform temp_tf, first_tf, second_tf;
+
+        tf::Vector3 first_orig, second_orig;
+
+        first_tf = tube_ptr->getTransform();
+        //second_tf = _tube->getTransform();
+        first_orig = tube_ptr->cylinders[0].getMidPoint(first_tf);
+        second_tf = _tube->getTransform();
+        second_orig = _tube->cylinders[corres_ind[0]].getMidPoint(second_tf);
+        second_tf.setRotation(first_tf.getRotation());
+        second_tf.setOrigin(second_orig);
+        tf::Transform err_tf1 = first_tf.inverseTimes(second_tf);
+        err_tf1.setRotation(tf::Quaternion(0,0,0,1));
+
         temp_tf = tube_ptr->getTransform();
         tf::Vector3 axis_first = tube_ptr->cylinders[0].getAxisVector(temp_tf);
         temp_tf = _tube->getTransform();
@@ -607,8 +618,8 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
         tf::Transform tube_tf = tube_ptr->getTransform(), new_tube_tf = _tube->getTransform();
         tf::Transform tube_plus_err;
         tf::Vector3 vec;
-        std::string s;
-        std::cin>>s;
+//        std::string s;
+//        std::cin>>s;
 
         double theta_step = (2*M_PI)/cnt;
         double theta = 0;
@@ -643,19 +654,19 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
             if(theta<0){
                 theta += (2*M_PI);
             }
-            std::cout<<"\ntheta : "<<theta<<"err : "<<err;
+            //std::cout<<"\ntheta : "<<theta<<"err : "<<err;
             prev_err = err;
             cnt--;
         }
         err_tf2.setIdentity();
-        err_tf2.setRotation(tf::Quaternion(tf::Vector3(0, 0, 1), theta));
+        //err_tf2.setRotation(tf::Quaternion(tf::Vector3(0, 0, 1), theta));
         temp_tf = tube_ptr->getTransform();
         temp_tf = temp_tf * err_tf1 * err_tf2;
         tf::Vector3 pos_err = err_tf1.getOrigin();
         ROS_INFO_STREAM("Position Error(x,y,z) : ("<<pos_err.getX()<<", "<<pos_err.getY()<<", "<<pos_err.getZ()<<")");
         geometry_msgs::Pose pose = tf2pose(temp_tf);
-        //tube_ptr->setPose(pose);
-        //tube_ptr->setPoseAsActualPose();
+        tube_ptr->setPose(pose);
+        tube_ptr->setPoseAsActualPose();
     }
     else{
         ROS_WARN("Couldn't find first cylinder in new model!");
@@ -668,39 +679,46 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
 // currently error between poses of both tubes has to be within certain limit
 void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
                                       TubePerception::Tube::Ptr second,
-                                      std::vector<unsigned int> & corresponding_indices){
+                                      std::vector<unsigned int> & corresponding_indices,
+                                      std::vector<double> &confidence){
+    const double W_l = 0.5;
+    const double W_t = 0.5;
+
     corresponding_indices.resize(first->cylinders.size());
+    confidence.resize(first->cylinders.size());
     unsigned int idx;
     tf::Transform temp_tf;
     // compare distance between  two mid points and store the index of closest one
     for(unsigned int i=0; i<first->cylinders.size(); i++){
+
         temp_tf = first->getTransform();
-        tf::Vector3 first_mid_point = first->cylinders[i].getMidPoint(temp_tf);
-        tf::Vector3 second_mid_point;
-        double min_dist = std::numeric_limits<double>::max(), dist, first_len, second_len, len_err;
-        // initialize with unreal index value
-        idx = std::numeric_limits<unsigned int>::max();
+        tf::Vector3 first_axis = first->cylinders[i].getAxisVector(temp_tf), second_axis;
+        double max_confidence = std::numeric_limits<double>::max(),
+                first_len, second_len, len_err, angle1, angle2, conf;
         first_len = first->cylinders[i].getAxisLength();
         //compare mid points of the cylinders in second tube and store index id distance is less than certain value (radius)
         for(unsigned int j=0; j<second->cylinders.size(); j++){
             temp_tf = second->getTransform();
-            second_mid_point = second->cylinders[j].getMidPoint(temp_tf);
-            second_len = second->cylinders[j].getAxisLength();
-            dist = first_mid_point.distance(second_mid_point);
+            second_axis = second->cylinders[j].getAxisVector(temp_tf);
+            angle1 = first_axis.angle(second_axis);
+            second_axis *= -1;
+            angle2 = first_axis.angle(second_axis);
+            angle1 = std::abs(angle1);
+            angle2 = std::abs(angle2);
+            if(angle2<angle1){
+                angle1 = angle2;
+            }
             len_err = std::abs(first_len - second_len);
-            std::cout<<"\ndist : "<<dist;
-            if(dist<min_dist){
-                min_dist = dist;
-                // after finding closest corresponding cylinder, test if it fits maximum allowable distance
-                // currently radius (to make it little adeptive)
-                // position error between two corresponding cylinders has to be less than the radius of the cylinder
-                if(dist < second->cylinders[j].radius*2 && len_err<0.005){
-                    idx = j;
-                }
+            conf = len_err*W_l + angle1*W_t;
+            std::cout<<"\nconfidence : "<<conf;
+            if(conf<max_confidence){
+                max_confidence = conf;
+                idx = j;
             }
         }
         std::cout<<"\n";
         corresponding_indices[i] = idx;
+        confidence[i] = max_confidence;
     }
 }
 
@@ -710,7 +728,7 @@ bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2
         ROS_WARN("no cylinder in tube model!");
         return false;
     }
-    double r_inflate_coeff = 1.5; // inflate radius by 1.5 times
+    double r_inflate_coeff = 1.3; // inflate radius by 1.3 times
     double l_inflate_coeff = 1.2; // 20% longer axis
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -754,6 +772,8 @@ bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2
         p.z = p2[i].getZ();
         cloud_out->points.push_back(p);*/
     }
+    std::vector<int> indices;
+    pcl::removeNaNFromPointCloud(*cloud_in, *cloud_in, indices);
     cloud_out->points.clear();
     tf::Vector3 test_point;
     for(unsigned int i=0; i<cloud_in->points.size(); i++){
@@ -770,8 +790,8 @@ bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2
     }
     pcl::toROSMsg(*cloud_out,*cloudOut);
     ROS_INFO("Total %d points found", cloud_out->points.size());
-    displayCloud(cloud_in);
-    displayCloud(cloud_out);
+    //displayCloud(cloud_in);
+    //displayCloud(cloud_out);
     return true;
 }
 
@@ -786,6 +806,7 @@ bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
     pcl::ModelCoefficients coeff;
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
     // if any cylinder present
+    //displayCloud(disk_cloud);
     if(!_get_cylinder(disk_cloud, minRadius, maxRadius, coeff, inliers)){
         ROS_WARN("Couldn't find disk in given cloud cluster");
         return false;
@@ -978,7 +999,7 @@ void CloudProcessing::_generate_work_vectors()
     tf::Vector3 perp_vec = _get_perp_vec3(axis);
     tf::Vector3 point, vec1,vec2;
 
-    vec1 = perp_vec.rotate(axis, ((double)rand()/RAND_MAX)*M_PI );
+    vec1 = perp_vec.rotate(axis, ((double)rand()/(double)RAND_MAX)*M_PI);
     //vec1 = perp_vec;
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
     for(int i=0; i<45; i++){
@@ -994,6 +1015,58 @@ void CloudProcessing::_generate_work_vectors()
         pointnormal.normal_z = vec2.z();
         cloud->points.push_back(pointnormal);
     }
+    _tube->workPointsCluster.push_back(cloud);
+
+    cloud->points.clear();
+    vec1 = vec1.rotate(axis,M_PI/4);
+    for(int i=0; i<45; i++){
+        vec2 = vec1.rotate(axis,(i*M_PI)/180);
+        point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
+        vec2.normalize();
+        PointT pointnormal;
+        pointnormal.x = point.x();
+        pointnormal.y = point.y();
+        pointnormal.z = point.z();
+        pointnormal.normal_x = vec2.x();
+        pointnormal.normal_y = vec2.y();
+        pointnormal.normal_z = vec2.z();
+        cloud->points.push_back(pointnormal);
+    }
+    _tube->workPointsCluster.push_back(cloud);
+
+    cloud->points.clear();
+    vec1 = vec1.rotate(axis,M_PI/4);
+    for(int i=0; i<45; i++){
+        vec2 = vec1.rotate(axis,(i*M_PI)/180);
+        point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
+        vec2.normalize();
+        PointT pointnormal;
+        pointnormal.x = point.x();
+        pointnormal.y = point.y();
+        pointnormal.z = point.z();
+        pointnormal.normal_x = vec2.x();
+        pointnormal.normal_y = vec2.y();
+        pointnormal.normal_z = vec2.z();
+        cloud->points.push_back(pointnormal);
+    }
+    _tube->workPointsCluster.push_back(cloud);
+
+    cloud->points.clear();
+    vec1 = vec1.rotate(axis,M_PI/4);
+    for(int i=0; i<45; i++){
+        vec2 = vec1.rotate(axis,(i*M_PI)/180);
+        point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
+        vec2.normalize();
+        PointT pointnormal;
+        pointnormal.x = point.x();
+        pointnormal.y = point.y();
+        pointnormal.z = point.z();
+        pointnormal.normal_x = vec2.x();
+        pointnormal.normal_y = vec2.y();
+        pointnormal.normal_z = vec2.z();
+        cloud->points.push_back(pointnormal);
+    }
+
     _tube->workPointsCluster.push_back(cloud);
 }
 
@@ -1142,8 +1215,12 @@ double CloudProcessing::_get_radius(){
     seg.setDistanceFromOrigin(0.05);
     // Obtain the cylinder inliers and coefficients
     seg.segment (inliers, coeff);
-    ROS_INFO("Foud cylinder radius using cylinder RANSAC: %f", coeff.values[6]);
-    return coeff.values[6]; //_r.push_back(coeff.values[6]);
+    double r = coeff.values.at(6);
+    if(inliers.indices.size()<_tube_cloud->points.size()*_weak_line_thr){
+        r=0;
+    }
+    ROS_INFO("Foud cylinder radius using cylinder RANSAC: %f", coeff.values.at(6));
+    return  r;//_r.push_back(coeff.values[6]);
 }
 
 bool CloudProcessing::_get_cylinder(pcl::PointCloud<PointT>::Ptr cloud,
@@ -1156,25 +1233,27 @@ bool CloudProcessing::_get_cylinder(pcl::PointCloud<PointT>::Ptr cloud,
     //pcl::PointIndices inliers;
     coeff.values.clear();
     // Create the segmentation object for cylinder segmentation and set all the parameters
-    seg.setOptimizeCoefficients (true);
+    //seg.setOptimizeCoefficients (true);
     seg.setModelType (pcl::SACMODEL_CYLINDER);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setNormalDistanceWeight (0.1);
-    seg.setMaxIterations (20000);
-    seg.setDistanceThreshold (0.05);
+    seg.setMaxIterations (100000);
+    seg.setDistanceThreshold (0.001);
     seg.setRadiusLimits (r_min, r_max);
-    seg.setProbability(0.99);
+    seg.setProbability(0.8);
     seg.setInputCloud (cloud);
     seg.setInputNormals (cloud);
-    seg.setDistanceFromOrigin(0.05);
+    seg.setDistanceFromOrigin(0.5);
     // Obtain the cylinder inliers and coefficients
     seg.segment (*inliers, coeff);
-    if(coeff.values.size()<7){
+    if(inliers->indices.empty()){
         ROS_WARN("No cylinder found by RANSAC for given cloud");
         return false;
     }
-    if(inliers->indices.size()<(cloud->points.size()/10)){ // if inliers are less than 10%
-        ROS_WARN("Cylinder found but less than 10 percent (%d) inliers of total points (%d).", inliers->indices.size(), cloud->points.size());
+    if(inliers->indices.size()<(cloud->points.size()/40)){ // if inliers are less than 10%
+        ROS_WARN("Cylinder found but less than 2.5 percent (%d) inliers of total number of points (%d)",
+                 inliers->indices.size(), cloud->points.size());
+        return false;
     }
     if(coeff.values[6]<r_min || coeff.values[6]>r_max){
          ROS_WARN("No cylinder for given radius constraints (%f, %f)",r_min, r_max);
