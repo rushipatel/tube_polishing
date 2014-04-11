@@ -19,7 +19,7 @@ public:
     void clearAllObjects(void);
     void removeAttachedCollisionObject(std::string id);
     void removeCollisionObject(std::string id);
-    void setAllowedContactCube(geometry_msgs::Pose pose, double dim);
+    void setAllowedContactCube(geometry_msgs::Pose pose, double dim, std::vector<std::string> &link_names);
     void clearAllowedContact(void);
     // sets planning scene using attached and collision objects
     arm_navigation_msgs::SetPlanningSceneDiff::Response setPlanningScene();

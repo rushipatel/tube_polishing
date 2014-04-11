@@ -604,8 +604,8 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
         tf::Vector3 axis_first = tube_ptr->cylinders[0].getAxisVector(temp_tf);
         temp_tf = _tube->getTransform();
         tf::Vector3 axis_second = _tube->cylinders[corres_ind[0]].getAxisVector(temp_tf);
-        double angle = axis_first.angle(axis_second);
-        tf::Vector3 perp_vec = axis_first.cross(axis_second);
+        //double angle = axis_first.angle(axis_second);
+        //tf::Vector3 perp_vec = axis_first.cross(axis_second);
         //err_tf1.setRotation(tf::Quaternion(perp_vec, angle));
 
         tf::Transform err_tf2;
@@ -686,7 +686,7 @@ void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
 
     corresponding_indices.resize(first->cylinders.size());
     confidence.resize(first->cylinders.size());
-    unsigned int idx;
+    unsigned int idx = std::numeric_limits<unsigned int>::max();
     tf::Transform temp_tf;
     // compare distance between  two mid points and store the index of closest one
     for(unsigned int i=0; i<first->cylinders.size(); i++){
@@ -700,6 +700,7 @@ void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
         for(unsigned int j=0; j<second->cylinders.size(); j++){
             temp_tf = second->getTransform();
             second_axis = second->cylinders[j].getAxisVector(temp_tf);
+            second_len = second->cylinders[j].getAxisLength();
             angle1 = first_axis.angle(second_axis);
             second_axis *= -1;
             angle2 = first_axis.angle(second_axis);
@@ -869,11 +870,25 @@ bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
     disk.p2 = cyl.p2;
     disk.isStrong = cyl.isStrong;
     disk.radius = cyl.radius;
+
+    //make x axis horizontal
+    tf::Transform xform0;
+    xform0.setIdentity();
+    xform0.setOrigin(tf::Vector3(1,0,0));
+
+    xform0 = disk_tf * xform0;
+    tf::Vector3 x_axis_of_disk = xform0.getOrigin() - disk_tf.getOrigin();
+    //project x axis of disk on x-z plan of global frame
+    x_axis_of_disk.setZ(0.0);
+    //angle between world x_axis and x_axis of disk in x-z plan
+    double angle = x_axis_of_disk.angle(tf::Vector3(1,0,0));
+    xform0.setIdentity();
+    xform0.setRotation(tf::Quaternion(tf::Vector3(0,0,1),angle));
     tf::Transform xform;
     xform.setIdentity();
     xform.setRotation(tf::Quaternion(tf::Vector3(1,0,0),M_PI/2));
     xform.setOrigin(tf::Vector3(-disk.radius, 0, 0));
-    tf::Transform work_pose = disk_tf * xform;
+    tf::Transform work_pose = disk_tf * xform0 * xform;
     workPose = tf2pose(work_pose);
     return true;
 }
@@ -945,7 +960,7 @@ bool CloudProcessing::_convert_cloud_to(std::string target_frame, const sensor_m
 void CloudProcessing::_segmentize_cloud(pcl::PointCloud<PointT>::Ptr cloud, pcl::PointCloud<PointT>::Ptr hull_points)
 {
     //straight from example
-    double z_min = 0., z_max = 0.05; // we want the points above the plane, no farther than 5 cm from the surface
+    //double z_min = 0., z_max = 0.05; // we want the points above the plane, no farther than 5 cm from the surface
     //pcl::PointCloud<PointT>::Ptr hull_points(new pcl::PointCloud<PointT>);
     pcl::ConvexHull<PointT> hull;
     hull.setDimension (2); // not necessarily needed, but we need to check the dimensionality of the output
@@ -988,7 +1003,7 @@ void CloudProcessing::_generate_work_vectors()
 
     //tf::Transform tube_tf = _tube->getTransform();
     tf::Transform tube_tf = tf::Transform::getIdentity();
-    tf::Vector3 axis = _tube->cylinders[cyl_idx].getAxisVector(tube_tf);
+    tf::Vector3 axis = _tube->cylinders[cyl_idx].getAxisVector(tube_tf); //in local
     axis.normalize();
 
     //in global frame
@@ -1002,11 +1017,11 @@ void CloudProcessing::_generate_work_vectors()
     vec1 = perp_vec.rotate(axis, ((double)rand()/(double)RAND_MAX)*M_PI);
     //vec1 = perp_vec;
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
+    PointT pointnormal;
     for(int i=0; i<45; i++){
         vec2 = vec1.rotate(axis,(i*M_PI)/180);
         point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
         vec2.normalize();
-        PointT pointnormal;
         pointnormal.x = point.x();
         pointnormal.y = point.y();
         pointnormal.z = point.z();
@@ -1433,7 +1448,7 @@ void CloudProcessing::_project_points_on_line(pcl::PointCloud<PointT>::Ptr cloud
     pcl::ModelCoefficients::Ptr coeff(new pcl::ModelCoefficients);
     coeff->header = line_coeff.header;
     coeff->values.resize(line_coeff.values.size()); //size should be 6
-    for(int i=0; i<line_coeff.values.size(); i++)
+    for(unsigned int i=0; i<line_coeff.values.size(); i++)
         coeff->values[i] = line_coeff.values[i];
 
     // project line in_ points (part of line definition) on to axis defined in coeff

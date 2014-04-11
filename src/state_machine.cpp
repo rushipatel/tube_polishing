@@ -135,15 +135,25 @@ void stateMachine::start()
         case GRASP_ANLYS:
         {
             ROS_INFO_NAMED(LGRNM,"*Analyzing Grasps...");
+            _collision_objects->clearAllowedContact();
+            std::vector<std::string> link_names;
+            link_names.push_back(_tube_obj_id);
+            link_names.push_back(_wheel_id);
+            _collision_objects->setAllowedContactCube(_work_pose1, 0.05, link_names);
             _update_scene();
             //_get_disk_and_work_pose();
             if(!_get_computed_grasp_pair()){
                 _work_traj_idx++;
+                _state = GRASP_ANLYS;
                 if(_work_traj_idx>=_tube->workPointsCluster.size()){
-                    _state = ERR;
-                    break;
+                    ROS_WARN_NAMED(LGRNM,"No more trajectory left");
+                    _state = DONE;
                 }
+                break;
             }
+            visualization_msgs::MarkerArray ma;
+            _tube->getWorkPointsMarker(ma);
+            _work_point_pub.publish(ma);
             _publish_grasps();
             _state = REGRASP;
             break;
@@ -265,15 +275,18 @@ void stateMachine::start()
                 }
                 if(!_arms->moveLeftArmWithMPlanning(q_left_first)){ //first 7 values
                     _state = ERR;
+                    break;
                 }
-                _att2right = true;
                 if(!_arms->moveRightArmWithMPlanning(q_right_first)){
                     _state = ERR;
+                    break;
                 }
                 _gripper->setRightGripperPosition(_tube->cylinders[0].radius*/*1.5*/1, -1);
                 _att2right = true;
+                ROS_INFO_NAMED(LGRNM,"Executing synced trajectory...");
                 if(!_arms->executeJointTrajectoryWithSync(_computed_grasp_pair.qRight, _computed_grasp_pair.qLeft)){
                     _state = ERR;
+                    break;
                 }
             }
             _state = DONE;

@@ -212,9 +212,11 @@ private:
     void _get_right_joints(std::vector<double> &joint_state);
     void _get_left_joints(std::vector<double> &joint_state);
 
-    void _get_right_goal();
-    void _get_left_goal();
-    void _sync_start_times(void);
+    void _get_joint_trajectory_goal(const std::vector<double> &qIn,
+                                    pr2_controllers_msgs::JointTrajectoryGoal &goal,
+                                    const std::vector<std::string> &jnt_nms);
+    void _call_joints_unnormalizer(pr2_controllers_msgs::JointTrajectoryGoal &traj_goal);
+    void _sync_start_times(pr2_controllers_msgs::JointTrajectoryGoal &right_goal, pr2_controllers_msgs::JointTrajectoryGoal &left_goal);
 
     //bool _call_right_arm_gpik(std::vector<double> &right_joint_trajectory);
     //bool _call_left_arm_gpik(std::vector<double> &left_joint_trajectory);

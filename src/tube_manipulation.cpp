@@ -326,7 +326,6 @@ bool TubeManipulation::Arms::_gen_trajectory(std::vector<double> &right_joint_tr
                  _get_simple_left_arm_ik(left_pose, left_joint_state, left_joints_seed) &&
                 _collision_check->isStateValid(right_joint_state, left_joint_state) )
         {
-
             for(unsigned int i=0; i<right_joint_state.size(); i++)
             {
                 right_joint_traj.push_back(right_joint_state[i]);
@@ -353,35 +352,39 @@ bool TubeManipulation::Arms::_gen_trajectory(std::vector<double> &right_joint_tr
  *
  *  
  */
-void TubeManipulation::Arms::_call_right_joints_unnormalizer(void)
+void TubeManipulation::Arms::_call_joints_unnormalizer(pr2_controllers_msgs::JointTrajectoryGoal &traj_goal)
 {
     arm_navigation_msgs::FilterJointTrajectory::Request req;
     arm_navigation_msgs::FilterJointTrajectory::Response res;
     req.allowed_time = ros::Duration(60);
 
-    req.start_state.joint_state.name = _r_jnt_nms;
-    req.start_state.joint_state.position.resize(_r_jnt_nms.size());
+    req.start_state.joint_state.name = traj_goal.trajectory.joint_names;
+    req.start_state.joint_state.position.resize(traj_goal.trajectory.joint_names.size());
 
-    for(unsigned int i=0; i<_r_jnt_nms.size(); i++){
-        req.start_state.joint_state.position[i] = _right_goal.trajectory.points[1].positions[i];
+    if(traj_goal.trajectory.points.size()<2){
+        ROS_ERROR_NAMED(ARMS_LGRNM,"Size of trajectory points must be at laest 2");
+        return;
     }
 
-    req.trajectory.joint_names = _r_jnt_nms;
-    req.trajectory.points.resize(_right_goal.trajectory.points.size());
-
-    for(unsigned int i=0; i<_right_goal.trajectory.points.size(); i++){
-        req.trajectory.points[i].positions.resize(_r_jnt_nms.size());
+    for(unsigned int i=0; i<traj_goal.trajectory.joint_names.size(); i++){
+        req.start_state.joint_state.position[i] = traj_goal.trajectory.points[1].positions[i];
     }
 
-    for(unsigned int i=0; i<_right_goal.trajectory.points.size(); i++){
-        for(int j=0; j<_r_jnt_nms.size(); j++){
-            req.trajectory.points[i].positions[j] = _right_goal.trajectory.points[i].positions[j];
+    req.trajectory.joint_names = traj_goal.trajectory.joint_names;
+    req.trajectory.points.resize(traj_goal.trajectory.points.size());
+
+    for(unsigned int i=0; i<traj_goal.trajectory.points.size(); i++){
+        req.trajectory.points[i].positions.resize(traj_goal.trajectory.joint_names.size());
+    }
+    for(unsigned int i=0; i<traj_goal.trajectory.points.size(); i++){
+        for(int j=0; j<traj_goal.trajectory.joint_names.size(); j++){
+            req.trajectory.points[i].positions[j] = traj_goal.trajectory.points[i].positions[j];
         }
     }
 
     if(_traj_unnormalizer_client.call(req,res)){
         if(res.error_code.val == res.error_code.SUCCESS){
-            _right_goal.trajectory = res.trajectory;
+            traj_goal.trajectory = res.trajectory;
         }
         else{
             ROS_ERROR_NAMED(ARMS_LGRNM,"Requested right trajectory was not filtered. Error code: %d",res.error_code.val);
@@ -429,8 +432,8 @@ void TubeManipulation::Arms::_call_left_joints_unnormalizer()
         }
         else{
             ROS_ERROR_NAMED(ARMS_LGRNM,"Requested left trajectory was not filtered. Error code: %d",res.error_code.val);
-            ros::shutdown();
-            exit(-1);
+            //ros::shutdown();
+            //exit(-1);
         }
     }
     else{
@@ -442,31 +445,40 @@ void TubeManipulation::Arms::_call_left_joints_unnormalizer()
  *
  *  
  */
-void TubeManipulation::Arms::_get_right_goal()
+void TubeManipulation::Arms::_get_joint_trajectory_goal(const std::vector<double> &qIn,
+                                                        pr2_controllers_msgs::JointTrajectoryGoal &goal,
+                                                        const std::vector<std::string> &jnt_nms)
 {
     trajectory_msgs::JointTrajectoryPoint traj_point;
 
-    traj_point.positions.resize(_r_jnt_nms.size());
-    traj_point.velocities.resize(_r_jnt_nms.size());
+    traj_point.positions.resize(jnt_nms.size());
+    traj_point.velocities.resize(jnt_nms.size());
 
-    _right_goal.trajectory.joint_names = _r_jnt_nms;
-    _right_goal.trajectory.points.resize(_right_joint_traj.size());
+    goal.trajectory.joint_names = jnt_nms;
+
+    if((qIn.size()%jnt_nms.size()) != 0){
+        ROS_ERROR_NAMED(ARMS_LGRNM,"Cannot convert linear joint trajectory in to joint trajectory goal");
+        return;
+    }
+    int nr_of_points = (qIn.size()/jnt_nms.size());
+    goal.trajectory.points.resize(nr_of_points);
+    //goal.trajectory.points.resize(_right_joint_traj.size());
 
     //first point
-    for(int j=0; j<_r_jnt_nms.size(); j++){
-        traj_point.positions[j] = _right_joint_traj[j];
-        traj_point.velocities[j] = 0.0;
+    for(int i=0; i<jnt_nms.size(); i++){
+        traj_point.positions[i] = qIn[i];
+        traj_point.velocities[i] = 0.0;
     }
     traj_point.time_from_start = ros::Duration(0.25);
-    _right_goal.trajectory.points[0] = traj_point;
+    goal.trajectory.points[0] = traj_point;
 
     //rest of the points
-    for(unsigned int i=1; i<_obj_pose_traj.poses.size(); i++){
-        for(int j=0; j<_r_jnt_nms.size(); j++){
-            traj_point.positions[j] = _right_joint_traj[(i*(_r_jnt_nms.size()))+j];
+    for(unsigned int i=1; i<nr_of_points; i++){
+        for(int j=0; j<jnt_nms.size(); j++){
+            traj_point.positions[j] = qIn[(i*(jnt_nms.size()))+j];
             traj_point.velocities[j] = 0.0;
         }
-        _right_goal.trajectory.points[i] = traj_point;
+        goal.trajectory.points[i] = traj_point;
     }
 }
 
@@ -474,67 +486,83 @@ void TubeManipulation::Arms::_get_right_goal()
  *
  *  
  */
-void TubeManipulation::Arms::_get_left_goal()
-{
-    trajectory_msgs::JointTrajectoryPoint traj_point;
+//void TubeManipulation::Arms::_get_left_goal()
+//{
+//    trajectory_msgs::JointTrajectoryPoint traj_point;
 
-    traj_point.positions.resize(7);
-    traj_point.velocities.resize(7);
+//    traj_point.positions.resize(7);
+//    traj_point.velocities.resize(7);
 
-    _left_goal.trajectory.joint_names = _l_jnt_nms;
-    _left_goal.trajectory.points.resize(_left_joint_traj.size());
+//    _left_goal.trajectory.joint_names = _l_jnt_nms;
+//    _left_goal.trajectory.points.resize(_left_joint_traj.size());
 
-    for(int j=0; j<_l_jnt_nms.size(); j++){
-        traj_point.positions[j] = _left_joint_traj[j];
-        traj_point.velocities[j] = 0.0;
-    }
-    traj_point.time_from_start = ros::Duration(0.25);
-    _left_goal.trajectory.points[0] = traj_point;
+//    for(int j=0; j<_l_jnt_nms.size(); j++){
+//        traj_point.positions[j] = _left_joint_traj[j];
+//        traj_point.velocities[j] = 0.0;
+//    }
+//    traj_point.time_from_start = ros::Duration(0.25);
+//    _left_goal.trajectory.points[0] = traj_point;
 
-    for(unsigned int i=1; i<_obj_pose_traj.poses.size(); i++){
-        for(int j=0; j<_l_jnt_nms.size(); j++){
-            traj_point.positions[j] = _left_joint_traj[(i*(_l_jnt_nms.size()))+j];
-            traj_point.velocities[j] = 0.0;
-        }
-        _left_goal.trajectory.points[i] = traj_point;
-    }
-}
+//    for(unsigned int i=1; i<_obj_pose_traj.poses.size(); i++){
+//        for(int j=0; j<_l_jnt_nms.size(); j++){
+//            traj_point.positions[j] = _left_joint_traj[(i*(_l_jnt_nms.size()))+j];
+//            traj_point.velocities[j] = 0.0;
+//        }
+//        _left_goal.trajectory.points[i] = traj_point;
+//    }
+//}
 
 /*! \brief Synchronizes start times of both goal joint trajectory based on maximum joint move in both arms.
  *
  *  Note: MAX_JOINT_VEL=0.5 is defined in dualArms.h file.
  */
-void TubeManipulation::Arms::_sync_start_times(void)
+void TubeManipulation::Arms::_sync_start_times(pr2_controllers_msgs::JointTrajectoryGoal &right_goal,
+                                               pr2_controllers_msgs::JointTrajectoryGoal &left_goal)
 {
+    if(right_goal.trajectory.points.size()!=left_goal.trajectory.points.size()){
+        ROS_ERROR_NAMED(ARMS_LGRNM,"Cannot sync trajectories. Sizes are different");
+        return;
+    }
     double max_right_joint_move = 0, max_left_joint_move = 0, max_joint_move=0;
     double time_from_start = 0.25;
-    for(unsigned int i=1; i < _obj_pose_traj.poses.size(); i++){
+    for(unsigned int i=1; i < right_goal.trajectory.points.size(); i++){
         max_right_joint_move = 0;
-        for(int j=0; j<7; j++){
-            double joint_move = fabs(_right_goal.trajectory.points[i].positions[j] -
-                                     _right_goal.trajectory.points[i-1].positions[j]);
-            if(joint_move > max_right_joint_move) max_right_joint_move = joint_move;
+        std::string max_right_joint_nm, max_left_joint_nm, max_joint_nm;
+        for(int j=0; j<_r_jnt_nms.size(); j++){
+            double joint_move = fabs(right_goal.trajectory.points[i].positions[j] -
+                                     right_goal.trajectory.points[i-1].positions[j]);
+            if(joint_move > max_right_joint_move){
+                max_right_joint_move = joint_move;
+                max_right_joint_nm = _r_jnt_nms[j];
+            }
         }
 
         max_left_joint_move = 0;
-        for(int j=0; j<7; j++){
-            double joint_move = fabs(_left_goal.trajectory.points[i].positions[j] -
-                                     _left_goal.trajectory.points[i-1].positions[j]);
-            if(joint_move > max_left_joint_move) max_left_joint_move = joint_move;
+        for(int j=0; j<_l_jnt_nms.size(); j++){
+            double joint_move = fabs(left_goal.trajectory.points[i].positions[j] -
+                                     left_goal.trajectory.points[i-1].positions[j]);
+            if(joint_move > max_left_joint_move){
+                max_left_joint_move = joint_move;
+                max_left_joint_nm = _l_jnt_nms[j];
+            }
         }
 
-        if(max_right_joint_move>max_left_joint_move)
+        if(max_right_joint_move>max_left_joint_move){
             max_joint_move = max_right_joint_move;
-        else
+            max_joint_nm = max_right_joint_nm;
+        }
+        else{
             max_joint_move = max_left_joint_move;
+            max_joint_nm = max_left_joint_nm;
+        }
 
         double seconds = max_joint_move/MAX_JOINT_VEL;
         if(seconds>6.0)
-            ROS_WARN_NAMED(ARMS_LGRNM,"max_joint_move: %0.3f, seconds: %0.3f at traj point %d; check wrap arounds in joints",
-                     max_joint_move, seconds, i);
+            ROS_WARN_NAMED(ARMS_LGRNM,"Joint %s moves %0.3f in %0.3f seconds at traj point %d. check wrap arounds in joints",
+                           max_joint_nm, max_joint_move, seconds, i);
         time_from_start += seconds;
-        _right_goal.trajectory.points[i].time_from_start = ros::Duration(time_from_start);
-        _left_goal.trajectory.points[i].time_from_start = ros::Duration(time_from_start);
+        right_goal.trajectory.points[i].time_from_start = ros::Duration(time_from_start);
+        left_goal.trajectory.points[i].time_from_start = ros::Duration(time_from_start);
     }
 }
 
@@ -571,27 +599,21 @@ bool TubeManipulation::Arms::executeJointTrajectoryWithSync(std::vector<double> 
         ROS_WARN_NAMED(ARMS_LGRNM,"Cannot execute trajectory! Number of trajectory points of both arms are different.");
         return false;
     }
-    _right_joint_traj = qRight;
-    _left_joint_traj = qLeft;
-    ROS_INFO_NAMED(ARMS_LGRNM,"getting right goal");
-    _get_right_goal();
-    ROS_INFO_NAMED(ARMS_LGRNM,"getting left goal");
-    _get_left_goal();
-    ROS_INFO_NAMED(ARMS_LGRNM,"unnormalizing right trajectory");
-    _call_right_joints_unnormalizer();
-    ROS_INFO_NAMED(ARMS_LGRNM,"unnormalizing left trajectory");
-    _call_left_joints_unnormalizer();
-    ROS_INFO_NAMED(ARMS_LGRNM,"syncing start times");
-    _sync_start_times();
+    pr2_controllers_msgs::JointTrajectoryGoal right_goal, left_goal;
+    _get_joint_trajectory_goal(qRight, right_goal, _r_jnt_nms);
+    _get_joint_trajectory_goal(qLeft, left_goal, _l_jnt_nms);
+    _call_joints_unnormalizer(right_goal);
+    _call_joints_unnormalizer(left_goal);
+    _sync_start_times(right_goal, left_goal);
 
     ros::Time time_to_start = ros::Time::now()+ros::Duration(1.0);
-    _right_goal.trajectory.header.stamp = time_to_start; //ros::Time::now()+ros::Duration(1.0);
-    _left_goal.trajectory.header.stamp = time_to_start; //ros::Time::now()+ros::Duration(1.0);
-    _traj_client_r->sendGoal(_right_goal);
-    _traj_client_l->sendGoal(_left_goal);
+    right_goal.trajectory.header.stamp = time_to_start; //ros::Time::now()+ros::Duration(1.0);
+    left_goal.trajectory.header.stamp = time_to_start; //ros::Time::now()+ros::Duration(1.0);
+    _traj_client_r->sendGoal(right_goal);
+    _traj_client_l->sendGoal(left_goal);
     _traj_client_r->waitForResult();
     _traj_client_l->waitForResult();
-    return(1);
+    return true;
 }
 
 // pass empty joint trajectory if that arm is not being used
@@ -1003,13 +1025,13 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
                 if(crnt_val<lower_bound){
                     double err = lower_bound - crnt_val;
                     if(err<adj_err){
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i]
+                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
                                               <<" is out of lower bound. Adjusted");
                         crnt_val = lower_bound;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i]
+                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
                                               <<" is out of lower bound. Error value is "
                                               <<err<<">"<<adj_err<<" Can not adjust!");
                     }
@@ -1017,13 +1039,13 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
                 if(crnt_val>upper_bound){
                     double err = crnt_val - upper_bound;
                     if(err<adj_err){
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i]
+                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
                                               <<" is out of upper bound. Adjusted.");
                         crnt_val = upper_bound;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i]
+                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
                                               <<" is out of upper bound. Error value is "
                                               <<err<<">"<<adj_err<<" Can not adjust!");
                     }
@@ -1837,10 +1859,10 @@ bool TubeManipulation::Arms::moveRightArmToCloudCapturePose(const tf::Vector3 &s
         rand_pose *= theta_tf;
 
         wrist_pose = tf2pose(rand_pose);
-        _publish_pose(wrist_pose);
+        //_publish_pose(wrist_pose);
         if(_get_simple_right_arm_ik(wrist_pose, ik_soln, current_joints)){
             if(collision_check.isRightArmStateValid(ik_soln)){
-                ros::Duration(3).sleep();
+                //ros::Duration(3).sleep();
                 cnt = 0;
                 ikSoln = ik_soln;
                 ROS_INFO_NAMED(ARMS_LGRNM, "Capture pose found");
@@ -1854,9 +1876,9 @@ bool TubeManipulation::Arms::moveRightArmToCloudCapturePose(const tf::Vector3 &s
 //            std::string s;
 //            std::cin>>s;
 //        }
-        ros::Duration(0.05).sleep();
+        //ros::Duration(0.05).sleep();
     }while(cnt>1);
-
+    _publish_pose(wrist_pose);
     return pose_found;
 }
 

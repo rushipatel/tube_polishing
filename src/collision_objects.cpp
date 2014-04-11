@@ -22,7 +22,7 @@ void collisionObjects::copyAllObjectsTo(collisionObjects::Ptr anotherObj){
         anotherObj->addCollisionObject(_coll_obj[i]);
     }
     if(!_allowed_contact.shape.dimensions.empty()){
-        anotherObj->setAllowedContactCube(_allowed_contact.pose_stamped.pose, _allowed_contact.shape.dimensions.at(0));
+        anotherObj->setAllowedContactCube(_allowed_contact.pose_stamped.pose, _allowed_contact.shape.dimensions.at(0), _allowed_contact.link_names);
     }
 }
 
@@ -70,7 +70,7 @@ void collisionObjects::removeCollisionObject(std::string id){
     }
 }
 
-void collisionObjects::setAllowedContactCube(geometry_msgs::Pose pose, double dim){
+void collisionObjects::setAllowedContactCube(geometry_msgs::Pose pose, double dim, std::vector<std::string> &link_names){
     _allowed_contact.name = "AllowedContact";
     _allowed_contact.link_names.clear();
     _allowed_contact.link_names.push_back("tube");
