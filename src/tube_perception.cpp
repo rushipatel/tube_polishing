@@ -1367,7 +1367,7 @@ void CloudProcessing::_segmentize_axis(void)
     _axis_points->width = _axis_points->points.size();
     _axis_points->height = 1;
     ROS_INFO("%d Axis points found",_axis_points->points.size());
-    ROS_INFO("%d Cylinder found", _tube->cylinders.size());
+    ROS_INFO("Tube model generated with %d cylinder(s)", _tube->cylinders.size());
 }
 
 

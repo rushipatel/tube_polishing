@@ -640,9 +640,14 @@ void GraspAnalysis::_compute_metric()
             lfm = ma_left.getForceMetric(q_l);
             lrm = ma_left.getRotationMetric(q_l);
 
-            _valid_pairs->graspPairs[i].forceMetric[j] = std::min(rfm,lfm);
-            if(std::min(rfm,lfm)<f_min)
-                f_min = std::min(rfm,lfm);
+            /*_valid_pairs->graspPairs[i].forceMetric[j] = std::min(rfm,lfm);
+            if(std::min(rfm,lfm)<f_min) //minimum force of left and right
+                f_min = std::min(rfm,lfm);*/
+
+            _valid_pairs->graspPairs[i].forceMetric[j] = rfm + lfm;
+            if((rfm+lfm)<f_min) //minimum force of left and right
+                f_min = rfm + lfm;
+
             _valid_pairs->graspPairs[i].rotMetric[j] = std::min(rrm,lrm);
             if(std::min(rrm,lrm)<r_min)
                 r_min = std::min(rrm,lrm);

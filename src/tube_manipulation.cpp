@@ -557,9 +557,9 @@ void TubeManipulation::Arms::_sync_start_times(pr2_controllers_msgs::JointTrajec
         }
 
         double seconds = max_joint_move/MAX_JOINT_VEL;
-        if(seconds>6.0)
-            ROS_WARN_NAMED(ARMS_LGRNM,"Joint %s moves %0.3f in %0.3f seconds at traj point %d. check wrap arounds in joints",
-                           max_joint_nm, max_joint_move, seconds, i);
+        if(seconds>6.0){
+            ROS_WARN_NAMED(ARMS_LGRNM,"Joint %s moves %0.3f in %0.3f seconds at traj point %d. check wrap arounds in joints", max_joint_nm.c_str(), max_joint_move, seconds, i);
+        }
         time_from_start += seconds;
         right_goal.trajectory.points[i].time_from_start = ros::Duration(time_from_start);
         left_goal.trajectory.points[i].time_from_start = ros::Duration(time_from_start);

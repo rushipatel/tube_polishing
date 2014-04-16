@@ -13,7 +13,8 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _work_traj_idx = 0;
     _r_soln_avail = false;
     _l_soln_avail = false;
-    _WRIST_OFFSET = 0.15;
+    //_WRIST_OFFSET = 0.15;
+    _WRIST_OFFSET = 0.072;
     _PICK_WRIST_OFFSET = 0.2;
     _TABLE_HEIGHT = 0.5; //in meters
     _z_error = 0.0;
@@ -765,7 +766,7 @@ void stateMachine::_get_disk_and_workpose(){
     geometry_msgs::Pose work_pose;
     for(unsigned int i=0; i<_clusters.size(); i++){
         if(_cloud_process->findDisk(_clusters[i], MIN_R, MAX_R, wheel, work_pose)){
-            ROS_INFO_NAMED(LGRNM,"Wheel found at: x=%f, y=%f, z=%f", work_pose.position.x,
+            ROS_INFO_NAMED(LGRNM,"Wheel found. Work pose origin at: x=%f, y=%f, z=%f", work_pose.position.x,
                            work_pose.position.y, work_pose.position.z);
             _work_pose1 = work_pose;
             _wheel_cyl = wheel;
