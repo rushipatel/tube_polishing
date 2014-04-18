@@ -569,15 +569,14 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
     _compare_models(tube_ptr, _tube, corres_ind, confidence );
     //since the pose of any tube model is first cylinder
     // find fisrt cylinder
-    std::cout<<"\nOriginal Tube -> New tube";
+    ROS_INFO("Original Tube -> New tube");
     int corresp_cyl_cnt = 0;
     for(unsigned int i=0; i<corres_ind.size(); i++){
         if(corres_ind[i]<corres_ind.size()){
             corresp_cyl_cnt++;
         }
-        std::cout<<"\n"<<i<<" -> "<<corres_ind[i];
+        ROS_INFO_STREAM(" "<<i<<" -> "<<corres_ind[i]);
     }
-    std::cout<<"\n";
 
     if(corresp_cyl_cnt<2){
         ROS_WARN("Couldn't find enough corresponding cylinders");
@@ -696,7 +695,7 @@ void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
         double max_confidence = std::numeric_limits<double>::max(),
                 first_len, second_len, len_err, angle1, angle2, conf;
         first_len = first->cylinders[i].getAxisLength();
-        //compare mid points of the cylinders in second tube and store index id distance is less than certain value (radius)
+        //compare mid points/axis length/axis vector of the cylinders in second tube and store index id distance is less than certain value (radius)
         for(unsigned int j=0; j<second->cylinders.size(); j++){
             temp_tf = second->getTransform();
             second_axis = second->cylinders[j].getAxisVector(temp_tf);
@@ -711,13 +710,13 @@ void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
             }
             len_err = std::abs(first_len - second_len);
             conf = len_err*W_l + angle1*W_t;
-            std::cout<<"\nconfidence : "<<conf;
+            //std::cout<<"\nconfidence : "<<conf;
             if(conf<max_confidence){
                 max_confidence = conf;
                 idx = j;
             }
         }
-        std::cout<<"\n";
+        //std::cout<<"\n";
         corresponding_indices[i] = idx;
         confidence[i] = max_confidence;
     }
@@ -1006,34 +1005,35 @@ void CloudProcessing::_generate_work_vectors()
     tf::Vector3 axis = _tube->cylinders[cyl_idx].getAxisVector(tube_tf); //in local
     axis.normalize();
 
-    //in global frame
+    // point on axis of cylinder
     tf::Vector3 at_point = _tube->cylinders[cyl_idx].getAxisVector(tube_tf);
     at_point *= l;
-    at_point += _tube->cylinders[cyl_idx].p1;
+    at_point += _tube->cylinders[cyl_idx].p1; //convert from cylinder to tube frame
 
     tf::Vector3 perp_vec = _get_perp_vec3(axis);
-    tf::Vector3 point, vec1,vec2;
+    tf::Vector3 point, vec1, vec2;
 
     vec1 = perp_vec.rotate(axis, ((double)rand()/(double)RAND_MAX)*M_PI);
     //vec1 = perp_vec;
-    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
-    PointT pointnormal;
-    for(int i=0; i<45; i++){
-        vec2 = vec1.rotate(axis,(i*M_PI)/180);
-        point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
-        vec2.normalize();
-        pointnormal.x = point.x();
-        pointnormal.y = point.y();
-        pointnormal.z = point.z();
-        pointnormal.normal_x = vec2.x();
-        pointnormal.normal_y = vec2.y();
-        pointnormal.normal_z = vec2.z();
-        cloud->points.push_back(pointnormal);
-    }
-    _tube->workPointsCluster.push_back(cloud);
 
-    cloud->points.clear();
-    vec1 = vec1.rotate(axis,M_PI/4);
+    for(unsigned int ii=1; ii<=4; ii++){
+        pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
+        PointT pointnormal;
+        for(int i=0; i<45; i++){
+            vec2 = vec1.rotate(axis,(i*M_PI)/180);
+            point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
+            vec2.normalize();
+            pointnormal.x = point.x();
+            pointnormal.y = point.y();
+            pointnormal.z = point.z();
+            pointnormal.normal_x = vec2.x();
+            pointnormal.normal_y = vec2.y();
+            pointnormal.normal_z = vec2.z();
+            cloud->points.push_back(pointnormal);
+        }
+        _tube->workPointsCluster.push_back(cloud);
+        vec1 = vec1.rotate(axis,(M_PI/4)*ii);
+    }/*
     for(int i=0; i<45; i++){
         vec2 = vec1.rotate(axis,(i*M_PI)/180);
         point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
@@ -1081,8 +1081,7 @@ void CloudProcessing::_generate_work_vectors()
         pointnormal.normal_z = vec2.z();
         cloud->points.push_back(pointnormal);
     }
-
-    _tube->workPointsCluster.push_back(cloud);
+    _tube->workPointsCluster.push_back(cloud);*/
 }
 
 bool CloudProcessing::writePointCloudOnfile(const sensor_msgs::PointCloud2 &rosCloud, std::string fileName){

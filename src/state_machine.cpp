@@ -268,7 +268,7 @@ void stateMachine::start()
             if(_att2left){
                 std::vector<double> q_right_first(7), q_left_first(7);
                 if(!(_computed_grasp_pair.qLeft.size()>7 && _computed_grasp_pair.qRight.size()>7)){
-                    ROS_ERROR_NAMED(LGRNM,"trajectories stored in computed grasp pair is less than 7");
+                    ROS_ERROR_NAMED(LGRNM,"trajectories stored in computed grasp pair is invalid");
                 }
                 for(unsigned int i=0; i<7; i++){
                     q_left_first[i] = _computed_grasp_pair.qLeft[i];
@@ -432,7 +432,7 @@ bool stateMachine::_gen_tube_model(void){
     if(!_cloud_process->genTubeModel(_clusters.at(_cluster_idx),_tube)){
         return false;
     }
-    ROS_INFO_NAMED(LGRNM,"Tube model generated with %d cylinders",_tube->cylinders.size());
+    ROS_INFO_NAMED(LGRNM,"Tube model generated with %d cylinders and %d work point clusters",_tube->cylinders.size(), _tube->workPointsCluster.size());
     return true;
 }
 
@@ -568,7 +568,7 @@ void stateMachine::_publish_work_pose(void){
 
 bool stateMachine::_get_computed_grasp_pair()
 {
-    ROS_INFO_NAMED(LGRNM,"Computing for grasp pair...");
+    ROS_INFO_NAMED(LGRNM,"Computing grasp pair for work trajectory %d...",(_work_traj_idx+1));
     _grasp_analysis->setTubePtr(_tube);
     _grasp_analysis->setWorkPose(_work_pose1);
     _grasp_analysis->setWorkTrajIdx(_work_traj_idx);

@@ -95,7 +95,8 @@ TubeManipulation::Arms::Arms(ros::NodeHandlePtr nh, collisionObjects::Ptr colObj
         _ik_client_l = _rh->serviceClient<kinematics_msgs::GetConstraintAwarePositionIK>("pr2_left_arm_kinematics/get_constraint_aware_ik");
     _smpl_ik_client_l = _rh->serviceClient<kinematics_msgs::GetPositionIK>("pr2_left_arm_kinematics/get_ik");
     _traj_unnormalizer_client =
-            _rh->serviceClient<arm_navigation_msgs::FilterJointTrajectory>("trajectory_filter_unnormalizer/filter_trajectory");
+            _rh->serviceClient<arm_navigation_msgs::FilterJointTrajectory>
+            ("trajectory_filter_unnormalizer/filter_trajectory");
     _traj_filter_client = _rh->serviceClient<arm_navigation_msgs::FilterJointTrajectoryWithConstraints>("trajectory_filter_server/filter_trajectory_with_constraints");
 
     _test_pose_pub = _rh->advertise<geometry_msgs::PoseStamped>("tube_polishing/arms/test_pose", 1);
@@ -520,7 +521,7 @@ void TubeManipulation::Arms::_sync_start_times(pr2_controllers_msgs::JointTrajec
                                                pr2_controllers_msgs::JointTrajectoryGoal &left_goal)
 {
     if(right_goal.trajectory.points.size()!=left_goal.trajectory.points.size()){
-        ROS_ERROR_NAMED(ARMS_LGRNM,"Cannot sync trajectories. Sizes are different");
+        ROS_ERROR_NAMED(ARMS_LGRNM,"Cannot sync trajectories. Size of trajectory points are different");
         return;
     }
     double max_right_joint_move = 0, max_left_joint_move = 0, max_joint_move=0;
@@ -558,7 +559,7 @@ void TubeManipulation::Arms::_sync_start_times(pr2_controllers_msgs::JointTrajec
 
         double seconds = max_joint_move/MAX_JOINT_VEL;
         if(seconds>6.0){
-            ROS_WARN_NAMED(ARMS_LGRNM,"Joint %s moves %0.3f in %0.3f seconds at traj point %d. check wrap arounds in joints", max_joint_nm.c_str(), max_joint_move, seconds, i);
+            ROS_WARN_NAMED(ARMS_LGRNM,"Joint %s moves %0.3f in %0.2f seconds at traj point %d. check wrap arounds in joints", max_joint_nm.c_str(), max_joint_move, seconds, i);
         }
         time_from_start += seconds;
         right_goal.trajectory.points[i].time_from_start = ros::Duration(time_from_start);
@@ -602,6 +603,7 @@ bool TubeManipulation::Arms::executeJointTrajectoryWithSync(std::vector<double> 
     pr2_controllers_msgs::JointTrajectoryGoal right_goal, left_goal;
     _get_joint_trajectory_goal(qRight, right_goal, _r_jnt_nms);
     _get_joint_trajectory_goal(qLeft, left_goal, _l_jnt_nms);
+
     _call_joints_unnormalizer(right_goal);
     _call_joints_unnormalizer(left_goal);
     _sync_start_times(right_goal, left_goal);
@@ -1027,7 +1029,7 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
                     if(err<adj_err){
                         ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
                                               <<" is out of lower bound. Adjusted");
-                        crnt_val = lower_bound;
+                        crnt_val = lower_bound+0.000001;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
@@ -1041,7 +1043,7 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
                     if(err<adj_err){
                         ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
                                               <<" is out of upper bound. Adjusted.");
-                        crnt_val = upper_bound;
+                        crnt_val = upper_bound-0.000001;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
@@ -1084,7 +1086,7 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
                     if(err<adj_err){
                         ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_l_jnt_nms[i]
                                               <<" is out of lower bound. Adjusted");
-                        crnt_val = lower_bound;
+                        crnt_val = lower_bound+0.000001;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
@@ -1098,7 +1100,7 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
                     if(err<adj_err){
                         ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_l_jnt_nms[i]
                                               <<" is out of upper bound. Adjusted");
-                        crnt_val = upper_bound;
+                        crnt_val = upper_bound-0.000001;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
@@ -1123,6 +1125,7 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
         std::vector<double> right_joints, left_joints;
         if(right_arm){
             for(int i=0; i<_r_jnt_nms.size(); i++){
+                //getting segmantation fault at next line
                 right_joints[i] = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
             }
             _get_left_joints(left_joints);
@@ -1607,7 +1610,7 @@ bool TubeManipulation::Arms::getRegraspPoseRight(arm_navigation_msgs::AttachedCo
     collision_check.enableVisualization();
     //collision_check.setAttachedObjPtr(attObjPtr);
     collision_check.refreshState();
-    _collision_objects->printListOfObjects();
+    //_collision_objects->printListOfObjects();
     tf::Transform obj_orig, obj, rand_tf,
             wrist=pose2tf(wrist_pose),
             grasp=pose2tf(crnt_grasp),

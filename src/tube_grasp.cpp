@@ -140,7 +140,7 @@ bool GraspAnalysis::getComputedGraspPair(GraspPair &graspPair)
         return true;
     }
     else{
-        ROS_ERROR("GraspAnalysis - There is no valid grasp pair or grasps hasn't been computed yet. did you call analyze()?");
+        ROS_ERROR("There is no valid grasp pair or grasps hasn't been computed yet.");
         return false;
     }
 }
@@ -386,64 +386,78 @@ bool GraspAnalysis::_gen_work_trajectory()
     geometry_msgs::Pose pose;
     _work_traj.header.frame_id = "/base_link";
     _work_traj.header.stamp= ros::Time::now();
+    _work_traj.poses.clear();
+    if(_traj_idx>=_tube->workPointsCluster.size()){
+        ROS_WARN("Invalid work trajectory index");
+    }
 
-    for(size_t i=0; i<_tube->workPointsCluster.size(); i++)
+    if(_tube->workPointsCluster.empty()){
+        ROS_WARN("No work trajectory exists in given tube model");
+    }
+    cloud = _tube->workPointsCluster[_traj_idx];
+
+    for(size_t j=0; j<cloud->points.size(); j++)
     {
-        cloud = _tube->workPointsCluster[i];
-
-        for(size_t j=0; j<cloud->points.size(); j++)
-        {
-            PointT point;
-            point = cloud->points[j];
-            unsigned int cyl_idx = _tube->whichCylinder(point);
-            if(cyl_idx != _tube->cylinders.size()){
-                tf::Transform tube_tf = _tube->getTransform();
-                cyl_axis =_tube->cylinders[cyl_idx].getAxisVector(tube_tf);
-            }
-            else
-            {
-                ROS_ERROR("GraspAnalysis - Couldn't get cylinder index");
-                return false;
-            }
-            cyl_axis.normalize();
-            ux.setValue(point.normal_x, point.normal_y, point.normal_z);
-            ux.normalize();
-            uy = ux.cross(cyl_axis);
-            uy.normalize();
-            uz = ux.cross(uy);
-            uz.normalize();
-
-            tf::Matrix3x3 mat;
-
-            mat.setValue(ux.getX(), uy.getX(), uz.getX(),
-                         ux.getY(), uy.getY(), uz.getY(),
-                         ux.getZ(), uy.getZ(), uz.getZ());
-
-            /*mat.setValue(ux.getX(), ux.getY(), ux.getZ(),
-                           uy.getX(), uy.getY(), uy.getZ(),
-                           uz.getX(), uz.getY(), uz.getZ());*/
-
-            tf::Quaternion q,q2,q3;
-            mat.getRotation(q);
-            tf::Vector3 vec(1, 0, 0);
-            //q2.setRotation(vec, (M_PI/2));
-            q2.setValue(0,0,0,1);
-            q3 = q*q2;
-            //Rotate +/- 90 degrees around X to align Y to Axis.
-            //Weird but only work around as of now.
-            pose.orientation.x = q3.getX();
-            pose.orientation.y = q3.getY();
-            pose.orientation.z = q3.getZ();
-            pose.orientation.w = q3.getW();
-            pose.position.x = point.x;
-            pose.position.y = point.y;
-            pose.position.z = point.z;
-            _work_traj.poses.push_back(pose);
+        PointT point;
+        point = cloud->points[j];
+        unsigned int cyl_idx = _tube->whichCylinder(point);
+        if(cyl_idx != _tube->cylinders.size()){
+            tf::Transform tube_tf = _tube->getTransform();
+            cyl_axis =_tube->cylinders[cyl_idx].getAxisVector(tube_tf);
         }
+        else
+        {
+            ROS_ERROR("Couldn't get cylinder index");
+            return false;
+        }
+        cyl_axis.normalize();
+        ux.setValue(point.normal_x, point.normal_y, point.normal_z);
+        ux.normalize();
+        uy = ux.cross(cyl_axis);
+        uy.normalize();
+        uz = ux.cross(uy);
+        uz.normalize();
+
+        tf::Matrix3x3 mat;
+
+        mat.setValue(ux.getX(), uy.getX(), uz.getX(),
+                     ux.getY(), uy.getY(), uz.getY(),
+                     ux.getZ(), uy.getZ(), uz.getZ());
+
+        /*mat.setValue(ux.getX(), ux.getY(), ux.getZ(),
+                       uy.getX(), uy.getY(), uy.getZ(),
+                       uz.getX(), uz.getY(), uz.getZ());*/
+        double angle = ux.angle(tf::Vector3(1,0,0));
+        tf::Vector3 rot_vec = ux.cross(tf::Vector3(1,0,0));
+        tf::Quaternion q;
+        q.setRotation(rot_vec, angle);
+        tf::Transform t1(q),t2, t;
+        t2.setIdentity();t2.setOrigin(tf::Vector3(0,1,0));
+        t = t1*t2;
+        tf::Vector3 y_of_new_frame = t.getOrigin();
+        angle = uz.angle(y_of_new_frame);
+        tf::Quaternion q2, q3;
+        q2.setRotation(tf::Vector3(1,0,0),angle);
+
+        /*tf::Quaternion q,q2,q3;
+        mat.getRotation(q);
+        q2.setRotation(tf::Vector3(1,0,0), (M_PI/2));
+        //q2.setValue(0,0,0,1);*/
+        q3 = q*q2;
+        //Rotate +/- 90 degrees around X to align Y to Axis.
+        //Weird but only work around as of now.
+        pose.orientation.x = q3.getX();
+        pose.orientation.y = q3.getY();
+        pose.orientation.z = q3.getZ();
+        pose.orientation.w = q3.getW();
+        pose.position.x = point.x;
+        pose.position.y = point.y;
+        pose.position.z = point.z;
+        _work_traj.poses.push_back(pose);
     }
     //_normalize_worktrajectory();
     //_xform_in_tubeframe();
-    _work2tube_trajectory();
+    _work2tube_trajectory(); //sets _tube_traj from work point poses
     return true;
 }
 
@@ -469,7 +483,6 @@ void GraspAnalysis::_work2tube_trajectory()
         _tube_traj.poses[i] = tf2pose(t);
     }
 }
-
 
 void GraspAnalysis::_gen_test_pairs()
 {
@@ -531,8 +544,7 @@ void GraspAnalysis::_test_pairs_for_ik()
     arm_navigation_msgs::CollisionObject co;
     _tube->getCollisionObject(co);
     collision_objects->removeCollisionObject(co.id.c_str());
-    collision_objects->printListOfObjects();
-    //collision_objects->setAllowedContactCube(_work_pose, 0.02);
+    //collision_objects->printListOfObjects();
 
     arm_navigation_msgs::AttachedCollisionObject::Ptr att_obj_ptr(new arm_navigation_msgs::AttachedCollisionObject);
     TubeManipulation::Arms manip(_nh, collision_objects); //arms use collision_objects
@@ -674,7 +686,7 @@ void GraspAnalysis::_compute_metric()
         _grasp_pair_found = true;
     }
     else
-        ROS_ERROR("TubeGrasp - No computed valid grasp found");
+        ROS_ERROR("No computed valid grasp found");
 
 
     /*dualArms da(nodeHandle);
