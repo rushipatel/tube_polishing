@@ -1,5 +1,7 @@
 #include "robotHead.h"
 
+#define RBHD_LGRNM "rbHd"
+
 //! Action client initialization
 robotHead::robotHead()
 {
@@ -7,7 +9,7 @@ robotHead::robotHead()
     point_head_client_ = new PointHeadClient("/head_traj_controller/point_head_action", true);
     //wait for head controller action server to come up
     while(!point_head_client_->waitForServer(ros::Duration(5.0)))
-        ROS_INFO("Waiting for the point_head_action server to come up");
+        ROS_INFO_NAMED(RBHD_LGRNM,"Waiting for the point_head_action server to come up");
 }
 
 //! Points the high-def camera frame at a point in a given frame
@@ -40,7 +42,7 @@ bool robotHead::lookAt(double x, double y, double z)
     actionlib::SimpleClientGoalState state = point_head_client_->getState();
     if(!state.isDone())
     {
-        ROS_WARN("RobotHead - Couldn't set head to given point");
+        ROS_WARN_NAMED(RBHD_LGRNM,"Couldn't set head to given point");
         return false;
     }
     return true;

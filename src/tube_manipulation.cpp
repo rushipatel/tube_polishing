@@ -2,10 +2,10 @@
 #include <arm_kinematics_constraint_aware/arm_kinematics_solver_constraint_aware.h>
 #include <stdio.h>
 
-#define ARMS_LGRNM "Arms"
-#define COLCHK_LGRNM "CollisionCheck"
-#define TRAJ_LGRNM "Trajectory"
-
+#define ARMS_LGRNM "arms"
+#define COLCHK_LGRNM "colChk"
+//#define TRAJ_LGRNM "Trajectory"
+/*
 TubeManipulation::Trajectory::Trajectory()
 {
     _r_jnt_nms.push_back("r_shoulder_pan_joint");
@@ -58,7 +58,7 @@ void TubeManipulation::Trajectory::setTrajectory(std::vector<double> &rightTraj,
             point.positions[j] = leftTraj[(i*7) + j];
         _left_traj.points[i] = point;
     }
-}
+}*/
 
 /*void TubeManipulation::Trajectory::syncTrajectories()
 {
@@ -99,7 +99,7 @@ TubeManipulation::Arms::Arms(ros::NodeHandlePtr nh, collisionObjects::Ptr colObj
             ("trajectory_filter_unnormalizer/filter_trajectory");
     _traj_filter_client = _rh->serviceClient<arm_navigation_msgs::FilterJointTrajectoryWithConstraints>("trajectory_filter_server/filter_trajectory_with_constraints");
 
-    _test_pose_pub = _rh->advertise<geometry_msgs::PoseStamped>("tube_polishing/arms/test_pose", 1);
+    //_test_pose_pub = _rh->advertise<geometry_msgs::PoseStamped>("tube_polishing/arms/test_pose", 1);
 
     /*arm_navigation_msgs::SetPlanningSceneDiff::Request planning_scene_req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response planning_scene_res;
@@ -1002,54 +1002,41 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
             std::vector<double> crnt_joints;
             _get_right_joints(crnt_joints);
             double requested_val, lower_bound, upper_bound, crnt_val;
+            ROS_INFO_NAMED(ARMS_LGRNM,"JOINT NAME - [LOWER, UPPER](bounds) [REQUESTED](position) [CURRENT](position)");
             for(int i=0; i<_r_jnt_nms.size(); i++)
             {
                 requested_val = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
-                crnt_val = crnt_joints[i];
+                //crnt_val = crnt_joints[i];
+                crnt_val = req.motion_plan_request.start_state.joint_state.position[i];
                 lower_bound = _joint_bounds[_r_jnt_nms[i].c_str()].first;
                 upper_bound = _joint_bounds[_r_jnt_nms[i].c_str()].second;
 
-
-                ROS_INFO_STREAM_NAMED(ARMS_LGRNM," "<<_r_jnt_nms[i].c_str()
-                                      <<"  Bounds = ["<<lower_bound<<"  "<<upper_bound
-                                <<"]  Requested value : "<<requested_val
-                                      <<"  Current value : "<<crnt_val);
+                //ROS_INFO_NAMED(ARMS_LGRNM,"%s - [%f, %f] [%f] [%f]",
+                //               _r_jnt_nms[i].c_str(),lower_bound,upper_bound,requested_val,crnt_val);
                 if(crnt_val<lower_bound){
-                    ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Current joint value "
-                                          <<crnt_val<<" of "<<_r_jnt_nms[i].c_str()
-                                          <<" joint is out of lower bound");
-                }
-                if(crnt_val>upper_bound){
-                    ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Current joint value "
-                                          <<crnt_val<<" of "<<_r_jnt_nms[i].c_str()
-                                          <<" joint is out of upper bound");
-                }
-                if(crnt_val<lower_bound){
+                    ROS_WARN_NAMED(ARMS_LGRNM,"Current value %f of %s is out of lower bound",
+                                   crnt_val,_r_jnt_nms[i].c_str());
                     double err = lower_bound - crnt_val;
                     if(err<adj_err){
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
-                                              <<" is out of lower bound. Adjusted");
+                        ROS_WARN_NAMED(ARMS_LGRNM,"  Adjusted");
                         crnt_val = lower_bound+0.000001;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
-                                              <<" is out of lower bound. Error value is "
-                                              <<err<<">"<<adj_err<<" Can not adjust!");
+                        ROS_WARN_NAMED(ARMS_LGRNM,"  Error is too high. Not adjusted!");
                     }
                 }
                 if(crnt_val>upper_bound){
+                    ROS_WARN_NAMED(ARMS_LGRNM,"Current value %f of %s is out of upper bound",
+                                   crnt_val,_r_jnt_nms[i].c_str());
                     double err = crnt_val - upper_bound;
                     if(err<adj_err){
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
-                                              <<" is out of upper bound. Adjusted.");
+                        ROS_WARN_NAMED(ARMS_LGRNM,"  Adjusted");
                         crnt_val = upper_bound-0.000001;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_r_jnt_nms[i].c_str()
-                                              <<" is out of upper bound. Error value is "
-                                              <<err<<">"<<adj_err<<" Can not adjust!");
+                        ROS_WARN_NAMED(ARMS_LGRNM,"  Error is too high. Not adjusted!");
                     }
                 }
             }
@@ -1059,56 +1046,43 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
             std::vector<double> crnt_joints;
             _get_left_joints(crnt_joints);
             double requested_val, lower_bound, upper_bound, crnt_val;
+            ROS_INFO_NAMED(ARMS_LGRNM,"JOINT NAME - [LOWER, UPPER](bounds) [REQUESTED](position) [CURRENT](position)");
             for(int i=0; i<_l_jnt_nms.size(); i++)
             {
                 requested_val = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
-                crnt_val = crnt_joints[i];
+                //crnt_val = crnt_joints[i];
+                crnt_val = req.motion_plan_request.start_state.joint_state.position[i];
                 lower_bound = _joint_bounds[_l_jnt_nms[i].c_str()].first;
                 upper_bound = _joint_bounds[_l_jnt_nms[i].c_str()].second;
 
-
-                ROS_INFO_STREAM_NAMED(ARMS_LGRNM," "<<_l_jnt_nms[i].c_str()
-                                      <<"  Bounds = ["<<lower_bound<<"  "<<upper_bound
-                                <<"]  Requested value : "<<requested_val
-                                      <<"  Current value : "<<crnt_val);
+                //ROS_INFO_NAMED(ARMS_LGRNM,"%s - [%f, %f] [%f] [%f]",
+                //               _l_jnt_nms[i].c_str(),lower_bound,upper_bound,requested_val,crnt_val);
                 if(crnt_val<lower_bound){
-                    ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Current joint value "
-                                          <<crnt_val<<" of "<<_l_jnt_nms[i].c_str()
-                                          <<" joint is out of lower bound");
-                }
-                if(crnt_val>upper_bound){
-                    ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Current joint value "
-                                          <<crnt_val<<" of "<<_l_jnt_nms[i].c_str()
-                                          <<" joint is out of upper bound");
-                }
-                if(crnt_val<lower_bound){
+                    ROS_WARN_NAMED(ARMS_LGRNM,"Current value %f of %s is out of lower bound",
+                                   crnt_val,_l_jnt_nms[i].c_str());
                     double err = lower_bound - crnt_val;
                     if(err<adj_err){
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_l_jnt_nms[i]
-                                              <<" is out of lower bound. Adjusted");
+                        ROS_WARN_NAMED(ARMS_LGRNM,"  Adjusted");
                         crnt_val = lower_bound+0.000001;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_l_jnt_nms[i]
-                                              <<" is out of lower bound. Error value is "
-                                              <<err<<">"<<adj_err<<" Can not adjust!");
+                        ROS_WARN_NAMED(ARMS_LGRNM,"  Error is too high. Couldn't adjust!");
                     }
                 }
                 if(crnt_val>upper_bound){
+                    ROS_WARN_NAMED(ARMS_LGRNM,"Current value %f of %s is out of upper bound",
+                                   crnt_val,_l_jnt_nms[i].c_str());
                     double err = crnt_val - upper_bound;
                     if(err<adj_err){
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_l_jnt_nms[i]
-                                              <<" is out of upper bound. Adjusted");
+                        ROS_WARN_NAMED(ARMS_LGRNM,"  Adjusted");
                         crnt_val = upper_bound-0.000001;
                         req.motion_plan_request.start_state.joint_state.position[i] = crnt_val;
                     }
                     else{
-                        ROS_WARN_STREAM_NAMED(ARMS_LGRNM,"Joint "<<_l_jnt_nms[i]
-                                              <<" is out of upper bound. Error value is "
-                                              <<err<<">"<<adj_err<<" Can not adjust!");
+                        ROS_WARN_NAMED(ARMS_LGRNM,"  Error is too high. Couldn't adjust!");
                     }
-                }
+                }   
             }
         }
         //_get_motion_plan(req,res);
@@ -1622,7 +1596,7 @@ bool TubeManipulation::Arms::getRegraspPoseRight(arm_navigation_msgs::AttachedCo
     tf::Vector3 pos;
     double y,p,r;
     double x_pos, y_pos, z_pos;
-    int MAX_CNT = 10000;
+    int MAX_CNT = 1000;
     int cnt = MAX_CNT;
     obj = obj_orig; //start with object's original pose
     std::vector<double> right_joints(7), right_seeds(7),
@@ -1717,7 +1691,7 @@ void TubeManipulation::Arms::_publish_pose(const geometry_msgs::Pose &pose){
     pose_stamped.header.frame_id = "/base_link";
     pose_stamped.header.stamp = ros::Time::now();
     pose_stamped.pose = pose;
-    _test_pose_pub.publish(pose_stamped);
+    //_test_pose_pub.publish(pose_stamped);
 }
 
 
@@ -1725,9 +1699,6 @@ bool TubeManipulation::Arms::moveRightArmToCloudCapturePose(const tf::Vector3 &s
                                                          const tf::Vector3 &startOrig,
                                                          const double minSensorDistance,
                                                          std::vector<double> &ikSoln){
-    ros::Publisher vis_msg = _rh->advertise<visualization_msgs::MarkerArray>("tube_polishing/arms/arrows",1);
-    visualization_msgs::MarkerArray ma;
-    visualization_msgs::Marker m;
 
     TubeManipulation::CollisionCheck collision_check(_rh, _collision_objects);
     collision_check.enableVisualization();
@@ -1780,30 +1751,6 @@ bool TubeManipulation::Arms::moveRightArmToCloudCapturePose(const tf::Vector3 &s
             continue; //continue before cnt--
         }
 
-//        m.action = m.ADD;
-//        m.color.r = 1;
-//        m.color.a = 1;
-//        m.header.frame_id = "/base_link";
-//        m.header.stamp = ros::Time::now();
-//        m.id = 1;
-//        m.type = m.ARROW;
-//        //m.lifetime = ros::Duration(1);
-
-//        m.scale.x = 0.005;
-//        m.scale.y = 0.006;
-//        m.scale.z = 0.01;
-
-//        geometry_msgs::Point point;
-//        point.x = rand_orig.getX();
-//        point.y = rand_orig.getY();
-//        point.z = rand_orig.getZ();
-//        m.points.push_back(point);
-//        point.x += ray_to_sensor.getX();
-//        point.y += ray_to_sensor.getY();
-//        point.z += ray_to_sensor.getZ();
-//        m.points.push_back(point);
-
-//        ma.markers.push_back(m);
 
         /*y = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;
         p = ((double)rand()/(double)RAND_MAX) * 2 * M_PI;*/
@@ -1822,30 +1769,10 @@ bool TubeManipulation::Arms::moveRightArmToCloudCapturePose(const tf::Vector3 &s
         //x_axis = rand_pose.getOrigin();
         x_axis.setValue(1,0,0); //x axis of q is negative x of global frame
 
-//        m.id++;
-//        m.points.clear();
-//        point.x = rand_orig.getX();
-//        point.y = rand_orig.getY();
-//        point.z = rand_orig.getZ();
-//        m.points.push_back(point);
-//        point.x += 1;
-//        m.points.push_back(point);
-//        ma.markers.push_back(m);
 
         double angle = ray_to_sensor.angle(x_axis);
         //std::cout<<"\nTheta : "<<angle;
         perp_vec = x_axis.cross(ray_to_sensor);
-//        m.id++;
-//        m.points.clear();
-//        point.x = rand_orig.getX();
-//        point.y = rand_orig.getY();
-//        point.z = rand_orig.getZ();
-//        m.points.push_back(point);
-//        point.x += perp_vec.getX();
-//        point.y += perp_vec.getY();
-//        point.z += perp_vec.getZ();
-//        m.points.push_back(point);
-//        ma.markers.push_back(m);
 
         q.setRotation(perp_vec, angle);
 
@@ -1881,7 +1808,7 @@ bool TubeManipulation::Arms::moveRightArmToCloudCapturePose(const tf::Vector3 &s
 //        }
         //ros::Duration(0.05).sleep();
     }while(cnt>1);
-    _publish_pose(wrist_pose);
+    //_publish_pose(wrist_pose);
     return pose_found;
 }
 

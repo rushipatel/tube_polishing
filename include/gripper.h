@@ -8,7 +8,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <pr2_controllers_msgs/JointControllerState.h>
 
-#define GRPR_LGRNM "Gripper"
+#define GRPR_LGRNM "grpr"
 
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction> GripperClient;
 

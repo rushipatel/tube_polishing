@@ -1,6 +1,7 @@
 #include "tubeGrasp.h"
 #include "math.h"
 
+#define GRSP_LGRNM "grsp"
 
 namespace TubeGrasp
 {
@@ -33,12 +34,12 @@ tf::Transform Grasp::getTransform(void){
 }
 
 geometry_msgs::Pose Grasp::getWristPose(){
-    ROS_WARN_COND(_wrist_offset==0.0, "Wrist Offset is set to zero. Did you forget to update it using setWristOffset()?");
+    ROS_WARN_COND_NAMED(_wrist_offset==0.0, GRSP_LGRNM, "Wrist Offset is set to zero. Did you forget to update it using setWristOffset()?");
     return tf2pose(_get_wrist_pose(_wrist_offset));
 }
 
 tf::Transform Grasp::getWristTransform(){
-    ROS_WARN_COND(_wrist_offset==0.0, "Wrist Offset is set to zero. Did you forget to update it using setWristOffset()?");
+    ROS_WARN_COND_NAMED(_wrist_offset==0.0, GRSP_LGRNM, "Wrist Offset is set to zero. Did you forget to update it using setWristOffset()?");
     return _get_wrist_pose(_wrist_offset);
 }
 
@@ -140,7 +141,7 @@ bool GraspAnalysis::getComputedGraspPair(GraspPair &graspPair)
         return true;
     }
     else{
-        ROS_ERROR("There is no valid grasp pair or grasps hasn't been computed yet.");
+        ROS_ERROR_NAMED(GRSP_LGRNM,"There is no valid grasp pair or grasps hasn't been computed yet.");
         return false;
     }
 }
@@ -332,7 +333,7 @@ void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, Grasp
             }
         }
     }
-    ROS_INFO("%d grasps generated",grasp_array->grasps.size());
+    ROS_INFO_NAMED(GRSP_LGRNM,"%d grasps generated",grasp_array->grasps.size());
 }
 
 void GraspAnalysis::_normalize_worktrajectory()
@@ -361,7 +362,7 @@ void GraspAnalysis::_normalize_worktrajectory()
                         prev_pose.orientation.w );
         theta_dist = crnt_q.getAngle() - prev_q.getAngle();
         axis_dist  = crnt_q.getAxis() - prev_q.getAxis();
-        //ROS_INFO_STREAM("Angle: "<<theta_dist<<"  Axis: "<<axis_dist);
+        //ROS_INFO_STREAM_NAMED(GRSP_LGRNM,"Angle: "<<theta_dist<<"  Axis: "<<axis_dist);
     }*/
 }
 
@@ -388,11 +389,11 @@ bool GraspAnalysis::_gen_work_trajectory()
     _work_traj.header.stamp= ros::Time::now();
     _work_traj.poses.clear();
     if(_traj_idx>=_tube->workPointsCluster.size()){
-        ROS_WARN("Invalid work trajectory index");
+        ROS_WARN_NAMED(GRSP_LGRNM,"Invalid work trajectory index");
     }
 
     if(_tube->workPointsCluster.empty()){
-        ROS_WARN("No work trajectory exists in given tube model");
+        ROS_WARN_NAMED(GRSP_LGRNM,"No work trajectory exists in given tube model");
     }
     cloud = _tube->workPointsCluster[_traj_idx];
 
@@ -405,9 +406,8 @@ bool GraspAnalysis::_gen_work_trajectory()
             tf::Transform tube_tf = _tube->getTransform();
             cyl_axis =_tube->cylinders[cyl_idx].getAxisVector(tube_tf);
         }
-        else
-        {
-            ROS_ERROR("Couldn't get cylinder index");
+        else{
+            ROS_ERROR_NAMED(GRSP_LGRNM,"Couldn't get cylinder index");
             return false;
         }
         cyl_axis.normalize();
@@ -427,32 +427,55 @@ bool GraspAnalysis::_gen_work_trajectory()
         /*mat.setValue(ux.getX(), ux.getY(), ux.getZ(),
                        uy.getX(), uy.getY(), uy.getZ(),
                        uz.getX(), uz.getY(), uz.getZ());*/
-        double angle = ux.angle(tf::Vector3(1,0,0));
+
+        /*double angle = ux.angle(tf::Vector3(1,0,0));
         tf::Vector3 rot_vec = ux.cross(tf::Vector3(1,0,0));
         tf::Quaternion q;
-        q.setRotation(rot_vec, angle);
+        q.setRotation(rot_vec, angle*(-1));
         tf::Transform t1(q),t2, t;
         t2.setIdentity();t2.setOrigin(tf::Vector3(0,1,0));
         t = t1*t2;
         tf::Vector3 y_of_new_frame = t.getOrigin();
         angle = uz.angle(y_of_new_frame);
         tf::Quaternion q2, q3;
-        q2.setRotation(tf::Vector3(1,0,0),angle);
+        q2.setRotation(tf::Vector3(1,0,0),angle);*/
 
         /*tf::Quaternion q,q2,q3;
         mat.getRotation(q);
         q2.setRotation(tf::Vector3(1,0,0), (M_PI/2));
         //q2.setValue(0,0,0,1);*/
-        q3 = q*q2;
+        //q3 = q*q2;
         //Rotate +/- 90 degrees around X to align Y to Axis.
         //Weird but only work around as of now.
-        pose.orientation.x = q3.getX();
+
+        tf::Transform tf_norm, tf_cyl = _tube->cylinders[cyl_idx].getTransform();
+        tf_cyl.setOrigin(tf::Vector3(0,0,0)); // just keep the rotation since we are working with normal(vector)
+        tf_norm.setIdentity();
+        tf_norm.setOrigin(tf::Vector3(point.normal_x, point.normal_y, point.normal_z));
+        tf_norm = tf_cyl.inverseTimes(tf_norm); //now normal is in cylinder frame
+        //ux on XY plane of local cylinder
+        tf::Vector3 ux_XY = tf_norm.getOrigin();
+        ux_XY.setZ(0.0);
+        tf::Vector3 x_axis(1,0,0);
+        //double theta_z = ux_XY.angle(tf::Vector3(1,0,0));// angle between Original X and normal in XY plane
+        double theta_z = x_axis.angle(ux_XY);// angle between Original X and normal in XY plane
+        tf::Quaternion q1(tf::Vector3(0,0,1),theta_z), q2, q3;
+        //double theta_y = ux_XY.angle(ux);
+        //q2.setRotation(tf::Vector3(0,1,0),theta_y);
+        q2.setRotation(tf::Vector3(1,0,0), M_PI/2);
+        q3 = q1*q2;
+        tf::Transform pose_in_cyl(q3,tf::Vector3(0,0,0));
+        tf_cyl = _tube->cylinders[cyl_idx].getTransform();
+        tf::Transform pose_in_tube = tf_cyl * pose_in_cyl;
+        pose_in_tube.setOrigin(tf::Vector3(point.x, point.y, point.z));
+        pose = tf2pose(pose_in_tube);
+        /*pose.orientation.x = q3.getX();
         pose.orientation.y = q3.getY();
         pose.orientation.z = q3.getZ();
         pose.orientation.w = q3.getW();
         pose.position.x = point.x;
         pose.position.y = point.y;
-        pose.position.z = point.z;
+        pose.position.z = point.z;*/
         _work_traj.poses.push_back(pose);
     }
     //_normalize_worktrajectory();
@@ -469,7 +492,7 @@ void GraspAnalysis::_work2tube_trajectory()
         W = pose2tf(pose);
     else
     {
-        ROS_ERROR("GraspAnalysis - WorkPose is not set yet.");
+        ROS_ERROR_NAMED(GRSP_LGRNM,"WorkPose is not set yet.");
         return;
     }
     _tube_traj.header.frame_id = "/base_link";
@@ -500,7 +523,7 @@ void GraspAnalysis::_gen_test_pairs()
             }
         }
     }
-    ROS_INFO_STREAM("Total Grasp Pairs : "<<_test_pairs->graspPairs.size());
+    ROS_INFO_STREAM_NAMED(GRSP_LGRNM,"Total Grasp Pairs : "<<_test_pairs->graspPairs.size());
 }
 
 void GraspAnalysis::_test_pairs_for_ik()
@@ -518,14 +541,13 @@ void GraspAnalysis::_test_pairs_for_ik()
     unsigned int idx_of_indices;
     //get indeces of MAX_ITERATION number of non repetative random pairs
     if(MAX_ITERATION>=indices.size()){
-        ROS_WARN("MAX_ITERATION is set to %d, however total number of test pairs is %d. Updating MAX_ITERATION to %d.",
+        ROS_WARN_NAMED(GRSP_LGRNM,"MAX_ITERATION is set to %d, however total number of test pairs is %d. Updating MAX_ITERATION to %d.",
                  MAX_ITERATION, indices.size(), indices.size());
         MAX_ITERATION = indices.size();
     }
 
     if(MAX_TEST_GRASPS>MAX_ITERATION){
-        ROS_WARN("MAX_TEST_GRASP is set to %d, however it exceeds MAX_ITERATION. Updating MAX_TEXT_GRASP to %d",
-                 MAX_TEST_GRASPS, MAX_ITERATION);
+        ROS_WARN_NAMED(GRSP_LGRNM,"MAX_TEST_GRASP is set to %d, however it exceeds MAX_ITERATION. Updating MAX_TEST_GRASP to %d",MAX_TEST_GRASPS, MAX_ITERATION);
         MAX_TEST_GRASPS = MAX_ITERATION;
     }
 
@@ -533,7 +555,7 @@ void GraspAnalysis::_test_pairs_for_ik()
         idx_of_indices = rand()%(indices.size());
         rand_indices.push_back(indices[idx_of_indices]);
         indices.erase(indices.begin() + idx_of_indices);
-        //ROS_INFO("Size of indices : %d",indices.size());
+        //ROS_INFO_NAMED(GRSP_LGRNM,"Size of indices : %d",indices.size());
     }
 
     //unsigned long it=MAX_ITERATION;
@@ -548,8 +570,9 @@ void GraspAnalysis::_test_pairs_for_ik()
 
     arm_navigation_msgs::AttachedCollisionObject::Ptr att_obj_ptr(new arm_navigation_msgs::AttachedCollisionObject);
     TubeManipulation::Arms manip(_nh, collision_objects); //arms use collision_objects
-    ROS_INFO_STREAM("Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
-    ROS_INFO_STREAM("Press 'q' to interrupt computation and continue with available valid pair(s)");
+    ROS_INFO_STREAM_NAMED(GRSP_LGRNM,"Checking "<<MAX_ITERATION<<" randomly selected grasps for ik...");
+    //ROS_INFO_STREAM_NAMED(GRSP_LGRNM,"Press 'q' to interrupt computation and continue with available valid pair(s)");
+    ROS_INFO_STREAM_NAMED(GRSP_LGRNM,"Press return key to interrupt computation and continue with available valid pair(s)");
     for(unsigned int i=0; i<rand_indices.size(); i++)
     {
         //it--;
@@ -570,24 +593,18 @@ void GraspAnalysis::_test_pairs_for_ik()
         else{
             //fail_cnt++;
         }
-        std::cout<<"\r"<<MAX_ITERATION-i<<" -> "<<test_grasps<<std::flush;
+        std::cout<<std::flush<<"\r"<<MAX_ITERATION-i<<" -> "<<test_grasps<<std::flush;
         if(kbhit()){
             ss.clear();
-//            std::cin>>ss;
-//            if(ss.compare("q")==0){
-                break;
-//            }
+            break;
         }
-        //std::cout<<"\rpres 'q' to continue  ["<<MAX_ITERATION-it<<'\t'<<test_grasps<<']'<<std::flush;
     }
     std::cout<<'\n';
     if(!_valid_pairs->graspPairs.empty()){
-        ROS_INFO_STREAM("GraspAnalysis - "<<_valid_pairs->graspPairs.size()
-                        <<" valid pairs found from "
-                        <<MAX_ITERATION<<" iteration");
+        ROS_INFO_NAMED(GRSP_LGRNM,"%d valid pairs found from %d iterations",_valid_pairs->graspPairs.size(),MAX_ITERATION);
     }
     else
-        ROS_WARN_STREAM("No pair found to be valid for IK");
+        ROS_WARN_NAMED(GRSP_LGRNM,"No pair found to be valid for IK!");
 }
 
 //To compute manipulability metric and assign rank
@@ -667,10 +684,10 @@ void GraspAnalysis::_compute_metric()
         _valid_pairs->graspPairs[i].minForce = f_min;
         _valid_pairs->graspPairs[i].minRot = r_min;
         _valid_pairs->graspPairs[i].rank = (f_min*0.5) + (r_min*0.5);
-        ROS_INFO_STREAM("Pair "<<i<<" (F,R): "<<f_min<<" "<<r_min);
+        ROS_INFO_STREAM_NAMED(GRSP_LGRNM,"Pair "<<i<<" (F,R): "<<f_min<<" "<<r_min);
     }
     double r = 0;
-    unsigned long int best_grasp;
+    unsigned long int best_grasp = std::numeric_limits<unsigned long int>::max();
     for(size_t i=0; i<_valid_pairs->graspPairs.size(); i++)
     {
         if(_valid_pairs->graspPairs[i].rank>r)
@@ -681,12 +698,12 @@ void GraspAnalysis::_compute_metric()
     }
     if(!_valid_pairs->graspPairs.empty())
     {
-        ROS_WARN_STREAM("Best Grasp Pair index: "<<best_grasp);
+        ROS_WARN_STREAM_NAMED(GRSP_LGRNM,"Best Grasp Pair index: "<<best_grasp);
         _computed_pair = _valid_pairs->graspPairs[best_grasp];
         _grasp_pair_found = true;
     }
     else
-        ROS_ERROR("No computed valid grasp found");
+        ROS_ERROR_NAMED(GRSP_LGRNM,"No computed valid grasp found");
 
 
     /*dualArms da(nodeHandle);

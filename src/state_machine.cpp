@@ -1,6 +1,7 @@
 #include "state_machine.h"
+#include <stdio.h>
 
-#define LGRNM "stateMachine"
+#define LGRNM "stMc"
 
 stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _nh = nh;
@@ -127,6 +128,9 @@ void stateMachine::start()
                 }
                 break;
             }
+            geometry_msgs::PoseArray pa;
+            _tube->getCylinderPoses(pa);
+
             _get_disk_and_workpose();
             _state = PICK;
             //_state = DONE;
@@ -156,6 +160,7 @@ void stateMachine::start()
             _tube->getWorkPointsMarker(ma);
             _work_point_pub.publish(ma);
             _publish_grasps();
+            getchar();
             _state = REGRASP;
             break;
         }
@@ -649,7 +654,6 @@ void stateMachine::_get_attached_obj(){
 
 bool stateMachine::_lift_obj_with_right_arm(void)
 {
-    ROS_INFO_NAMED(LGRNM,"Lifting object with right arm...");
     _update_scene();
     _pick_grasp.setWristOffset(_PICK_WRIST_OFFSET+
                                (_tube->cylinders[_pick_grasp.cylinderIdx].radius*4)); //clearance is 3 times of radius

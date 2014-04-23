@@ -1,6 +1,6 @@
 #include "collisionObjects.h"
 
-#define CO_LGRNM "collisionObjects"
+#define CL_LGRNM "clObj"
 
 collisionObjects::collisionObjects(ros::NodeHandlePtr nh)
 {
@@ -30,12 +30,12 @@ void collisionObjects::addAttachedCollisionObject(const arm_navigation_msgs::Att
 {
     int idx = _find_attached_object(attObj.object.id.c_str());
     if(idx > -1 && idx<_att_obj.size()){
-        ROS_DEBUG_NAMED(CO_LGRNM,"Requested to add %s as attached object but it already exists. Updating object", attObj.object.id.c_str());
+        ROS_DEBUG_NAMED(CL_LGRNM,"Requested to add %s as attached object but it already exists. Updating object", attObj.object.id.c_str());
         _att_obj[idx] = attObj;
         return;
     }
     else if(!attObj.object.id.empty()){
-        ROS_INFO_NAMED(CO_LGRNM,"Adding %s attached object", attObj.object.id.c_str());
+        ROS_INFO_NAMED(CL_LGRNM,"Adding %s attached object", attObj.object.id.c_str());
         _att_obj.push_back(attObj);
     }
 }
@@ -44,12 +44,12 @@ void collisionObjects::addCollisionObject(const arm_navigation_msgs::CollisionOb
 {
     int idx = _find_collision_object(obj.id.c_str());
     if(idx > -1 && idx < _coll_obj.size()){
-        ROS_DEBUG_NAMED(CO_LGRNM,"Requested to add %s as collsion object but it already exists. Updating object", obj.id.c_str());
+        ROS_DEBUG_NAMED(CL_LGRNM,"Requested to add %s as collsion object but it already exists. Updating object", obj.id.c_str());
         _coll_obj[idx] = obj;
         return;
     }
     else if(!obj.id.empty()){
-        ROS_INFO_NAMED(CO_LGRNM,"Adding %s object", obj.id.c_str());
+        ROS_INFO_NAMED(CL_LGRNM,"Adding %s object", obj.id.c_str());
         _coll_obj.push_back(obj);
     }
 }
@@ -57,7 +57,7 @@ void collisionObjects::addCollisionObject(const arm_navigation_msgs::CollisionOb
 void collisionObjects::removeAttachedCollisionObject(std::string id){
     int idx = _find_attached_object(id);
     if(idx>-1 && idx<_att_obj.size()){
-        ROS_INFO_NAMED(CO_LGRNM, "Removing %s from the attached collision object list", _att_obj[idx].object.id.c_str());
+        ROS_INFO_NAMED(CL_LGRNM, "Removing %s from the attached collision object list", _att_obj[idx].object.id.c_str());
         _att_obj.erase(_att_obj.begin()+idx);
     }
 }
@@ -65,7 +65,7 @@ void collisionObjects::removeAttachedCollisionObject(std::string id){
 void collisionObjects::removeCollisionObject(std::string id){
     int idx = _find_collision_object(id);
     if(idx>-1 && idx<_coll_obj.size()){
-        ROS_INFO_NAMED(CO_LGRNM, "Removing %s from the collision object list", _coll_obj[idx].id.c_str());
+        ROS_INFO_NAMED(CL_LGRNM, "Removing %s from the collision object list", _coll_obj[idx].id.c_str());
         _coll_obj.erase(_coll_obj.begin()+idx);
     }
 }
@@ -111,9 +111,9 @@ arm_navigation_msgs::SetPlanningSceneDiff::Response collisionObjects::setPlannin
     }
 
     if(!_set_pln_scn_client.call(req, res)){
-        ROS_ERROR_NAMED(CO_LGRNM,"Call to %s failed", SET_PLANNING_SCENE_DIFF_NAME);
+        ROS_ERROR_NAMED(CL_LGRNM,"Call to %s failed", SET_PLANNING_SCENE_DIFF_NAME);
         if(!ros::service::exists(SET_PLANNING_SCENE_DIFF_NAME, true)){
-            ROS_WARN_NAMED(CO_LGRNM,"%s service doesn't exist", SET_PLANNING_SCENE_DIFF_NAME);
+            ROS_WARN_NAMED(CL_LGRNM,"%s service doesn't exist", SET_PLANNING_SCENE_DIFF_NAME);
         }
     }
     //printListOfObjects();

@@ -29,7 +29,7 @@ typedef actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryActio
 namespace TubeManipulation
 {
 
-class Trajectory
+/*class Trajectory
 {
 public:
     Trajectory();
@@ -40,7 +40,7 @@ private:
     trajectory_msgs::JointTrajectory _left_traj;
     std::vector<std::string> _r_jnt_nms;
     std::vector<std::string> _l_jnt_nms;
-};
+};*/
 
 
 class CollisionCheck
@@ -114,7 +114,7 @@ private:
  *  It generates joint trajectory for both hands using GetconstraintAwarePositionIK service 
  *  and executes both trajectory in synchronized fashion.
  */
-class Arms : public Trajectory
+class Arms /*: public Trajectory*/
 {
 public:
     Arms(ros::NodeHandlePtr nh, collisionObjects::Ptr colObjPtr);
