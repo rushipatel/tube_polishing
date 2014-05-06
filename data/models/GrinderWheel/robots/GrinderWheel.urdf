@@ -1,25 +1,20 @@
-<gazebo>
-  <static>true</static>
-  <gravity>false</gravity>
-  <!--allow_auto_disable>true</allow_auto_disable-->
-</gazebo>
 <robot
   name="GrinderWheel">
   <link
     name="GrinderWheel">
     <inertial>
       <origin
-        xyz="0.098912 0.035176 -0.15745"
+        xyz="0.12055 0.051104 -0.17225"
         rpy="0 0 0" />
       <mass
-        value="2.8265" />
+        value="8.5031" />
       <inertia
-        ixx="0.0256064004447245"
-        ixy="0.00115046648579164"
-        ixz="-0.0116971061426419"
-        iyy="0.0384640049480456"
-        iyz="-0.00194732910652626"
-        izz="0.0270358567190425" />
+        ixx="0.106275720301414"
+        ixy="0.00245556620972084"
+        ixz="-0.0121211611529315"
+        iyy="0.144370805726873"
+        iyz="-0.00350876291006481"
+        izz="0.0723314528493448" />
     </inertial>
     <visual>
       <origin

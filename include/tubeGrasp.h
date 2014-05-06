@@ -98,7 +98,7 @@ namespace TubeGrasp
         //void pickUpTube(geometry_msgs::Pose &pickPose);
         bool getComputedGraspPair(GraspPair &graspPair);
         void getTubeWorkTrajectory(geometry_msgs::PoseArray &tube_traj);
-        Grasp getPickPose(std::vector<tf::Vector3> &pointsToAvoid, double min_dist);
+        Grasp getPickPose(std::vector<tf::Vector3> &pointsToAvoid, double min_dist, geometry_msgs::PoseArray &grasp_pose_array);
 
         geometry_msgs::PoseArray _work_traj; //put this back in private after dbg/dev
         geometry_msgs::PoseArray _tube_traj;

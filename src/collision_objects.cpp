@@ -99,7 +99,6 @@ arm_navigation_msgs::SetPlanningSceneDiff::Response collisionObjects::setPlannin
             req.planning_scene_diff.attached_collision_objects.push_back(_att_obj[i]);
         }
     }
-
     for(unsigned int i=0; i<_coll_obj.size(); i++){
         if(!_coll_obj[i].shapes.empty()){
             req.planning_scene_diff.collision_objects.push_back(_coll_obj[i]);

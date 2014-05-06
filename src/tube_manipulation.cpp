@@ -698,6 +698,14 @@ bool TubeManipulation::Arms::moveRightArm(geometry_msgs::Pose pose)
 
     if(_get_right_arm_ik(pose, joint_state, crnt_joints))
     {
+        double max_delta = 0, delta;
+        for(int i=0; i<joint_state.position.size(); i++){
+            delta = std::abs(crnt_joints[i] - joint_state.position[i]);
+            if(max_delta<delta){
+                max_delta = delta;
+            }
+        }
+        double time = max_delta/MAX_JOINT_VEL;
         traj_goal.trajectory.points.resize(1);
         traj_goal.trajectory.joint_names = _r_jnt_nms;
         goal.positions.resize(_r_jnt_nms.size());
@@ -705,7 +713,7 @@ bool TubeManipulation::Arms::moveRightArm(geometry_msgs::Pose pose)
         for(int i=0; i<_r_jnt_nms.size(); i++)
         {
             goal.positions[i] = joint_state.position[i];
-            goal.velocities[i] = 0.0;
+            goal.velocities[i] = std::abs(crnt_joints[i] - joint_state.position[i]) / time;
         }
         goal.time_from_start = ros::Duration(0.0);
         traj_goal.trajectory.points[0] = goal;
@@ -1002,7 +1010,7 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
             std::vector<double> crnt_joints;
             _get_right_joints(crnt_joints);
             double requested_val, lower_bound, upper_bound, crnt_val;
-            ROS_INFO_NAMED(ARMS_LGRNM,"JOINT NAME - [LOWER, UPPER](bounds) [REQUESTED](position) [CURRENT](position)");
+            //ROS_INFO_NAMED(ARMS_LGRNM,"JOINT NAME - [LOWER, UPPER](bounds) [REQUESTED](position) [CURRENT](position)");
             for(int i=0; i<_r_jnt_nms.size(); i++)
             {
                 requested_val = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
@@ -1046,7 +1054,7 @@ bool TubeManipulation::Arms::_handle_planning_error(arm_navigation_msgs::GetMoti
             std::vector<double> crnt_joints;
             _get_left_joints(crnt_joints);
             double requested_val, lower_bound, upper_bound, crnt_val;
-            ROS_INFO_NAMED(ARMS_LGRNM,"JOINT NAME - [LOWER, UPPER](bounds) [REQUESTED](position) [CURRENT](position)");
+            //ROS_INFO_NAMED(ARMS_LGRNM,"JOINT NAME - [LOWER, UPPER](bounds) [REQUESTED](position) [CURRENT](position)");
             for(int i=0; i<_l_jnt_nms.size(); i++)
             {
                 requested_val = req.motion_plan_request.goal_constraints.joint_constraints[i].position;
@@ -1596,7 +1604,7 @@ bool TubeManipulation::Arms::getRegraspPoseRight(arm_navigation_msgs::AttachedCo
     tf::Vector3 pos;
     double y,p,r;
     double x_pos, y_pos, z_pos;
-    int MAX_CNT = 1000;
+    int MAX_CNT = 30000;
     int cnt = MAX_CNT;
     obj = obj_orig; //start with object's original pose
     std::vector<double> right_joints(7), right_seeds(7),
@@ -1619,9 +1627,9 @@ bool TubeManipulation::Arms::getRegraspPoseRight(arm_navigation_msgs::AttachedCo
         {
             if(collision_check.isStateValid(right_joints, left_joints))
             {
-                collision_check.setMarkerLifeTime(60);
+                collision_check.setMarkerLifeTime(5);
                 collision_check.isStateValid(right_joints, left_joints);
-                sleep(2);
+                sleep(3);
                 ik_soln = left_joints;
                 std::cout<<std::endl;
                 ROS_INFO_NAMED(ARMS_LGRNM,"Valid object pose found in %d iteration", (MAX_CNT-cnt));
@@ -1639,12 +1647,18 @@ bool TubeManipulation::Arms::getRegraspPoseRight(arm_navigation_msgs::AttachedCo
         q.setRPY(r,p,y);
 
         // bounding box to move around
-        double x_min = -0.25,
+        /*double x_min = -0.25,
                 x_max = 0.25,
                 y_min = -0.2,
                 y_max = 0.2,
                 z_min = 0.1,
-                z_max = 0.5;
+                z_max = 0.5;*/
+        double x_min = -0.25,
+                x_max = 0.25,
+                y_min = -0.25,
+                y_max = 0.25,
+                z_min = -0.25,
+                z_max = 0.25;
 
         // random number between 0 and 1
         x_pos = ((double)rand()/(double)RAND_MAX);
@@ -1999,6 +2013,8 @@ TubeManipulation::CollisionCheck::CollisionCheck(ros::NodeHandlePtr nh,
     _mrk_life_time = 0.2;
 
     _collision_obj_ptr = objPtr;
+    //_collision_obj_ptr.reset(new collisionObjects(_nh));
+    //objPtr->copyAllObjectsTo(_collision_obj_ptr);
 
     /*_r_jnts.resize(7);
     _l_jnts.resize(7);

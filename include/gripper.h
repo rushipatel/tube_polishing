@@ -65,14 +65,14 @@ void Gripper::setMinimumError(double err){
 bool Gripper::openRightGripper()
 {
     double effort = -1;
-    double position = 0.7;
+    double position = 0.8;
     return setRightGripperPosition(position, effort);
 }
 
 bool Gripper::openLeftGripper()
 {
     double effort = -1;
-    double position = 0.7;
+    double position = 0.8;
     return setLeftGripperPosition(position, effort);
 }
 

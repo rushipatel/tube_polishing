@@ -23,13 +23,15 @@
   <node name="spawn_table" pkg="gazebo" type="spawn_model" args="-urdf -param table_description -model table_1" 
    respawn="false" output="screen" />
 
-  <node name="spawn_object" pkg="gazebo" type="spawn_model" 
+  <!--node name="spawn_object" pkg="gazebo" type="spawn_model" 
    args="-urdf -file $(find tube_polishing)/data/models/tube_2/robots/tube_2.urdf -model object_1 -x 0.7 -y -0.1 -z 0.6 -Y 5.5" 
-   respawn="false" output="screen"/>
+   respawn="false" output="screen"/-->
    
    <node name="spawn_wheel" pkg="gazebo" type="spawn_model" 
-   args="-urdf -file $(find tube_polishing)/data/models/GrinderWheel/robots/GrinderWheel.urdf -model wheel -x 0.85 -y 0.05 -z 0.85" 
+   args="-urdf -file $(find tube_polishing)/data/models/GrinderWheel/robots/GrinderWheel.urdf -model wheel -x 0.85 -y -0.01 -z 0.85 -Y 0.2" 
    respawn="false" output="screen"/>
+   
+   <node name="spawn_object" pkg="gazebo" type="spawn_model" args="-urdf -file $(find tube_polishing)/data/models/tube_9_asm/robots/tube_9_asm.urdf -model object_9 -x 0.80 -y 0.1 -z 0.65 -Y 1.2 -R -1.5" respawn="false" output="screen"/>
 
   <!-- parameters that give you reasonable physics as well as good speed -->
   <!-- needed so that gripper joint stops on objects instead of oscillating forever -->

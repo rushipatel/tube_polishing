@@ -21,11 +21,11 @@ public:
         PICK,
         GRASP_ANLYS,
         REGRASP,
-        TRAJ_GEN,
         TRAJ_EXE,
         DONE,
         ERR,
-        RECAPTURE
+        RECAPTURE,
+        NEXT_IT
     };
     void start();
 
@@ -70,6 +70,7 @@ private:
     ros::Publisher _work_point_pub;
     ros::Publisher _pick_grasp_pub;
     ros::Publisher _work_pose_pub;
+    ros::Publisher _lift_poses_pub;
 
     std::vector<sensor_msgs::PointCloud2> _clusters;
 
@@ -77,6 +78,7 @@ private:
     arm_navigation_msgs::AttachedCollisionObject::Ptr _att_obj;
     arm_navigation_msgs::CollisionObject _table;
     arm_navigation_msgs::CollisionObject _wheel;
+    arm_navigation_msgs::CollisionObject _motor_asm;
     arm_navigation_msgs::CollisionObject _tube_collision_obj;
     std::vector<double> _right_arm_home_jnts;
     std::vector<double> _left_arm_home_jnts;

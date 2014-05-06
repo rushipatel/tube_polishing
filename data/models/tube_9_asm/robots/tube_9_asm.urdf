@@ -1,0 +1,123 @@
+<?xml version="1.0" ?>
+
+<robot
+  name="tube_9_asm">
+  
+  <material name="Blue">
+    <color rgba="0.0 0.0 0.8 1.0"/>
+  </material>
+  <material name="Green">
+    <color rgba="0.0 0.8 0.0 1.0"/>
+  </material>
+  <material name="Grey">
+    <color rgba="0.7 0.7 0.7 1.0"/>
+  </material>
+  <material name="Grey2">
+    <color rgba="0.9 0.9 0.9 1.0"/>
+  </material>
+  <material name="Red">
+    <color rgba="0.8 0.0 0.0 1.0"/>
+  </material>
+  <material name="White">
+    <color rgba="1.0 1.0 1.0 1.0"/>
+  </material>
+  <material name="Black">
+    <color rgba="0.1 0.1 0.1 1.0"/>
+  </material>
+  <material name="LightGrey">
+    <color rgba="0.6 0.6 0.6 1.0"/>
+  </material>
+    
+  <link
+    name="tube_link">
+    <inertial>
+      <origin
+        xyz="-0.26816 0.075034 -0.042483"
+        rpy="0 0 0" />
+      <!--mass
+        value="2.1884" /-->
+      <mass
+	value="0.5" />
+      <inertia
+        ixx="0.024183"
+        ixy="0.017942"
+        ixz="-0.0018039"
+        iyy="0.038001"
+        iyz="-0.0038561"
+        izz="0.058434" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_9_asm/meshes/tube_link.stl" />
+      </geometry>
+      <material name="Grey"/>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_9_asm/meshes/tube_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="tube_link">
+    <material name="Grey"/>
+  </gazebo>
+  <link
+    name="ring">
+    <inertial>
+      <origin
+        xyz="-0.0025 0 7.494E-16"
+        rpy="0 0 0" />
+      <mass
+        value="2.7285E-05" />
+      <inertia
+        ixx="1.588E-08"
+        ixy="2.5589E-39"
+        ixz="1.4805E-36"
+        iyy="7.9969E-09"
+        iyz="-2.4325E-38"
+        izz="7.9969E-09" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://tube_polishing/data/models/tube_9_asm/meshes/ring.stl" />
+      </geometry>
+      <material name="Red"/>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://tube_polishing/data/models/tube_9_asm/meshes/ring.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="ring">
+    <material>Gazebo/Green</material>
+  </gazebo>
+  <joint
+    name="tube_to_ring"
+    type="fixed">
+    <origin
+      xyz="-0.28604 0.052068 0.15388"
+      rpy="1.5708 0 0" />
+    <parent
+      link="tube_link" />
+    <child
+      link="ring" />
+    <axis
+      xyz="-1 0 0" />
+  </joint>
+</robot>

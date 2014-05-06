@@ -7,32 +7,39 @@ namespace TubePerception
 {
 
 /********************************Cylinder CLASS********************************/
+//! \brief Returns local pose of cylinder
 geometry_msgs::Pose Cylinder::getPose(void){
     return _local_pose;
 }
 
+//! \brief Returns local pose of cylinder as tf::Transform object
 tf::Transform Cylinder::getTransform(void){
     return pose2tf(_local_pose);
 }
 
+//! \brief Sets local pose of cylinder
 void Cylinder::setPose(const geometry_msgs::Pose &pose){
     _local_pose = pose;
 }
 
+//! \brief Sets local pose of cylinder
 void Cylinder::setPose(const tf::Transform &t){
     _local_pose = tf2pose(t);
 }
 
+//! \brief returns global pose of cylinder given pose of tube this cylinder part of
 geometry_msgs::Pose Cylinder::getGlobalPose(geometry_msgs::Pose &tubePose){
     tf::Transform tubeTf = pose2tf(tubePose);
      return (tf2pose(getGlobalTf(tubeTf)));
 }
 
+//! \brief Returns local pose of cylinder
 tf::Transform Cylinder::getGlobalTf(tf::Transform &tubeTF){
     tf::Transform local_tf = pose2tf(_local_pose);
     return (tubeTF * local_tf);
 }
 
+//! \brief Returns axis of cylinder in gloabl frame given pose in transform object of tube this cylinder part of
 tf::Vector3 Cylinder::getAxisVector(tf::Transform &tubeTf){
     tf::Vector3 new_p1, new_p2;
     _convert_points_in_global(tubeTf, new_p1,new_p2);
@@ -40,11 +47,14 @@ tf::Vector3 Cylinder::getAxisVector(tf::Transform &tubeTf){
     return vec;
 }
 
+//! \brief Returns length of cylinder
 double Cylinder::getAxisLength(){
     tf::Vector3 vec = p2-p1;
     return vec.length();
 }
 
+
+//! \brief Returns mid point of cylinder in globale frame given the pose of tube this clyinder part of
 tf::Vector3 Cylinder::getMidPoint(tf::Transform &tubeTf){
     tf::Vector3 new_p1, new_p2;
     _convert_points_in_global(tubeTf, new_p1, new_p2);
@@ -53,6 +63,7 @@ tf::Vector3 Cylinder::getMidPoint(tf::Transform &tubeTf){
     return point;
 }
 
+//! \brief Returns first point of cylinder's axis in global frame given the pose of tube
 tf::Vector3 Cylinder::getGlobalP1(tf::Transform &tubeTf){
     tf::Transform point_tf;
     point_tf.setIdentity();
@@ -61,7 +72,8 @@ tf::Vector3 Cylinder::getGlobalP1(tf::Transform &tubeTf){
     return point_tf.getOrigin();
 }
 
-tf::Vector3 Cylinder::getGlobalP2(tf::Transform &tubeTf){
+//! \brief Returns local pose of cylinder
+ tf::Vector3 Cylinder::getGlobalP2(tf::Transform &tubeTf){
     tf::Transform point_tf;
     point_tf.setIdentity();
     point_tf.setOrigin(p2);
@@ -69,6 +81,7 @@ tf::Vector3 Cylinder::getGlobalP2(tf::Transform &tubeTf){
     return point_tf.getOrigin();
 }
 
+ //! \brief Given transform, convert's first point of cylinder in transform's source frame
 void Cylinder::_convert_points_in_global(tf::Transform &tf, tf::Vector3 &p1_out, tf::Vector3 &p2_out){
     tf::Transform point_tf;
     point_tf.setIdentity();
@@ -80,9 +93,10 @@ void Cylinder::_convert_points_in_global(tf::Transform &tf, tf::Vector3 &p1_out,
     p2_out = point_tf.getOrigin();
 }
 
-
-// inflates cylinder by adding 1mm in radius
-// uses global p1 and p2
+/*! \brief Tests if @param testPoint (in global frame) is inside cylinder
+* inflates cylinder by adding 1mm in radius
+* Uses global p1 and p2 of cylinder
+*/
 bool Cylinder::isInlier(tf::Vector3 &testPoint, tf::Transform &tubeTf){
     tf::Vector3 p1_new, p2_new;
     _convert_points_in_global(tubeTf, p1_new, p2_new);
@@ -90,90 +104,31 @@ bool Cylinder::isInlier(tf::Vector3 &testPoint, tf::Transform &tubeTf){
     double r = radius + 0.001;
     return (isInCylinder(p1_new, p2_new, vec.length2(), r*r, testPoint));
 }
-
-/*
-void Cylinder::getMarkers(visualization_msgs::MarkerArray &markerArray)
-{
-    visualization_msgs::Marker marker;
-
-    marker.header.frame_id = "base_link";
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "Individual_Cyl";
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.type = visualization_msgs::Marker::CYLINDER;
-    marker.color.r = 0.0;
-    marker.color.g = 0.3;
-    marker.color.b = 0.3;
-    marker.color.a = 0.8;
-    marker.lifetime = ros::Duration(20);
-    marker.scale.x = marker.scale.y = radius*2;
-    marker.scale.z = getAxisLength();
-    marker.id = 101;
-    marker.pose = getPose();
-    markerArray.markers.push_back(marker);
-
-    marker.header.frame_id = "base_link";
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "IndividualCylinderAxis";
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.type = visualization_msgs::Marker::CYLINDER;
-    marker.scale.x = 0.001;
-    marker.scale.y = 0.001;
-    marker.color.b = 1;
-    marker.color.a = 0.5;
-    marker.lifetime = ros::Duration(20);
-    marker.scale.z = getAxisLength();
-    marker.id = 201;
-    marker.pose = getPose();
-    markerArray.markers.push_back(marker);
-
-    marker.header.frame_id = "base_link";
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "CylinderEnds";
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.type = visualization_msgs::Marker::SPHERE;
-    marker.color.r = 1.0;
-    marker.color.g = 0.0;
-    marker.color.b = 0.0;
-    marker.color.a = 0.5;
-    marker.id ++;
-    marker.scale.x = marker.scale.y = marker.scale.z = 0.005;
-    marker.lifetime = ros::Duration(20);
-
-    tf::Vector3 vec(p1.x, p1.y, p1.z);
-    marker.pose.position.x = vec.getX();
-    marker.pose.position.y = vec.getY();
-    marker.pose.position.z = vec.getZ();
-    markerArray.markers.push_back(marker);
-
-    tf::Vector3 vec2(p2.x, p2.y, p2.z);
-    marker.id++;
-    marker.pose.position.x = vec2.getX();
-    marker.pose.position.y = vec2.getY();
-    marker.pose.position.z = vec2.getZ();
-    markerArray.markers.push_back(marker);
-}*/
-
 /******************************************************************************/
 
 /**********************************Tube CLASS**********************************/
+//! \brief Constructor.
 Tube::Tube(){
 
 }
 
+//! \brief sets the pose of tube
 void Tube::setPose(geometry_msgs::Pose &pose){
     _pose = pose;
 }
 
+//! \brief returns set pose of tube
 geometry_msgs::Pose Tube::getPose(void){
     return _pose;
 }
 
+//! \brief returns set pose of tube in tf::Transform object
 tf::Transform Tube::getTransform(void){
     tf::Transform tf = pose2tf(_pose);
     return tf;
 }
 
+//! \brief
 geometry_msgs::Pose Tube::getCylinderGlobalPose(unsigned int cylIdx){
     if(cylinders.empty())
         ROS_ERROR_NAMED(PRCPN_LGRNM,"No cylinder present. Illegal query for pose");
@@ -356,7 +311,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.r = 1;
     marker.color.g = 1;
     marker.color.a = 1;
-    marker.lifetime = ros::Duration(20);
+    marker.lifetime = ros::Duration(15);
     for(size_t i=0; i<cylinders.size(); i++){
         marker.scale.z = cylinders[i].getAxisLength();
         marker.id = i+1;
@@ -375,7 +330,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.g = 0.3;
     marker.color.b = 0.3;
     marker.color.a = 0.7;
-    marker.lifetime = ros::Duration(20);
+    //marker.lifetime = ros::Duration(20);
     for(size_t i=0; i<cylinders.size(); i++){
         marker.scale.x = marker.scale.y = cylinders[i].radius*2;
         marker.scale.z = cylinders[i].getAxisLength();
@@ -399,7 +354,7 @@ void Tube::getCylinderMarker(visualization_msgs::MarkerArray &markerArray)
     marker.color.a = 0.5;
     marker.id = 1;
     marker.scale.x = marker.scale.y = marker.scale.z = 0.005;
-    marker.lifetime = ros::Duration(20);
+    marker.lifetime = ros::Duration(15);
     for(size_t i=0; i<cylinders.size(); i++){
 
         tf::Transform p;
@@ -447,8 +402,10 @@ void Tube::getWorkPointsMarker(visualization_msgs::MarkerArray &markerArray){
     marker.header.frame_id = "/base_link";
     marker.header.stamp = ros::Time::now();
     marker.type = marker.ARROW;
-    marker.color.a = 0.5;
+    marker.lifetime = ros::Duration(15);
+    /*marker.color.a = 0.5;
     marker.color.r = 1;
+    marker.color.b = 0;*/
     geometry_msgs::Point point, p_global;
     tf::Vector3 norm_vec;
     marker.scale.x = 0.001;
@@ -457,16 +414,23 @@ void Tube::getWorkPointsMarker(visualization_msgs::MarkerArray &markerArray){
     tf::Transform tube_tf = pose2tf(_pose), point_tf;
     tf::Vector3 vec;
     point_tf.setIdentity();
+    std_msgs::ColorRGBA clr;
+    clr.a = 0.5;
+    clr.r = 1;
+    clr.b = 0;
+    double clr_step = 1;
     for(unsigned int i=0; i<workPointsCluster.size(); i++){
         cloud = workPointsCluster[i];
         for(unsigned int j=0; j<cloud->points.size(); j++){
             marker.id++;
+            marker.color = clr;
             point.x = cloud->points[j].x;
             point.y = cloud->points[j].y;
             point.z = cloud->points[j].z;
             norm_vec.setValue(cloud->points[j].normal_x,
                           cloud->points[j].normal_y,
                           cloud->points[j].normal_z);
+            norm_vec.normalize();
             norm_vec *= 0.02; // 20mm long
             //
             point_tf.setOrigin(tf::Vector3(point.x, point.y, point.z));
@@ -491,6 +455,16 @@ void Tube::getWorkPointsMarker(visualization_msgs::MarkerArray &markerArray){
 
             markerArray.markers.push_back(marker);
             marker.points.clear();
+        }
+
+        clr.r -=clr_step;
+        if(clr.r<0){
+            clr.r=1;
+        }
+
+        clr.b +=clr_step;
+        if(clr.b>1){
+            clr.b=0;
         }
     }
 }
@@ -524,17 +498,28 @@ bool CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
     _axis_points.reset(new pcl::PointCloud<PointT>);
     //_convert_cloud_to("/base_link",)
     _convert_to_pcl(clusterCloud, _tube_cloud);
+    //writePointCloudOnfile(clusterCloud,"clusterCloud1.pcd");
+    //writePointCloudOnfile(_tube_cloud,"clusterCloud2.pcd");
+    pcl::PointCloud<PointT>::Ptr points_of_interest(new pcl::PointCloud<PointT>);
+    _get_points_of_interest(_tube_cloud, points_of_interest);
+
+    //displayCloud2(interest_points_cloud);
     _tube = tube_ptr;
     _tube->reset();
     _num_of_points = _tube_cloud->points.size();
-
+    std::cout<<'\n'<<"Initial_cloud"<<'\n';
+    displayCloud(_tube_cloud,"Initial_cloud");
     _compensate_error();
     _estimate_normals(_tube_cloud);
+    std::cout<<'\n'<<"Initial_cloud_with_normals"<<'\n';
+    displayCloudWithNormals(_tube_cloud,"Initial_cloud_with_normals");
     _r = _get_radius();
     if(_r==0){
         return false;
     }
     _collaps_normals();
+    std::cout<<'\n'<<"raw_axis"<<'\n';
+    displayCloud(_raw_axis_points,"raw_axis");
     _segmentize_axis();
     _define_pose(); // <<< Cylinders gets converted in local frame including p1 and p2
     _tube->setPoseAsActualPose();
@@ -543,8 +528,40 @@ bool CloudProcessing::genTubeModel(const sensor_msgs::PointCloud2 &clusterCloud,
         ROS_WARN_NAMED(PRCPN_LGRNM,"No cylinder found in cluster!");
         return false;
     }
-    _generate_work_vectors();  // could be plugin for rgb processing
+    //_generate_work_vectors();  // could be plugin for rgb processing
+    _generate_work_vectors(points_of_interest);
+    //_tube->workPointsCluster.push_back(points_of_interest);
     return true;
+}
+
+void CloudProcessing::_get_points_of_interest(pcl::PointCloud<PointT>::Ptr cloud_in, pcl::PointCloud<PointT>::Ptr cloud_out){
+    if(cloud_in->points.empty()){
+        return;
+    }
+
+    PointT point;
+    //std::vector<unsigned int> red_points;
+    pcl::PointIndices::Ptr interest_points(new pcl::PointIndices);
+    for(unsigned int i=0; i<cloud_in->points.size(); i++){
+        point = cloud_in->points[i];
+        //extract red green and blue
+        uint32_t rgb = *reinterpret_cast<int*>(&point.rgb);
+        uint8_t r = (rgb >> 16) & 0x0000ff;
+        uint8_t g = (rgb >> 8) & 0x0000ff;
+        uint8_t b = (rgb) & 0x0000ff;
+        unsigned int intensity = r + b + g;
+         if(intensity <255){ //if intensity is less 33.33%
+            interest_points->indices.push_back(i);
+         }
+    }
+    interest_points->header.frame_id="/base_link";
+    interest_points->header.stamp = ros::Time::now();
+    ROS_WARN_NAMED(PRCPN_LGRNM, "%u interest points",interest_points->indices.size());
+    pcl::ExtractIndices<PointT> extract;
+    extract.setIndices(interest_points);
+    extract.setInputCloud(cloud_in);
+    extract.setNegative(false);
+    extract.filter(*cloud_out);
 }
 
 bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, TubePerception::Tube::Ptr tube_ptr){
@@ -567,6 +584,7 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
         ROS_WARN_NAMED(PRCPN_LGRNM,"No cylinder found in cluster!");
         return false;
     }
+
     std::vector<unsigned int> corres_ind;
     std::vector<double> confidence;
     _compare_models(tube_ptr, _tube, corres_ind, confidence );
@@ -679,7 +697,6 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
 }
 
 // could be extended to pose inverient feature comparision
-// currently error between poses of both tubes has to be within certain limit
 void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
                                       TubePerception::Tube::Ptr second,
                                       std::vector<unsigned int> & corresponding_indices,
@@ -726,21 +743,27 @@ void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
     }
 }
 
+/*! \brief Given tube model and scene point cloud, extracts points posibally part of know tube.
+  * tests all points in @param cloudIn, if they are part of any cylinder of given tube.
+  */
+
 bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2ConstPtr cloudIn, sensor_msgs::PointCloud2::Ptr cloudOut)
 {
     if(tube->cylinders.empty()){
         ROS_WARN_NAMED(PRCPN_LGRNM,"No cylinder in tube model!");
         return false;
     }
-    double r_inflate_coeff = 1.3; // inflate radius by 1.3 times
+    double r_inflate_coeff = 1.3; // inflate radius of cylinder by 1.3 times
     double l_inflate_coeff = 1.2; // 20% longer axis
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZRGB>);
     sensor_msgs::PointCloud2 cloudIn_converted;
+    //converts cloud in base_link if not already converted
     _convert_cloud_to("/base_link",*cloudIn,cloudIn_converted);
     //_convert_to_pcl(cloudIn_converted, cloud_in);
     pcl::fromROSMsg(cloudIn_converted, *cloud_in);
 
+    //container to be used to test points
     std::vector<double> r_sq(tube->cylinders.size());
     std::vector<double> l_sq(tube->cylinders.size());
     std::vector<tf::Vector3> p1(tube->cylinders.size());
@@ -763,23 +786,13 @@ bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2
 
         p1[i] = point1;
         p2[i] = point2;
-
-        /*std::cout<<"\nr_sq["<<i<<"] = "<<r_sq[i];
-        std::cout<<"\nl_sq["<<i<<"] = "<<l_sq[i];
-        PointT p;
-        p.x = p1[i].getX();
-        p.y = p1[i].getY();
-        p.z = p1[i].getZ();
-        cloud_out->points.push_back(p);
-        p.x = p2[i].getX();
-        p.y = p2[i].getY();
-        p.z = p2[i].getZ();
-        cloud_out->points.push_back(p);*/
     }
     std::vector<int> indices;
     pcl::removeNaNFromPointCloud(*cloud_in, *cloud_in, indices);
     cloud_out->points.clear();
     tf::Vector3 test_point;
+
+    // for all points and all cylinder in tube, test if point belongs to any cylinder
     for(unsigned int i=0; i<cloud_in->points.size(); i++){
         test_point.setX(cloud_in->points[i].x);
         test_point.setY(cloud_in->points[i].y);
@@ -792,13 +805,18 @@ bool CloudProcessing::extractTubePoints(Tube::Ptr tube, sensor_msgs::PointCloud2
             }
         }
     }
+
     pcl::toROSMsg(*cloud_out,*cloudOut);
     ROS_INFO_NAMED(PRCPN_LGRNM, "Total %d points extracted from cloud", (int)cloud_out->points.size());
+
     //displayCloud(cloud_in);
     //displayCloud(cloud_out);
     return true;
 }
 
+/*! \brief finds wheel of given radius limits
+  * not to be used for general purpose. specific to 3d model of grinder machine body
+  */
 bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
                                double minRadius, double maxRadius,
                                TubePerception::Cylinder &disk,
@@ -853,7 +871,7 @@ bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
     cyl.radius = _r;
 
     // compute pose and copy cylinder object
-    //had to use following from _define_poses. behaviour of setValue is not fully known
+    //had to use following from _define_poses. behaviour of mat.setValue is not fully known
     tf::Transform iden = tf::Transform::getIdentity();
     tf::Vector3 ux, uy, uz = cyl.getAxisVector(iden);
     uz.normalize();
@@ -882,20 +900,37 @@ bool CloudProcessing::findDisk(const sensor_msgs::PointCloud2 &clusterCloud,
     xform0 = disk_tf * xform0;
     tf::Vector3 x_axis_of_disk = xform0.getOrigin() - disk_tf.getOrigin();
     //project x axis of disk on x-z plan of global frame
-    x_axis_of_disk.setZ(0.0);
+    x_axis_of_disk.setY(0.0);
     //angle between world x_axis and x_axis of disk in x-z plan
     double angle = x_axis_of_disk.angle(tf::Vector3(1,0,0));
     xform0.setIdentity();
-    xform0.setRotation(tf::Quaternion(tf::Vector3(0,0,1),angle));
+
+    tf::Vector3 axis = cyl.getAxisVector(iden);
+    if(axis.getY()>0){
+        if(x_axis_of_disk.getZ()>0)
+            xform0.setRotation(tf::Quaternion(tf::Vector3(0,0,1),angle));
+        else
+            xform0.setRotation(tf::Quaternion(tf::Vector3(0,0,-1),angle));
+    }
+    else{
+        if(x_axis_of_disk.getZ()>0)
+            xform0.setRotation(tf::Quaternion(tf::Vector3(0,0,-1),angle));
+        else
+            xform0.setRotation(tf::Quaternion(tf::Vector3(0,0,1),angle));
+    }
     tf::Transform xform;
     xform.setIdentity();
-    xform.setRotation(tf::Quaternion(tf::Vector3(1,0,0),M_PI/2));
+    if(axis.getY()>0)
+        xform.setRotation(tf::Quaternion(tf::Vector3(1,0,0),M_PI/2));
+    else
+        xform.setRotation(tf::Quaternion(tf::Vector3(-1,0,0),M_PI/2));
     xform.setOrigin(tf::Vector3(-disk.radius, 0, 0));
     tf::Transform work_pose = disk_tf * xform0 * xform;
     workPose = tf2pose(work_pose);
     return true;
 }
 
+//! \brief
 void CloudProcessing::_convert_to_pcl(const sensor_msgs::PointCloud2 &rosTubeCloud, pcl::PointCloud<PointT>::Ptr pcl_cloud)
 {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -996,13 +1031,13 @@ void CloudProcessing::_segmentize_cloud(pcl::PointCloud<PointT>::Ptr cloud, pcl:
 
 //random 45/90degree circular trajectory. in global frame
 //now in local frame
-void CloudProcessing::_generate_work_vectors()
+void CloudProcessing::_generate_work_vectors(unsigned int cyl_idx, tf::Vector3 at_point)
 {
-    double l = (double)rand()/(double)RAND_MAX; // Not working. Always generates 0.840188
-    l = 0.5;
+    /*double l = (double)rand()/(double)RAND_MAX; //Not working. Always generates 0.840188
+    l = 0.6;
     
     int cyl_idx = rand()%(_tube->cylinders.size()+1);
-    cyl_idx = 0;
+    cyl_idx = 0;*/
 
     //tf::Transform tube_tf = _tube->getTransform();
     tf::Transform tube_tf = tf::Transform::getIdentity();
@@ -1010,23 +1045,25 @@ void CloudProcessing::_generate_work_vectors()
     axis.normalize();
 
     // point on axis of cylinder
-    tf::Vector3 at_point = _tube->cylinders[cyl_idx].getAxisVector(tube_tf);
+    /*tf::Vector3 at_point = _tube->cylinders[cyl_idx].getAxisVector(tube_tf);
     at_point *= l;
-    at_point += _tube->cylinders[cyl_idx].p1; //convert from cylinder to tube frame
+    at_point += _tube->cylinders[cyl_idx].p1; //convert from cylinder to tube frame*/
 
     tf::Vector3 perp_vec = _get_perp_vec3(axis);
     tf::Vector3 point, vec1, vec2;
 
     vec1 = perp_vec.rotate(axis, ((double)rand()/(double)RAND_MAX)*M_PI);
     //vec1 = perp_vec;
-
+    double angle = 0;
     for(unsigned int i=0; i<4; i++){
         pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
         PointT pointnormal;
-        for(int j=0; j<90; j+=2){
-            vec2 = vec1.rotate(axis,(j*M_PI)/180);
-            point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
+        for(unsigned int j=2; j<=45; j+=2){
+            angle = (((double)i*M_PI)/4) + (((double)j*M_PI)/180);
+            //std::cout<<"\n"<<angle;
+            vec2 = vec1.rotate(axis,angle);
             vec2.normalize();
+            point = at_point + (vec2*_tube->cylinders[cyl_idx].radius);
             pointnormal.x = point.x();
             pointnormal.y = point.y();
             pointnormal.z = point.z();
@@ -1036,14 +1073,87 @@ void CloudProcessing::_generate_work_vectors()
             cloud->points.push_back(pointnormal);
         }
         _tube->workPointsCluster.push_back(cloud);
-        vec1 = vec1.rotate(axis,(M_PI/2));
+        //vec1 = vec1.rotate(axis,(M_PI/2));
+        //std::cout<<"\n";
     }
+}
+
+void CloudProcessing::_generate_work_vectors(pcl::PointCloud<PointT>::Ptr interest_points)
+{
+    if(interest_points->points.empty()){
+        ROS_ERROR_NAMED(PRCPN_LGRNM,"No intereset point!");
+        return;
+    }
+
+    PointT test_point_pcl = interest_points->points.at(0);
+
+    tf::Transform tube_tf = _tube->getTransform(), test_point_tf;
+    test_point_tf.setIdentity();
+    test_point_tf.setOrigin(tf::Vector3(test_point_pcl.x, test_point_pcl.y, test_point_pcl.z));
+    tf::Transform local_point_tf;
+    local_point_tf = tube_tf.inverseTimes(test_point_tf);
+    tf::Vector3 origin_local_point = local_point_tf.getOrigin();
+    test_point_pcl.x = origin_local_point.getX();
+    test_point_pcl.y = origin_local_point.getY();
+    test_point_pcl.z = origin_local_point.getZ();
+
+    pcl::ModelCoefficients::Ptr coeff(new pcl::ModelCoefficients);
+    coeff->header.frame_id = "/base_link";
+    coeff->header.stamp = ros::Time::now();
+    coeff->values.resize(6);
+    int cyl_idx = _tube->whichCylinder(test_point_pcl);
+    tf::Vector3 p1, p2;
+    pcl::PointCloud<PointT>::Ptr points_out(new pcl::PointCloud<PointT>);
+    if(cyl_idx>=_tube->cylinders.size()){
+        p1 = _tube->cylinders[cyl_idx].getGlobalP1(tube_tf);
+        p2 = _tube->cylinders[cyl_idx].getGlobalP2(tube_tf);
+        coeff->values[0] = p1.getX();
+        coeff->values[1] = p1.getY();
+        coeff->values[2] = p1.getZ();
+        coeff->values[3] = p2.getX()-p1.getX();
+        coeff->values[4] = p2.getY()-p1.getY();
+        coeff->values[5] = p2.getZ()-p1.getZ();
+
+        pcl::ProjectInliers<PointT> proj;
+        proj.setModelType (pcl::SACMODEL_LINE);
+        proj.setInputCloud (interest_points);
+        proj.setModelCoefficients (coeff);
+        proj.filter(*points_out);
+    }
+
+    if(points_out->points.empty()){
+        ROS_ERROR_NAMED(PRCPN_LGRNM,"No interest point has been projected on line");
+        return;
+    }
+
+    PointT avg_point;
+    avg_point.x = avg_point.y = avg_point.z = 0.0;
+    for(unsigned int i=0; i<points_out->points.size(); i++){
+        avg_point.x += points_out->points[i].x;
+        avg_point.y += points_out->points[i].y;
+        avg_point.z += points_out->points[i].z;
+    }
+    avg_point.x /= points_out->points.size();
+    avg_point.y /= points_out->points.size();
+    avg_point.z /= points_out->points.size();
+
+    tf::Vector3 at_point;
+    at_point.setValue(avg_point.x, avg_point.y, avg_point.z);
+    _generate_work_vectors(cyl_idx, at_point);
 }
 
 bool CloudProcessing::writePointCloudOnfile(const sensor_msgs::PointCloud2 &rosCloud, std::string fileName){
     pcl::PointCloud<PointT>::Ptr pcl_cloud(new pcl::PointCloud<PointT>);
     _convert_to_pcl(rosCloud, pcl_cloud);
     if(pcl::io::savePCDFileASCII(fileName,*pcl_cloud)==-1)
+        return false;
+    return true;
+}
+
+bool CloudProcessing::writePointCloudOnfile(const pcl::PointCloud<PointT>::Ptr pclCloud,
+                           std::string fileName)
+{
+    if(pcl::io::savePCDFileASCII(fileName,*pclCloud)==-1)
         return false;
     return true;
 }
@@ -1198,6 +1308,28 @@ bool CloudProcessing::_get_cylinder(pcl::PointCloud<PointT>::Ptr cloud,
                                     pcl::ModelCoefficients &coeff,
                                     pcl::PointIndices::Ptr inliers)
 {
+    pcl::SACSegmentationFromNormals<PointT, PointT> seg0;
+    pcl::ModelCoefficients coeff0;
+    pcl::PointIndices::Ptr plane_inliers(new pcl::PointIndices);
+    seg0.setModelType(pcl::SACMODEL_PLANE);
+    seg0.setMethodType(pcl::SAC_RANSAC);
+    seg0.setNormalDistanceWeight(0.1);
+    seg0.setMaxIterations(10000);
+    seg0.setDistanceThreshold(0.001);
+    seg0.setProbability(0.8);
+    seg0.setInputCloud(cloud);
+    seg0.setInputNormals(cloud);
+    seg0.segment(*plane_inliers,coeff0);
+    //displayCloud(cloud);
+    //std::cout<<"\nplane inliers : "<<plane_inliers->indices.size()<<'\n';
+    _remove_inliers(cloud,plane_inliers);
+    plane_inliers->indices.clear();
+    //displayCloud(cloud);
+    seg0.segment(*plane_inliers,coeff0);
+    //std::cout<<"\nplane inliers : "<<plane_inliers->indices.size()<<'\n';
+    _remove_inliers(cloud,plane_inliers);
+    //displayCloud(cloud);
+
     pcl::SACSegmentationFromNormals<PointT, PointT> seg;
     //pcl::ModelCoefficients coeff;
     //pcl::PointIndices inliers;
@@ -1220,7 +1352,7 @@ bool CloudProcessing::_get_cylinder(pcl::PointCloud<PointT>::Ptr cloud,
         ROS_WARN_NAMED(PRCPN_LGRNM,"No cylinder found in given cloud");
         return false;
     }
-    if(inliers->indices.size()<(cloud->points.size()/40)){ // if inliers are less than 10%
+    if(inliers->indices.size()<(cloud->points.size()/100)){ // if inliers are less than 1%
         ROS_WARN_NAMED(PRCPN_LGRNM,
                        "Cylinder found but (%d) number of inliers are not enough. (%d total number of points)",
                        inliers->indices.size(), cloud->points.size());
@@ -1264,13 +1396,32 @@ void CloudProcessing::_segmentize_axis(void)
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
     Cylinder cyl;
     PointT p1, p2;
-    int is_strong; // 1 is true. -1 is false
+    int is_strong;
     pcl::ModelCoefficients coeff;
+    char loop_nr = '0';
+    std::string fname;
     while(_find_line(_raw_axis_points, inliers, coeff, is_strong)){
+        loop_nr++;
+        //********************************
+        pcl::PointCloud<PointT>::Ptr raw_axis_inliers(new pcl::PointCloud<PointT>);
+        pcl::ExtractIndices<PointT> extract;
+        extract.setInputCloud(_raw_axis_points);
+        extract.setIndices(inliers);
+        extract.setNegative(false);
+        extract.filter(*raw_axis_inliers);
+
+        fname = "raw_axis_inliers_";
+        fname += loop_nr;
+        std::cout<<'\n'<<fname<<'\n';
+        displayCloud(raw_axis_inliers,fname);
+        //********************************
         pcl::PointCloud<PointT>::Ptr axis_points(new pcl::PointCloud<PointT>);
         _project_points_on_line(_raw_axis_points, inliers, coeff, axis_points);
         pcl::getMaxSegment(*axis_points, p1, p2);
-
+        fname = "cyl_axis_inliers_";
+        fname += loop_nr;
+        std::cout<<'\n'<<fname<<'\n';
+        displayCloud(axis_points, fname);
         // set cylinder variables
         // haven't defined poses yet
         if(is_strong>0){
@@ -1298,7 +1449,10 @@ void CloudProcessing::_segmentize_axis(void)
 
         // remove current inliers from _raw_axis_points;
         _remove_inliers(_raw_axis_points,inliers);
-
+        fname = "raw_axis_";
+        fname += loop_nr;
+        std::cout<<'\n'<<fname<<'\n';
+        displayCloud(_raw_axis_points,fname);
         // reuse of indices
         inliers->indices.clear();
 
@@ -1312,10 +1466,16 @@ void CloudProcessing::_segmentize_axis(void)
         for(unsigned int i=0; i<axis_points->points.size(); i++){
             _axis_points->points.push_back(axis_points->points[i]);
         }
-
+        fname = "axis_";
+        fname += loop_nr;
+        std::cout<<'\n'<<fname<<'\n';
+        displayCloud(_axis_points,fname);
         // remove those points from _raw_axis_points if already hasn't been removed as a line inliers
         _remove_inliers(_raw_axis_points,inliers);
-
+        fname = "raw_axis_2_";
+        fname += loop_nr;
+        std::cout<<'\n'<<fname<<'\n';
+        displayCloud(_raw_axis_points,fname);
         // and get ready for next run
         inliers->indices.clear();
     }
@@ -1374,18 +1534,6 @@ bool CloudProcessing::_find_line(pcl::PointCloud<PointT>::Ptr cloud_in, pcl::Poi
     return false;
 }
 
-// finds two end points, p1 and p2, after projecting on to axis
-/*void CloudProcessing::_get_end_points(pcl::PointCloud<PointT>::Ptr cloud_in,
-                                      pcl::PointIndices::Ptr inliers,
-                                      pcl::ModelCoefficients line_coeff,
-                                      PointT &p1, PointT &p2){
-    pcl::PointCloud<PointT>::Ptr projected_points(new pcl::PointCloud<PointT>);
-    _project_points_on_line(cloud_in, inliers, line_coeff, projected_points);
-    // get two endpoints of the line (from the set of projected points)
-    pcl::getMaxSegment(*projected_points,p1,p2);
-}*/
-
-
 // extracts inliers from _raw_axis_points
 // projects inliers on to line defined by line_coeff
 void CloudProcessing::_project_points_on_line(pcl::PointCloud<PointT>::Ptr cloud_in,
@@ -1414,42 +1562,6 @@ void CloudProcessing::_project_points_on_line(pcl::PointCloud<PointT>::Ptr cloud
     proj.setModelCoefficients (coeff);
     proj.filter(*points_out);
 }
-
-// saves projected points in _axis_points
-/*void CloudProcessing::_get_line_points(pcl::PointIndices::Ptr inliers, pcl::ModelCoefficients line_coeff, PointT &p1, PointT &p2)
-{
-    pcl::PointCloud<PointT>::Ptr out_points(new pcl::PointCloud<PointT>);
-    pcl::PointCloud<PointT>::Ptr in_points(new pcl::PointCloud<PointT>);
-    pcl::ExtractIndices<PointT> extract;
-
-    // extract inlier points (part of line definition) from _raw_axis_points
-    extract.setInputCloud(_raw_axis_points);
-    extract.setIndices(inliers);
-    extract.setNegative(false);
-    extract.filter(*in_points);
-
-    // make copy of coefficients into new pointer object to use that in setModelCoefficient function
-    pcl::ModelCoefficients::Ptr coeff(new pcl::ModelCoefficients);
-    coeff->header = line_coeff.header;
-    coeff->values.resize(line_coeff.values.size()); //size should be 6
-    for(int i=0; i<line_coeff.values.size(); i++)
-        coeff->values[i] = line_coeff.values[i];
-
-    // project line in_ points (part of line definition) on to axis defined in coeff
-    pcl::ProjectInliers<PointT> proj;
-    proj.setModelType (pcl::SACMODEL_LINE);
-    proj.setInputCloud (in_points);
-    proj.setModelCoefficients (coeff);
-    proj.filter(*out_points);
-
-    // get two endpoints of the line (from the set of projected points)
-    pcl::getMaxSegment(*out_points,p1,p2);
-
-    //save line inliers in to _axis_points cloud
-    for(size_t i=0; i<line_points->points.size(); i++)
-        _axis_points->points.push_back(line_points->points[i]);
-}*/
-
 
 void CloudProcessing::_remove_inliers(pcl::PointCloud<PointT>::Ptr points,  std::vector<int> &indices){
     pcl::PointIndices::Ptr pcl_indices(new pcl::PointIndices);
@@ -1503,175 +1615,153 @@ void CloudProcessing::setZerror(float error){
     _z_error = error;
 }
 
-void CloudProcessing::displayCloud(pcl::PointCloud<PointT>::Ptr cloud)
+void CloudProcessing::displayCloudWithNormals(pcl::PointCloud<PointT>::Ptr cloud, std::string fname, char r, char g, char b)
+{
+    /*boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    viewer->setBackgroundColor (0.27,0.27,0.27);
+    pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color(cloud, r, g, b);
+    viewer->addPointCloud<PointT> (cloud,single_color,"cloud");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "cloud");
+    viewer->addPointCloudNormals<PointT, PointT> (cloud, cloud, 10, 0.02, "normals");
+    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.8, 0.8, 0.8, "normals");
+    //viewer->setCameraPose/*(0.65,-0.2,0.7,0,0,0,0.85,0.0,0.5);
+    //(0.00304872,3.04872
+    // 0.553262,-0.212465,0.682817
+    // -0.129723,-0.498943,0.868818
+    // 0.164084,0.231407,0.95892
+    // 0.523599
+    //1615,1026
+    //65,24);
+    viewer->camera_.clip[0] = 0.00304872;
+    viewer->camera_.clip[1] = 3.04872;
+
+    viewer->camera_.focal[0] = 0.553262;
+    viewer->camera_.focal[1] = -0.212465;
+    viewer->camera_.focal[2] = 0.682817;
+
+    viewer->camera_.pos[0] = -0.129723;
+    viewer->camera_.pos[1] = -0.498943;
+    viewer->camera_.pos[2] = 0.868818;
+
+    viewer->camera_.view[0] = 0.164084;
+    viewer->camera_.view[1] = 0.231407;
+    viewer->camera_.view[2] = 0.95892;
+
+    viewer->camera_.fovy = 0.5236;
+
+    viewer->camera_.window_size[0] = 1615;
+    viewer->camera_.window_size[1] = 1026;
+
+    viewer->camera_.window_pos[0] = 65;
+    viewer->camera_.window_pos[1] = 24;
+    viewer->updateCamera();
+    viewer->addCoordinateSystem (1.0);
+    viewer->initCameraParameters ();
+    //viewer->setFullScreen(true);
+    //viewer->saveScreenshot(fname);
+    viewer->spin();*/
+}
+
+void CloudProcessing::displayCloud(pcl::PointCloud<PointT>::Ptr cloud,std::string fname, char r, char g, char b)
+{
+    /*boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    viewer->setBackgroundColor (0.27,0.27,0.27);
+    //viewer->setBackgroundColor (0,0,0);
+    //pcl::visualization::PointCloudColorHandlerRGBField<PointT> color(cloud);
+    pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color(cloud,r,g,b);
+    //viewer->addPointCloud<PointT> (cloud,color,"cloud");
+    viewer->addPointCloud<PointT> (cloud, single_color,"cloud");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "cloud");
+    //(0.00304872,3.04872
+    // 0.553262,-0.212465,0.682817
+    // -0.129723,-0.498943,0.868818
+    // 0.164084,0.231407,0.95892
+    // 0.523599
+    //1615,1026
+    //65,24);
+    viewer->camera_.clip[0] = 0.00304872;
+    viewer->camera_.clip[1] = 3.04872;
+
+    viewer->camera_.focal[0] = 0.553262;
+    viewer->camera_.focal[1] = -0.212465;
+    viewer->camera_.focal[2] = 0.682817;
+
+    viewer->camera_.pos[0] = -0.129723;
+    viewer->camera_.pos[1] = -0.498943;
+    viewer->camera_.pos[2] = 0.868818;
+
+    viewer->camera_.view[0] = 0.164084;
+    viewer->camera_.view[1] = 0.231407;
+    viewer->camera_.view[2] = 0.95892;
+
+    viewer->camera_.fovy = 0.523599;
+
+    viewer->camera_.window_size[0] = 1615;
+    viewer->camera_.window_size[1] = 1026;
+
+    viewer->camera_.window_pos[0] = 65;
+    viewer->camera_.window_pos[1] = 24;
+    viewer->updateCamera();
+    //viewer->setFullScreen(true);
+    viewer->addCoordinateSystem (1.0);
+    viewer->initCameraParameters ();
+
+    //viewer->setFullScreen(true);
+    //viewer->saveScreenshot(fname);
+    //viewer->spinOnce(0.1);
+    viewer->spin();*/
+}
+
+void CloudProcessing::displayCloud2(pcl::PointCloud<PointT>::Ptr cloud)
 {
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    viewer->setBackgroundColor (0, 0, 0);
-    viewer->addPointCloud<PointT> (cloud,"cloud");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "cloud");
+    viewer->setBackgroundColor (1,1,1);
+    //viewer->setBackgroundColor (0,0,0);
+    pcl::visualization::PointCloudColorHandlerRGBField<PointT> color(cloud);
+    viewer->addPointCloud<PointT> (cloud,color,"cloud");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "cloud");
+    //viewer->addPointCloudNormals<PointT, PointT> (cloud, cloud, 5, 0.02, "normals");
+    //viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.33, 0.33, 0.33, "normals");
+    //(0.00304872,3.04872
+    // 0.553262,-0.212465,0.682817
+    // -0.129723,-0.498943,0.868818
+    // 0.164084,0.231407,0.95892
+    // 0.523599
+    //1615,1026
+    //65,24);
+    viewer->camera_.clip[0] = 0.00304872;
+    viewer->camera_.clip[1] = 3.04872;
+
+    viewer->camera_.focal[0] = 0.553262;
+    viewer->camera_.focal[1] = -0.212465;
+    viewer->camera_.focal[2] = 0.682817;
+
+    viewer->camera_.pos[0] = -0.129723;
+    viewer->camera_.pos[1] = -0.498943;
+    viewer->camera_.pos[2] = 0.868818;
+
+    viewer->camera_.view[0] = 0.164084;
+    viewer->camera_.view[1] = 0.231407;
+    viewer->camera_.view[2] = 0.95892;
+
+    viewer->camera_.fovy = 0.523599;
+
+    viewer->camera_.window_size[0] = 1615;
+    viewer->camera_.window_size[1] = 1026;
+
+    viewer->camera_.window_pos[0] = 65;
+    viewer->camera_.window_pos[1] = 24;
+    viewer->updateCamera();
+    //viewer->setFullScreen(true);
     viewer->addCoordinateSystem (1.0);
     viewer->initCameraParameters ();
+
+    //viewer->setFullScreen(true);
+    //viewer->saveScreenshot(fname);
+    //viewer->spinOnce(0.1);
     viewer->spin();
 }
 
-void CloudProcessing::displayCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
-{
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    viewer->setBackgroundColor (0, 0, 0);
-    viewer->addPointCloud<pcl::PointXYZRGB> (cloud,"cloud");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "cloud");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
-}
-/*void CloudProcessing::displayAxisPoints(void)
-{
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    viewer->setBackgroundColor (0, 0, 0);
-    viewer->addPointCloud<PointT> (_axis_points,"axis");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "axis");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
-}
-
-void CloudProcessing::displayCylinders(void)
-{
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    viewer->setBackgroundColor (0, 0, 0);
-    pcl::ModelCoefficients coeffs;
-    //float sum;
-    coeffs.values.resize(7);
-    for (size_t i=0; i<_tube->cylinders.size(); i++)
-    {
-        coeffs.header = _tube->cylinders[i].coefficients.header;
-        coeffs.values[0] = _tube->cylinders[i].p1.x;
-        coeffs.values[1] = _tube->cylinders[i].p1.y;
-        coeffs.values[2] = _tube->cylinders[i].p1.z;
-        coeffs.values[3] = _tube->cylinders[i].p2.x-_tube->cylinders[i].p1.x;
-        coeffs.values[4] = _tube->cylinders[i].p2.y-_tube->cylinders[i].p1.y;
-        coeffs.values[5] = _tube->cylinders[i].p2.z-_tube->cylinders[i].p1.z;
-        coeffs.values[6] = _tube->cylinders[i].radius;
-        std::strstream ss;
-        ss<<"Cylinder_"<<i;
-        viewer->addCylinder(coeffs,ss.str());
-    }
-    viewer->addPointCloud<PointT> (_axis_points,"LinePoints");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "LinePoints");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
-}
-
-void CloudProcessing::displayCylinders(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer)
-{
-     //(new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    //viewer->setBackgroundColor (0, 0, 0);
-    pcl::ModelCoefficients coeffs;
-    //float sum;
-    coeffs.values.resize(7);
-    for (size_t i=0; i<_tube->cylinders.size(); i++)
-    {
-        coeffs.header = _tube->cylinders[i].coefficients.header;
-        coeffs.values[0] = _tube->cylinders[i].p1.x;
-        coeffs.values[1] = _tube->cylinders[i].p1.y;
-        coeffs.values[2] = _tube->cylinders[i].p1.z;
-        coeffs.values[3] = _tube->cylinders[i].p2.x-_tube->cylinders[i].p1.x;
-        coeffs.values[4] = _tube->cylinders[i].p2.y-_tube->cylinders[i].p1.y;
-        coeffs.values[5] = _tube->cylinders[i].p2.z-_tube->cylinders[i].p1.z;
-        coeffs.values[6] = _tube->cylinders[i].radius;
-        std::strstream ss;
-        ss<<"Cylinder_"<<i;
-        viewer->addCylinder(coeffs,ss.str());
-    }
-    viewer->addPointCloud<PointT> (_axis_points,"LinePoints");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "LinePoints");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
-}
-
-void CloudProcessing::displayCylindersInLocalFrame(void)
-{
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    viewer->setBackgroundColor (0, 0, 0);
-    pcl::ModelCoefficients coeffs;
-    geometry_msgs::Pose pose;
-    tf::Transform tf;
-    tf::Matrix3x3 mat;
-    tf::Vector3 colm1,colm2,colm3, vec;
-    tf::Quaternion q;
-
-    coeffs.values.resize(7);
-    for (size_t i=0; i<_tube->cylinders.size(); i++)
-    {
-        coeffs.header = _tube->cylinders[i].coefficients.header;
-        pose = _tube->cylinders[i].getPose();
-        vec = _tube->cylinders[i].getAxisVector();
-
-        coeffs.values[0] = pose.position.x;
-        coeffs.values[1] = pose.position.y;
-        coeffs.values[2] = pose.position.z;
-        coeffs.values[3] = _tube->cylinders[i].p2.x-_tube->cylinders[i].p1.x;
-        coeffs.values[4] = _tube->cylinders[i].p2.y-_tube->cylinders[i].p1.y;
-        coeffs.values[5] = _tube->cylinders[i].p2.z-_tube->cylinders[i].p1.z;
-        coeffs.values[6] = _tube->cylinders[i].radius;
-        std::strstream ss;
-        ss<<"Cylinder_"<<i;
-        viewer->addCylinder(coeffs,ss.str());
-    }
-    viewer->addPointCloud<PointT> (_axis_points,"LinePoints");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "LinePoints");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
-}
-
-void CloudProcessing::displayLines(void)
-{
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    viewer->setBackgroundColor (0, 0, 0);
-    pcl::ModelCoefficients coeffs;
-    coeffs.header = _tube->cylinders[0].coefficients.header;
-    coeffs.values.resize(6);
-    for (size_t i=0; i<_tube->cylinders.size(); i++)
-    {
-        std::strstream ss;
-        ss<<"Line_"<<i;
-        viewer->addLine(_tube->cylinders[i].p1,_tube->cylinders[i].p2,ss.str());
-    }
-    //viewer->addPointCloud<PointT> (_axis_points,"LinePoints");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "LinePoints");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
-}
-
-void CloudProcessing::dispalyWorkTraj(void)
-{
-    pcl::PointCloud<PointT>::Ptr cloud;//(new pcl::PointCloud<PointT>);
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> 
-            viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-    for(int i=0; i<_tube->workPointsCluster.size(); i++)
-    {
-        cloud = _tube->workPointsCluster[i];
-
-        std::strstream ss;
-        ss.flush();
-        ss<<"C"<<i;
-        viewer->addPointCloud<PointT>(cloud,ss.str());
-    }
-    
-    
-    viewer->setBackgroundColor (0, 0, 0);
-    //viewer->addPointCloudNormals<PointT,pcl::PointNormal> (cloud,pcl_normals);
-    viewer->addPointCloud<PointT> (_tube_cloud,"tube_cloud");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "tube_cloud");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "C0");
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters ();
-    viewer->spin();
-}*/
 /******************************************************************************/
 
 }//TubePerception

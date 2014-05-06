@@ -143,8 +143,10 @@ namespace TubePerception
         CloudProcessing();
         //~CloudProcessing();
 
-        void displayCloud(pcl::PointCloud<PointT>::Ptr cloud);
-        void displayCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
+        void displayCloud(pcl::PointCloud<PointT>::Ptr cloud, std::string fname, char r=249, char g=249, char b=220);
+        void displayCloudWithNormals(pcl::PointCloud<PointT>::Ptr cloud, std::string fname, char r=249, char g=249, char b=220);
+        void displayCloud2(pcl::PointCloud<PointT>::Ptr cloud);
+        //void displayCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
         /*void displayAxisPoints(void);
         void displayCylinders(void);
         void displayCylinders(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer);
@@ -152,6 +154,8 @@ namespace TubePerception
         void displayCylindersInLocalFrame(void);*/
         void setZerror(float error);
         bool writePointCloudOnfile(const sensor_msgs::PointCloud2 &rosCloud,
+                                   std::string fileName);
+        bool writePointCloudOnfile(const pcl::PointCloud<PointT>::Ptr pclCloud,
                                    std::string fileName);
         bool readPointCloud(std::string fileName,
                             pcl::PointCloud<PointT>::Ptr cloudOut);
@@ -172,6 +176,7 @@ namespace TubePerception
                              TubePerception::Tube::Ptr tube_ptr);
 
     private:
+        void _get_points_of_interest(pcl::PointCloud<PointT>::Ptr cloudIn, pcl::PointCloud<PointT>::Ptr cloudOut);
         bool _convert_cloud_to(std::string target_frame,
                                const sensor_msgs::PointCloud2 &cloud_in,
                                sensor_msgs::PointCloud2 &cloud_out);
@@ -203,7 +208,8 @@ namespace TubePerception
                                const PointT & testpt );*/
         tf::Vector3 _get_perp_vec3(tf::Vector3 v3);
         void _define_pose(void);
-        void _generate_work_vectors();
+        void _generate_work_vectors(unsigned int cyl_idx, tf::Vector3 at_point);
+        void _generate_work_vectors(pcl::PointCloud<PointT>::Ptr interest_points);
         void _convert_to_pcl(const sensor_msgs::PointCloud2 &rosTubeCloud,
                              pcl::PointCloud<PointT>::Ptr pcl_cloud);
         void _project_points_on_line(pcl::PointCloud<PointT>::Ptr cloud_in,
