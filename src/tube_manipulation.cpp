@@ -301,7 +301,7 @@ bool TubeManipulation::Arms::_gen_trajectory(std::vector<double> &right_joint_tr
     geometry_msgs::Pose right_pose, left_pose;
     tf::Transform tf_right_wrist, tf_left_wrist, tf_obj;
     if(_obj_pose_traj.poses.empty()){
-        ROS_ERROR_NAMED(ARMS_LGRNM,"Object trajectory is empty");
+        ROS_ERROR_THROTTLE_NAMED(5,ARMS_LGRNM,"Object trajectory is empty!");
         return false;
     }
     //temporarly set pointer to given object

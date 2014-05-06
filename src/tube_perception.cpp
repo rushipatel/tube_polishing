@@ -1104,7 +1104,7 @@ void CloudProcessing::_generate_work_vectors(pcl::PointCloud<PointT>::Ptr intere
     int cyl_idx = _tube->whichCylinder(test_point_pcl);
     tf::Vector3 p1, p2;
     pcl::PointCloud<PointT>::Ptr points_out(new pcl::PointCloud<PointT>);
-    if(cyl_idx>=_tube->cylinders.size()){
+    if(cyl_idx<_tube->cylinders.size()){
         p1 = _tube->cylinders[cyl_idx].getGlobalP1(tube_tf);
         p2 = _tube->cylinders[cyl_idx].getGlobalP2(tube_tf);
         coeff->values[0] = p1.getX();
@@ -1137,8 +1137,14 @@ void CloudProcessing::_generate_work_vectors(pcl::PointCloud<PointT>::Ptr intere
     avg_point.y /= points_out->points.size();
     avg_point.z /= points_out->points.size();
 
+    tf::Transform avg_point_tf;
+    avg_point_tf.setIdentity();
+    avg_point_tf.setOrigin(tf::Vector3(avg_point.x, avg_point.y, avg_point.z));
+    avg_point_tf = tube_tf.inverseTimes(avg_point_tf);
+
+
     tf::Vector3 at_point;
-    at_point.setValue(avg_point.x, avg_point.y, avg_point.z);
+    at_point = avg_point_tf.getOrigin();
     _generate_work_vectors(cyl_idx, at_point);
 }
 

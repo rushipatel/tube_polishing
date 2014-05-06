@@ -271,13 +271,13 @@ TubeGrasp::Grasp GraspAnalysis::getPickPose(std::vector<tf::Vector3> &pointsToAv
                    grasp_sorted->grasps[i].wristPose.position.y,
                    grasp_sorted->grasps[i].wristPose.position.z );*/
         dist[i] = test_point.distance(ref); //store distance from reference point
-        std::cout<<"\n"<<i<<"\t"<<dist[i];
+        //std::cout<<"\n"<<i<<"\t"<<dist[i];
         if(dist[i] < min){ //remember index of the grasp closest to reference point
             grasp_idx = i;
             min = dist[i];
         }
     }
-    std::cout<<"\n["<<grasp_idx<<"]\n";
+    //std::cout<<"\n["<<grasp_idx<<"]\n";
     return grasp_sorted->grasps.at(grasp_idx);
 }
 
