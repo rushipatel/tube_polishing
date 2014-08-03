@@ -3,6 +3,7 @@
 
 #define LGRNM "stMc"
 
+/*! \brief Constructor. Initiallizes variables with default values.*/
 stateMachine::stateMachine(ros::NodeHandlePtr nh){
     _nh = nh;
     _att2right = false;
@@ -82,6 +83,7 @@ stateMachine::stateMachine(ros::NodeHandlePtr nh){
 
     _work_pose2 = _work_pose1;
 }
+
 
 void stateMachine::start()
 {

@@ -2,7 +2,7 @@
 
 #define RBHD_LGRNM "rbHd"
 
-//! Action client initialization
+/*! \brief Creates action client for point_head_action.*/
 robotHead::robotHead()
 {
     //Initialize the client for the Action interface to the head controller
@@ -12,7 +12,7 @@ robotHead::robotHead()
         ROS_INFO_NAMED(RBHD_LGRNM,"Waiting for the point_head_action server to come up");
 }
 
-//! Points the high-def camera frame at a point in a given frame
+/*! \brief Points the high-def camera frame at a point in the base_link frame.*/
 bool robotHead::lookAt(double x, double y, double z)
 {
     //the goal message we will be sending

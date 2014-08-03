@@ -6,7 +6,6 @@
 namespace TubePerception
 {
 
-/********************************Cylinder CLASS********************************/
 //! \brief Returns local pose of cylinder
 geometry_msgs::Pose Cylinder::getPose(void){
     return _local_pose;
@@ -104,31 +103,30 @@ bool Cylinder::isInlier(tf::Vector3 &testPoint, tf::Transform &tubeTf){
     double r = radius + 0.001;
     return (isInCylinder(p1_new, p2_new, vec.length2(), r*r, testPoint));
 }
-/******************************************************************************/
 
-/**********************************Tube CLASS**********************************/
-//! \brief Constructor.
+//! \brief Tube Object Constructor.
 Tube::Tube(){
 
 }
 
-//! \brief sets the pose of tube
+//! \brief Sets the pose of tube
 void Tube::setPose(geometry_msgs::Pose &pose){
     _pose = pose;
 }
 
-//! \brief returns set pose of tube
+//! \brief Returns set pose of tube
 geometry_msgs::Pose Tube::getPose(void){
     return _pose;
 }
 
-//! \brief returns set pose of tube in tf::Transform object
+//! \brief Returns set pose of tube in tf::Transform object
 tf::Transform Tube::getTransform(void){
     tf::Transform tf = pose2tf(_pose);
     return tf;
 }
 
-//! \brief
+//! \brief Returns the global pose of cylinder given the index of cylinders of tube.
+//! std lib throws a runtime error if cylIdx is out of range
 geometry_msgs::Pose Tube::getCylinderGlobalPose(unsigned int cylIdx){
     if(cylinders.empty())
         ROS_ERROR_NAMED(PRCPN_LGRNM,"No cylinder present. Illegal query for pose");
@@ -155,7 +153,9 @@ void Tube::resetPoseToActual(){
 }*/
 
 
-//tests only local points
+/*! \brief Given a point in local (tube) frame, tests whether it lies inside cylinder
+ *  inflates cylider by adding 0.002 in radius.
+ */
 unsigned int Tube::whichCylinder(PointT localPoint)
 {
     //ROS_INFO_STREAM_NAMED(PRCPN_LGRNM,"Test point : \n"<<localPoint);
@@ -178,6 +178,7 @@ unsigned int Tube::whichCylinder(PointT localPoint)
     return cylinders.size();
 }
 
+//! \brief 
 void Tube::getAttachedObjForRightGrasp(geometry_msgs::Pose right_grasp_pose,
                                   arm_navigation_msgs::AttachedCollisionObject::Ptr objPtr){
     _get_attached_collision_object(objPtr, right_grasp_pose, "r_wrist_roll_link", true, false);

@@ -2,18 +2,19 @@
 
 #define CL_LGRNM "clObj"
 
+/*! \brief constructor. Planing scene is set when object is created */
 collisionObjects::collisionObjects(ros::NodeHandlePtr nh)
 {
     _nh = nh;
-    _set_pln_scn_client = _nh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>(SET_PLANNING_SCENE_DIFF_NAME);
+    _set_pln_scn_client = _nh->serviceClient<arm_navigation_msgs::SetPlanningSceneDiff>
+            (SET_PLANNING_SCENE_DIFF_NAME);
     setPlanningScene();
 }
 
-collisionObjects::~collisionObjects()
-{
-    ;
+collisionObjects::~collisionObjects(){
 }
 
+/*! \brief Copies all collision objects in this object to another object*/
 void collisionObjects::copyAllObjectsTo(collisionObjects::Ptr anotherObj){
     for(unsigned int i=0; i<_att_obj.size(); i++){
         anotherObj->addAttachedCollisionObject(_att_obj[i]);
@@ -26,20 +27,25 @@ void collisionObjects::copyAllObjectsTo(collisionObjects::Ptr anotherObj){
     }
 }
 
+/*! \brief Adds attached collision object in to the list and copies object \var attObj in to vector.*/
 void collisionObjects::addAttachedCollisionObject(const arm_navigation_msgs::AttachedCollisionObject &attObj)
 {
     int idx = _find_attached_object(attObj.object.id.c_str());
     if(idx > -1 && idx<_att_obj.size()){
-        ROS_DEBUG_NAMED(CL_LGRNM,"Requested to add %s as attached object but it already exists. Updating object", attObj.object.id.c_str());
+        ROS_DEBUG_NAMED(CL_LGRNM,
+                        "Requested to add %s as attached object but it already exists. Updating object",
+                        attObj.object.id.c_str());
         _att_obj[idx] = attObj;
         return;
     }
     else if(!attObj.object.id.empty()){
-        ROS_INFO_NAMED(CL_LGRNM,"Adding %s attached object", attObj.object.id.c_str());
+        ROS_INFO_NAMED(CL_LGRNM,
+                       "Adding %s attached object", attObj.object.id.c_str());
         _att_obj.push_back(attObj);
     }
 }
 
+/*! \brief Adds static collision object in to the list and copies object \var obj in to vector.*/
 void collisionObjects::addCollisionObject(const arm_navigation_msgs::CollisionObject &obj)
 {
     int idx = _find_collision_object(obj.id.c_str());
@@ -54,14 +60,17 @@ void collisionObjects::addCollisionObject(const arm_navigation_msgs::CollisionOb
     }
 }
 
+/*! \brief Removes attached collision object from the list and deallocates related memory.*/
 void collisionObjects::removeAttachedCollisionObject(std::string id){
     int idx = _find_attached_object(id);
     if(idx>-1 && idx<_att_obj.size()){
-        ROS_INFO_NAMED(CL_LGRNM, "Removing %s from the attached collision object list", _att_obj[idx].object.id.c_str());
+        ROS_INFO_NAMED(CL_LGRNM, "Removing %s from the attached collision object list",
+                       _att_obj[idx].object.id.c_str());
         _att_obj.erase(_att_obj.begin()+idx);
     }
 }
 
+/*! \brief Removes static collision object from the list and deallocates related memory.*/
 void collisionObjects::removeCollisionObject(std::string id){
     int idx = _find_collision_object(id);
     if(idx>-1 && idx<_coll_obj.size()){
@@ -70,6 +79,7 @@ void collisionObjects::removeCollisionObject(std::string id){
     }
 }
 
+/*! \brief Sets allowed contact region in collision space given the length on cube in one direction and position as pose. */
 void collisionObjects::setAllowedContactCube(geometry_msgs::Pose pose, double dim, std::vector<std::string> &link_names){
     _allowed_contact.name = "AllowedContact";
     _allowed_contact.link_names.clear();
@@ -86,10 +96,12 @@ void collisionObjects::setAllowedContactCube(geometry_msgs::Pose pose, double di
     _allowed_contact.shape.type = _allowed_contact.shape.BOX;
 }
 
+/*! \brief Clears allowed contact object from the vector.*/
 void collisionObjects::clearAllowedContact(){
     _allowed_contact.shape.dimensions.clear();
 }
 
+/*! \brief Sets planning scene based on the stored list of objects and allowed contact region and returns the scene.*/
 arm_navigation_msgs::SetPlanningSceneDiff::Response collisionObjects::setPlanningScene(){
     arm_navigation_msgs::SetPlanningSceneDiff::Request req;
     arm_navigation_msgs::SetPlanningSceneDiff::Response res;
@@ -119,11 +131,13 @@ arm_navigation_msgs::SetPlanningSceneDiff::Response collisionObjects::setPlannin
     return res;
 }
 
+
 void collisionObjects::clearAllObjects(void){
     _att_obj.clear();
     _coll_obj.clear();
 }
 
+/*! \brief Debugging helper.*/
 void collisionObjects::printListOfObjects(){
     std::cout<<"\n*********************************";
     std::cout<<'\n'<<"Attached Collision Objects:"<<_att_obj.size();
@@ -137,6 +151,7 @@ void collisionObjects::printListOfObjects(){
     std::cout<<"\n*********************************\n";
 }
 
+/*! \brief Compares srting (id) and returns attached collision object's index from the vector.*/
 int collisionObjects::_find_attached_object(std::string id){
     for(unsigned int i=0; i<_att_obj.size(); i++){
         if(_att_obj[i].object.id.compare(id.c_str())==0){
@@ -146,6 +161,7 @@ int collisionObjects::_find_attached_object(std::string id){
     return -1;
 }
 
+/*! \brief Compares srting (id) and returns static collision object's index from the vector.*/
 int collisionObjects::_find_collision_object(std::string id){
     for(unsigned int i=0; i<_coll_obj.size(); i++){
         if(_coll_obj[i].id.compare(id.c_str())==0){
