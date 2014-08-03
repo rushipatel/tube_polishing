@@ -5,10 +5,12 @@
 namespace TubeGrasp
 {
 
+// returns set wrist offset
 double Grasp::getWristOffset(void){
     return _wrist_offset;
 }
 
+// Computes pose of wrist frame in global frame given object pose
 geometry_msgs::Pose Grasp::getWristGlobalPose(const geometry_msgs::Pose &objectPose)
 {
     tf::Transform obj = pose2tf(objectPose), grasp = getWristTransform();
@@ -16,6 +18,7 @@ geometry_msgs::Pose Grasp::getWristGlobalPose(const geometry_msgs::Pose &objectP
     return tf2pose(grasp);
 }
 
+// Overloaded. takes tf type argument.
 tf::Transform Grasp::getWristGlobalPose(const tf::Transform &objectTf)
 {
     tf::Transform grasp = getWristTransform();
@@ -23,25 +26,30 @@ tf::Transform Grasp::getWristGlobalPose(const tf::Transform &objectTf)
     return grasp;
 }
 
-// Do not use if not necessory
+// Do not use untill absolutly necessory. raw pose.
 geometry_msgs::Pose Grasp::getPose(void){
     return _pose;
 }
 
+// Same as last function. Returns pose in tf. raw pose.
 tf::Transform Grasp::getTransform(void){
     return pose2tf(_pose);
 }
 
+// Returns wrist pose in local (tube) frame. Uses set offset (_wrist_offset) to compute wrist pose.
 geometry_msgs::Pose Grasp::getWristPose(){
     ROS_WARN_COND_NAMED(_wrist_offset==0.0, GRSP_LGRNM, "Wrist Offset is set to zero. Did you forget to update it using setWristOffset()?");
     return tf2pose(_get_wrist_pose(_wrist_offset));
 }
 
+// Returns wrist pose in local (tube) frame. Uses set offset (_wrist_offset) to compute wrist pose.
 tf::Transform Grasp::getWristTransform(){
     ROS_WARN_COND_NAMED(_wrist_offset==0.0, GRSP_LGRNM, "Wrist Offset is set to zero. Did you forget to update it using setWristOffset()?");
     return _get_wrist_pose(_wrist_offset);
 }
 
+// _pose is coinsident with cylinder axis. Computes wrist pose using given 
+// offset in X axis. offset is distance from axis to wrist frame in perpendicular direction.
 tf::Transform Grasp::_get_wrist_pose(double offset){
     tf::Transform xform;
     xform.setIdentity();
@@ -49,26 +57,32 @@ tf::Transform Grasp::_get_wrist_pose(double offset){
     return (pose2tf(_pose)*xform);
 }
 
+// Interface function.
 tf::Transform Grasp::getWristTransform(double offset){
     return _get_wrist_pose(offset);
 }
 
+// Interface fucntion
 geometry_msgs::Pose Grasp::getWristPose(double offset){
     return tf2pose(_get_wrist_pose(offset));
 }
 
+// Sets offset from cylinder axis to wrist frame origin.
 void Grasp::setWristOffset(const double offset){
     _wrist_offset = offset;
 }
 
+// Sets pose of grasp.
 void Grasp::setPose(const geometry_msgs::Pose &pose){
     _pose = pose;
 }
 
+// overloaded.
 void Grasp::setPose(const tf::Transform &tf){
     _pose = tf2pose(tf);
 }
 
+// Constructor. Sets default values and collisionObject pointer.
 GraspAnalysis::GraspAnalysis(ros::NodeHandlePtr nh, collisionObjects::Ptr collisionObjs)
 {
     _nh = nh;
@@ -87,15 +101,18 @@ GraspAnalysis::GraspAnalysis(ros::NodeHandlePtr nh, collisionObjects::Ptr collis
     MAX_ITERATION = 800;
 }
 
+// Sets pointer of Tube object. All analysis are done using tube model pointed by this pointer
 void GraspAnalysis::setTubePtr(TubePerception::Tube::Ptr tube){
     _tube = tube;
 }
 
+// Work pose in global frame. Work pose is in 3D space where tube comes in to contact with machine.
 void GraspAnalysis::setWorkPose(geometry_msgs::Pose &p)
 {
     _work_pose = p;
 }
 
+// returns false if work pose is not set yet.
 int GraspAnalysis::getWorkPose(geometry_msgs::Pose &p)
 {
     if( !(_work_pose.orientation.x == 0 &&
@@ -112,16 +129,19 @@ int GraspAnalysis::getWorkPose(geometry_msgs::Pose &p)
     return 0;
 }
 
+// 
 void GraspAnalysis::getTubeWorkTrajectory(geometry_msgs::PoseArray &tube_traj)
 {
     tube_traj = _tube_traj;
 }
 
+// generaly work trajectory contains multiple trajectories of tube motion. index specifies for which trajectory grasp analysis is done.
 void GraspAnalysis::setWorkTrajIdx(int trajIdx)
 {
     _traj_idx = trajIdx;
 }
 
+// Initiates analysis
 void GraspAnalysis::compute()
 {
     _grasp_pair_found = false;
@@ -133,6 +153,7 @@ void GraspAnalysis::compute()
     _compute_metric();
 }
 
+// Returns false if no computation is performed or no valid pair is found after computation.
 bool GraspAnalysis::getComputedGraspPair(GraspPair &graspPair)
 {
     if(_grasp_pair_found){
@@ -282,8 +303,11 @@ TubeGrasp::Grasp GraspAnalysis::getPickPose(std::vector<tf::Vector3> &pointsToAv
 }
 
 
-//grasps are in tube frame
-void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, GraspArray::Ptr grasp_array, double offset)
+//grasps are in tube frame. Generates grasps around tube. Total number of grasps 
+// generated can be controlled by first two parameters. Offset is the distance 
+// from axis to the origin of wrist frame.
+void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, 
+                                GraspArray::Ptr grasp_array, double offset)
 {
     TubeGrasp::Grasp grasp;
 
@@ -319,15 +343,6 @@ void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, Grasp
                 step_tf.setRotation(quaternion);
                 tf_grasp_cyl = step_tf/**wrist_axis_tf*/;
                 tf_grasp_tube = _tube->cylinders[i].getTransform() * tf_grasp_cyl;
-//                tf::Vector3 orig = tf_grasp_tube.getOrigin();
-//                tf::Quaternion q = tf_grasp_tube.getRotation();
-//                grasp.wristPose.position.x = orig.x();
-//                grasp.wristPose.position.y = orig.y();
-//                grasp.wristPose.position.z = orig.z();
-//                grasp.wristPose.orientation.x = q.x();
-//                grasp.wristPose.orientation.y = q.y();
-//                grasp.wristPose.orientation.z = q.z();
-//                grasp.wristPose.orientation.w = q.w();
                 grasp.setPose(tf_grasp_tube);
                 grasp.setWristOffset(offset);
                 grasp.group = group_n;
@@ -340,6 +355,7 @@ void GraspAnalysis::_gen_grasps(double axis_step_size, int circular_steps, Grasp
     ROS_INFO_NAMED(GRSP_LGRNM,"%d grasps generated",grasp_array->grasps.size());
 }
 
+// under construction...
 void GraspAnalysis::_normalize_worktrajectory()
 {
 
@@ -370,6 +386,7 @@ void GraspAnalysis::_normalize_worktrajectory()
     }*/
 }
 
+// transforms trajectory points in to local frame.
 void GraspAnalysis::_xform_in_tubeframe()
 {
     geometry_msgs::Pose p;
@@ -384,6 +401,12 @@ void GraspAnalysis::_xform_in_tubeframe()
     }
 }
 
+// given ordered points on the surface of tube, generates 6D frame. 
+// Origin is the same as point. X-axis is the normal from point cloud data.
+// Using normal, it accomodates surface irregularities or non cylindrical 
+// (in exact sense) surface. Y is closest to cylinder axis and Z is farthest 
+// from axis. With the ideal tube model and noise free, accurate point cloud 
+// data, Y is the same as cylinder axis and Z is exactly perpendicular to axis.
 bool GraspAnalysis::_gen_work_trajectory()
 {
     pcl::PointCloud<PointT>::Ptr cloud;
@@ -493,14 +516,16 @@ bool GraspAnalysis::_gen_work_trajectory()
     return true;
 }
 
+// Given work trajectory and work pose, converts them in to tube trajectory.
+// Assuming all work points are passing through work pose origin, what would be 
+// the trajectory of tube it self.
 void GraspAnalysis::_work2tube_trajectory()
 {
     tf::Transform W, t, p;
     geometry_msgs::Pose pose;
     if(getWorkPose(pose))
         W = pose2tf(pose);
-    else
-    {
+    else{
         ROS_ERROR_NAMED(GRSP_LGRNM,"WorkPose is not set yet.");
         return;
     }
@@ -524,8 +549,7 @@ void GraspAnalysis::_work2tube_trajectory()
     t = W*p;
     _tube_traj.poses[_tube_traj.poses.size()-1] = tf2pose(t);
 
-    for(size_t i=0; i<_work_traj.poses.size(); i++)
-    {
+    for(size_t i=0; i<_work_traj.poses.size(); i++){
         p = pose2tf(_work_traj.poses[i]);
         p = p.inverse();
         t = W*p;
@@ -533,16 +557,14 @@ void GraspAnalysis::_work2tube_trajectory()
     }
 }
 
+// Simply, makes non-repetative pairs of sample grasps.
 void GraspAnalysis::_gen_test_pairs()
 {
     TubeGrasp::GraspPair gp;
-    for(size_t i=0; i<_grasp_array->grasps.size(); i++)
-    {
-        for(size_t j=0; j<_grasp_array->grasps.size(); j++)
-        {
+    for(size_t i=0; i<_grasp_array->grasps.size(); i++){
+        for(size_t j=0; j<_grasp_array->grasps.size(); j++){
             if(i!=j &&
-               _grasp_array->grasps[i].group!=_grasp_array->grasps[j].group)
-            {
+               _grasp_array->grasps[i].group!=_grasp_array->grasps[j].group){
                 gp.rightGrasp = _grasp_array->grasps[i];
                 gp.leftGrasp = _grasp_array->grasps[j];
                 _test_pairs->graspPairs.push_back(gp);
@@ -552,6 +574,7 @@ void GraspAnalysis::_gen_test_pairs()
     ROS_INFO_STREAM_NAMED(GRSP_LGRNM,"Total Grasp Pairs : "<<_test_pairs->graspPairs.size());
 }
 
+// 
 void GraspAnalysis::_test_pairs_for_ik()
 {
     unsigned int idx;

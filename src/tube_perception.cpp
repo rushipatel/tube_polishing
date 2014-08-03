@@ -473,11 +473,8 @@ void Tube::getWorkPointsMarker(visualization_msgs::MarkerArray &markerArray){
 void Tube::reset(){
     cylinders.clear();
     workPointsCluster.clear();
-}
-/******************************************************************************/
+} // Class Tube
 
-
-/***************************CloudProcessing CLASS******************************/
 
 CloudProcessing::CloudProcessing()
 {
@@ -697,7 +694,7 @@ bool CloudProcessing::resetPoseOfTube(const sensor_msgs::PointCloud2 &cluster, T
     return true;
 }
 
-// could be extended to pose inverient feature comparision
+// Under construction... to be extended to pose inverient feature comparision.
 void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
                                       TubePerception::Tube::Ptr second,
                                       std::vector<unsigned int> & corresponding_indices,
@@ -744,7 +741,7 @@ void CloudProcessing::_compare_models(TubePerception::Tube::Ptr first,
     }
 }
 
-/*! \brief Given tube model and scene point cloud, extracts points posibally part of know tube.
+/*! \brief Given tube model and scene point cloud, extracts points posibally part of known tube.
   * tests all points in @param cloudIn, if they are part of any cylinder of given tube.
   */
 
@@ -1768,8 +1765,6 @@ void CloudProcessing::displayCloud2(pcl::PointCloud<PointT>::Ptr cloud)
     //viewer->spinOnce(0.1);
     viewer->spin();
 }
-
-/******************************************************************************/
 
 }//TubePerception
 

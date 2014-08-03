@@ -134,6 +134,7 @@ TubeManipulation::Arms::~Arms(){
     delete _traj_client_l;
 }
 
+// gets joint bounds from robot_description topic.
 void TubeManipulation::Arms::_get_bounds_from_description()
 {
     planning_environment::CollisionModels collision_model("robot_description");
@@ -154,6 +155,7 @@ void TubeManipulation::Arms::_get_bounds_from_description()
     }
 }
 
+// Current right joints values from controller topic
 void TubeManipulation::Arms::getRightJoints(std::vector<double> &joints){
     _get_right_joints(joints);
 }
@@ -174,6 +176,7 @@ void TubeManipulation::Arms::_get_right_joints(std::vector<double> &joint_state)
       joint_state[i] = state_msg->actual.positions[i];
 }
 
+// Current left joint values from controller topic
 void TubeManipulation::Arms::getLeftJoints(std::vector<double> &joints){
     _get_left_joints(joints);
 }
@@ -194,16 +197,19 @@ void TubeManipulation::Arms::_get_left_joints(std::vector<double> &joint_state)
       joint_state[i] = state_msg->actual.positions[i];
 }
 
+// fk service interface
 geometry_msgs::Pose TubeManipulation::Arms::getRightArmFK(){
     std::vector<double> joints;
     _get_right_joints(joints);
     return _get_right_fk(joints);
 }
 
+// fk service interface
 geometry_msgs::Pose TubeManipulation::Arms::getRightArmFK(std::vector<double> &right_joints){
     return _get_right_fk(right_joints);
 }
 
+// fk service interface implementation.
 geometry_msgs::Pose TubeManipulation::Arms::_get_right_fk(std::vector<double> &joints)
 {
     kinematics_msgs::GetPositionFK::Request req;
@@ -230,16 +236,19 @@ geometry_msgs::Pose TubeManipulation::Arms::_get_right_fk(std::vector<double> &j
     return pose_stamped.pose;
 }
 
+// fk service interface
 geometry_msgs::Pose TubeManipulation::Arms::getLeftArmFK(){
     std::vector<double> joints;
     _get_left_joints(joints);
     return _get_left_fk(joints);
 }
 
+// fk service interface
 geometry_msgs::Pose TubeManipulation::Arms::getLeftArmFK(std::vector<double> &left_joints){
     return _get_left_fk(left_joints);
 }
 
+// fk interface service call.  implementaion
 geometry_msgs::Pose TubeManipulation::Arms::_get_left_fk(std::vector<double> &joints)
 {
     kinematics_msgs::GetPositionFK::Request req;
@@ -281,7 +290,7 @@ bool TubeManipulation::Arms::genTrajectory(geometry_msgs::PoseArray &objPoseArra
 }
 
 
-//Assumes that wrist offsets and obj pose trajectory is set
+//Assumes wrist offsets and obj pose trajectory is set
 bool TubeManipulation::Arms::_gen_trajectory(std::vector<double> &right_joint_traj,
                                              std::vector<double> &left_joint_traj)
 {
@@ -619,6 +628,7 @@ bool TubeManipulation::Arms::executeJointTrajectoryWithSync(std::vector<double> 
 }
 
 // pass empty joint trajectory if that arm is not being used
+// executes joint trajectory using trajectory action server.
 void TubeManipulation::Arms::_execute_joint_trajectory(trajectory_msgs::JointTrajectory &right_traj, trajectory_msgs::JointTrajectory &left_traj)
 {
     ROS_INFO_NAMED(ARMS_LGRNM,"Executing trajectory");
